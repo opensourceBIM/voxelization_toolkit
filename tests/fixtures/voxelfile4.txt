@@ -1,0 +1,6 @@
+file = parse("schependom_foundation.ifc")
+surfaces = create_geometry(file, exclude={"IfcOpeningElement", "IfcSpace"})
+voxels_lowres = voxelize(surfaces, VOXELSIZE=0.1)
+voxels_highres = voxelize(surfaces, VOXELSIZE=0.025)
+voxels_highres_resampled = resample(voxels_highres, -4)
+difference = subtract(voxels_highres_resampled, voxels_lowres)
