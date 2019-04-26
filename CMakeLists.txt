@@ -1,83 +1,68 @@
 cmake_minimum_required (VERSION 2.8.11)
 project (ifc_voxelizer)
 
+OPTION(IFC_SUPPORT "Build Volization Toolkit with IFC support (requires IfcOpenShell/master)." ON)
+
 include(CTest)
 
 set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 
 set(OCC_LIBRARY_NAMES TKernel TKMath TKBRep TKGeomBase TKGeomAlgo TKG3d TKG2d TKShHealing TKTopAlgo TKMesh TKOffset
                       TKPrim TKBool TKBO TKFillet TKSTEP TKSTEPBase TKSTEPAttr TKXSBase TKSTEP209 TKIGES TKHLR TKFeat)
+                      
+if(IFC_SUPPORT)
+add_definitions(-DWITH_IFC)
+endif()
+
 
 if(UNIX)
-    set(ICU_LIBRARY_NAMES icuuc icudata)
-    
-    set(IFCOPENSHELL_INSTALL ${IFCOPENSHELL_ROOT}/build/Linux/x86_64/install)
-    
-    set(BOOST_ROOT       ${IFCOPENSHELL_INSTALL}/boost-1.59.0)
-    
-    set(ICU_LIBRARY_DIR  ${IFCOPENSHELL_INSTALL}/icu-56.1/lib)
-    set(ICU_INCLUDE_DIR  ${IFCOPENSHELL_INSTALL}/icu-56.1/include)
-    
-    set(OCC_LIBRARY_DIR  ${IFCOPENSHELL_INSTALL}/occt-7.3.0/lib)
-    set(OCC_INCLUDE_DIR  ${IFCOPENSHELL_INSTALL}/occt-7.3.0/include/opencascade)
-    
-    set(IFC_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/src)
-    set(IFC_LIBRARY_DIR  ${IFCOPENSHELL_INSTALL}/ifcopenshell/lib)
-    set(IFC_LIBRARIES    ${IFC_LIBRARY_DIR}/libIfcGeom.a ${IFC_LIBRARY_DIR}/libIfcParse.a)
+    if(IFC_SUPPORT)
+        set(OCC_LIBRARY_DIR  ${IFCOPENSHELL_INSTALL}/occt-7.3.0/lib)
+        set(OCC_INCLUDE_DIR  ${IFCOPENSHELL_INSTALL}/occt-7.3.0/include/opencascade)
+    endif()
     
     string(REGEX REPLACE "([^;]+)" "${OCC_LIBRARY_DIR}/lib\\1.a" OCC_LIBRARIES "${OCC_LIBRARY_NAMES}")
-    string(REGEX REPLACE "([^;]+)" "${ICU_LIBRARY_DIR}/lib\\1.a" ICU_LIBRARIES "${ICU_LIBRARY_NAMES}")
 
     if(NOT APPLE)
         set(LIB_RT rt)
     endif()
 
-    add_definitions(-std=c++11 -Wno-deprecated-declarations)
-    
     find_package(Threads)
     find_library(dl NAMES dl)
 
     set(OCC_LIBRARIES -Wl,--start-group ${OCC_LIBRARIES} -Wl,--end-group)
-else()
-	add_definitions(-D_SCL_SECURE_NO_WARNINGS -D_CRT_SECURE_NO_WARNINGS)
-
-    set(ICU_LIBRARY_NAMES icuuc icudt)
     
-    set(MSVC_YEAR 2017)
-    if ("${MSVC_VERSION}" STREQUAL "1900")
-        set(MSVC_YEAR 2015)
+    add_definitions(-Wno-deprecated-declarations)
+else()
+    if(IFC_SUPPORT)
+        set(MSVC_YEAR 2017)
+        if ("${MSVC_VERSION}" STREQUAL "1900")
+            set(MSVC_YEAR 2015)
+        endif()
+        
+        file(TO_CMAKE_PATH "${IFCOPENSHELL_ROOT}" IFCOPENSHELL_ROOT)
+        if (EXISTS ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/oce/Win32/lib)
+            set(OCC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/oce/Win32/lib)    
+        else()
+            set(OCC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/opencascade-7.3.0/win32/lib)
+        endif()
+                             
+        set(OCC_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/oce/include/oce
+                             ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/opencascade-7.3.0/inc)
+    else()
+        file(TO_CMAKE_PATH "${OCC_LIBRARY_DIR}" OCC_LIBRARY_DIR)
     endif()
     
-    set(BOOST_ROOT       ${IFCOPENSHELL_ROOT}/deps/boost_1_67_0)
-    set(BOOST_LIBRARYDIR ${IFCOPENSHELL_ROOT}/deps/boost_1_67_0/stage/vs${MSVC_YEAR}-Win32/lib)
-	set(Boost_USE_STATIC_LIBS    ON)
+	add_definitions(-D_SCL_SECURE_NO_WARNINGS -D_CRT_SECURE_NO_WARNINGS -D_UNICODE)
+    
+    string(REGEX REPLACE "([^;]+)" "${OCC_LIBRARY_DIR}/\\1.lib" OCC_LIBRARIES "${OCC_LIBRARY_NAMES}")
+    
+    # todo detect
+    set(Boost_USE_STATIC_LIBS    ON)
 	set(Boost_USE_STATIC_RUNTIME ON)
 	set(Boost_USE_MULTITHREADED  ON)
     
-    set(ICU_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/icu/lib)
-    set(ICU_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/icu/include)
-    
-    if (EXISTS ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/oce/Win32/lib)
-        set(OCC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/oce/Win32/lib)    
-    else()
-        set(OCC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/opencascade-7.3.0/win32/lib)
-    endif()
-                         
-    set(OCC_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/oce/include/oce
-                         ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/opencascade-7.3.0/inc)
-    
-    set(IFC_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/src)
-    set(IFC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/build-vs${MSVC_YEAR}-x86/${CMAKE_BUILD_TYPE})
-    set(IFC_LIBRARIES    ${IFC_LIBRARY_DIR}/IfcParse.lib ${IFC_LIBRARY_DIR}/IfcGeom.lib)
-    
-    string(REGEX REPLACE "([^;]+)" "${OCC_LIBRARY_DIR}/\\1.lib" OCC_LIBRARIES "${OCC_LIBRARY_NAMES}")
-    string(REGEX REPLACE "([^;]+)" "${ICU_LIBRARY_DIR}/\\1.lib" ICU_LIBRARIES "${ICU_LIBRARY_NAMES}")
-    
-    list(APPEND IFC_LIBRARIES ws2_32.lib)
-    
-    add_definitions(-D_UNICODE)
-    
-    # Copied from IfcOpenShell to match compilation flags
+    # Copied from IfcOpenShell to match compilation flags, todo detect whether necessary
     FOREACH(flag CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE CMAKE_CXX_FLAGS_MINSIZEREL
 			CMAKE_CXX_FLAGS_RELWITHDEBINFO CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
 			CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO)
@@ -88,6 +73,41 @@ else()
 			STRING(REGEX REPLACE "/MDd" "/MTd" ${flag} "${${flag}}")
 		ENDIF()
 	ENDFOREACH()
+    
+    set(WS2_LIBRARIES ws2_32.lib)
+endif()
+
+if(IFC_SUPPORT)
+if(UNIX)
+    set(ICU_LIBRARY_NAMES icuuc icudata)
+    
+    set(IFCOPENSHELL_INSTALL ${IFCOPENSHELL_ROOT}/build/Linux/x86_64/install)
+    
+    set(BOOST_ROOT       ${IFCOPENSHELL_INSTALL}/boost-1.59.0)
+    
+    set(ICU_LIBRARY_DIR  ${IFCOPENSHELL_INSTALL}/icu-56.1/lib)
+    set(ICU_INCLUDE_DIR  ${IFCOPENSHELL_INSTALL}/icu-56.1/include)
+    
+    set(IFC_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/src)
+    set(IFC_LIBRARY_DIR  ${IFCOPENSHELL_INSTALL}/ifcopenshell/lib)
+    set(IFC_LIBRARIES    ${IFC_LIBRARY_DIR}/libIfcGeom.a ${IFC_LIBRARY_DIR}/libIfcParse.a)
+    
+    string(REGEX REPLACE "([^;]+)" "${ICU_LIBRARY_DIR}/lib\\1.a" ICU_LIBRARIES "${ICU_LIBRARY_NAMES}")
+else()
+    set(ICU_LIBRARY_NAMES icuuc icudt)
+    
+    set(BOOST_ROOT       ${IFCOPENSHELL_ROOT}/deps/boost_1_67_0)
+    set(BOOST_LIBRARYDIR ${IFCOPENSHELL_ROOT}/deps/boost_1_67_0/stage/vs${MSVC_YEAR}-Win32/lib)
+	
+    set(ICU_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/icu/lib)
+    set(ICU_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/icu/include)
+    
+    set(IFC_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/src)
+    set(IFC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/build-vs${MSVC_YEAR}-x86/${CMAKE_BUILD_TYPE})
+    set(IFC_LIBRARIES    ${IFC_LIBRARY_DIR}/IfcParse.lib ${IFC_LIBRARY_DIR}/IfcGeom.lib)
+    
+    string(REGEX REPLACE "([^;]+)" "${ICU_LIBRARY_DIR}/\\1.lib" ICU_LIBRARIES "${ICU_LIBRARY_NAMES}")
+endif()
 endif()
 
 find_package(Boost REQUIRED COMPONENTS regex program_options iostreams filesystem system)
@@ -135,7 +155,7 @@ add_subdirectory(${CMAKE_BINARY_DIR}/googletest-src
 set(LIBVOXELIZER_HEADER_FILES progress.h dim3.h sweep.h shift.h collapse.h edge_detect.h fill_gaps.h offset.h polyfill.h resample.h storage.h writer.h factory.h processor.h volume.h voxelizer.h traversal.h)
 set(LIBVOXELIZER_SOURCE_FILES tribox3.cpp polyfill.cpp progress.cpp set_voxel_iterator.cpp factory.cpp)
 add_library(libifcvoxelizer STATIC ${LIBVOXELIZER_HEADER_FILES} ${LIBVOXELIZER_SOURCE_FILES})
-target_link_libraries(libifcvoxelizer ${IFC_LIBRARIES} ${ICU_LIBRARIES} ${Boost_LIBRARIES} ${OCC_LIBRARIES} ${LIB_RT} ${dl} ${CMAKE_THREAD_LIBS_INIT})
+target_link_libraries(libifcvoxelizer ${IFC_LIBRARIES} ${ICU_LIBRARIES} ${Boost_LIBRARIES} ${OCC_LIBRARIES} ${LIB_RT} ${dl} ${CMAKE_THREAD_LIBS_INIT} ${WS2_LIBRARIES})
 
 set(LIBVOXEC_HEADER_FILES voxelfile.h voxec.h)
 set(LIBVOXEC_SOURCE_FILES voxec.cpp)
@@ -144,16 +164,14 @@ target_link_libraries(libvoxec libifcvoxelizer)
 
 file(GLOB test_filenames tests/*.cpp)
 foreach(filename ${test_filenames})
-
-get_filename_component(test_name ${filename} NAME_WE)
-add_executable("${test_name}" ${filename})
-SET(libvoxec_IF_USED "")
-if ("${test_name}" MATCHES "parser")
-SET(libvoxec_IF_USED libvoxec)
-endif()
-target_link_libraries("${test_name}" gtest_main libifcvoxelizer ${libvoxec_IF_USED} ${IFC_LIBRARIES} ${ICU_LIBRARIES} ${Boost_LIBRARIES} ${OCC_LIBRARIES} ${LIB_RT} ${dl} ${CMAKE_THREAD_LIBS_INIT})
-add_test(NAME "${test_name}" COMMAND "${test_name}")
-
+    get_filename_component(test_name ${filename} NAME_WE)
+    add_executable("${test_name}" ${filename})
+    SET(libvoxec_IF_USED "")
+    if ("${test_name}" MATCHES "parser")
+    SET(libvoxec_IF_USED libvoxec)
+    endif()
+    target_link_libraries("${test_name}" gtest_main libifcvoxelizer ${libvoxec_IF_USED} ${IFC_LIBRARIES} ${ICU_LIBRARIES} ${Boost_LIBRARIES} ${OCC_LIBRARIES} ${LIB_RT} ${dl} ${CMAKE_THREAD_LIBS_INIT})
+    add_test(NAME "${test_name}" COMMAND "${test_name}")
 endforeach()
 
 add_executable(ifc_voxelizer main.cpp)
@@ -163,4 +181,4 @@ add_executable(voxec voxec_main.cpp)
 target_link_libraries(voxec libvoxec)
 
 install(TARGETS ifc_voxelizer voxec RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
-install(FILES ${LIBVOXELIZER_HEADER_FILES} ${LIBVOXEC_HEADER_FILES} RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/include/voxel)
+install(FILES ${LIBVOXELIZER_HEADER_FILES} ${LIBVOXEC_HEADER_FILES} DESTINATION ${CMAKE_INSTALL_PREFIX}/include/voxel)
