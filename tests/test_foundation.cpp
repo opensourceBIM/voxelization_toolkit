@@ -2,8 +2,11 @@
 #include "../writer.h"
 #include "../processor.h"
 
+#ifdef WITH_IFC
 #include <ifcparse/IfcFile.h>
 #include <ifcgeom/IfcGeomIterator.h>
+using namespace Ifc2x3;
+#endif
 
 #include <BRep_Builder.hxx>
 #include <BRepBndLib.hxx>
@@ -11,14 +14,13 @@
 
 #include <gtest/gtest.h>
 
-using namespace Ifc2x3;
-
 #ifdef WIN32
 #define DIRSEP "\\"
 #else
 #define DIRSEP "/"
 #endif
 
+#ifdef WITH_IFC
 TEST(Voxelization, Foundation) {
 	const std::string input_filename = ".." DIRSEP "tests" DIRSEP "fixtures" DIRSEP "schependom_foundation.ifc";
 
@@ -82,3 +84,6 @@ TEST(Voxelization, Foundation) {
 		pr.process(geoms.begin(), geoms.end(), SURFACE(), output(MERGED(), "test_beam_surface.vox"));
 	}
 }
+#else
+TEST(Voxelization, DISABLED_Foundation) {}
+#endif

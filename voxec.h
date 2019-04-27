@@ -8,8 +8,14 @@
 #include "fill_gaps.h"
 #include "traversal.h"
 
+#ifdef WITH_IFC
 #include <ifcparse/IfcFile.h>
 #include <ifcgeom/IfcGeomIterator.h>
+#else
+namespace IfcParse {
+	class IfcFile {};
+}
+#endif
 
 #include <Bnd_Box.hxx>
 #include <BRepBndLib.hxx>
@@ -95,6 +101,7 @@ public:
 	virtual symbol_value invoke(const scope_map& scope) const = 0;
 };
 
+#ifdef WITH_IFC
 class op_parse_ifc_file : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
@@ -250,6 +257,7 @@ public:
 		return geometries;
 	}
 };
+#endif
 
 class op_voxelize : public voxel_operation {
 public:

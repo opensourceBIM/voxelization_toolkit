@@ -8,17 +8,20 @@
 #include "progress.h"
 #include "volume.h"
 
-#include <map>                    // @todo < commit in IfcopenShell
-#include <ifcparse/IfcLogger.h>   // @todo < commit in IfcopenShell
-#include <ifcgeom/IfcGeom.h>      // @todo for ALMOST_ZERO
-#include <ifcgeom/IfcGeomElement.h>
-
 #include <TopoDS_Shape.hxx>
 #include <TopoDS_Compound.hxx>
 
 #include <thread>
 
+#ifdef WITH_IFC
+#include <map>                    // @todo < commit in IfcopenShell
+#include <ifcparse/IfcLogger.h>   // @todo < commit in IfcopenShell
+#include <ifcgeom/IfcGeom.h>      // @todo for ALMOST_ZERO
+#include <ifcgeom/IfcGeomElement.h>
+
 typedef IfcGeom::BRepElement<double> elem_t;
+#endif
+
 typedef TopoDS_Shape geometry_t;
 typedef std::vector<std::pair<int, TopoDS_Compound > > geometry_collection_t;
 

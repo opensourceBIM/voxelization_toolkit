@@ -174,11 +174,8 @@ foreach(filename ${test_filenames})
     add_test(NAME "${test_name}" COMMAND "${test_name}")
 endforeach()
 
-add_executable(ifc_voxelizer main.cpp)
-target_link_libraries(ifc_voxelizer libifcvoxelizer)
-
 add_executable(voxec voxec_main.cpp)
 target_link_libraries(voxec libvoxec)
 
-install(TARGETS ifc_voxelizer voxec RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+install(TARGETS voxec RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
 install(FILES ${LIBVOXELIZER_HEADER_FILES} ${LIBVOXEC_HEADER_FILES} DESTINATION ${CMAKE_INSTALL_PREFIX}/include/voxel)

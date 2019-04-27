@@ -7,8 +7,10 @@ voxel_operation_map::map_t& voxel_operation_map::map() {
 	static voxel_operation_map::map_t m;
 	static bool initialized = false;
 	if (!initialized) {
+#ifdef WITH_IFC
 		m.insert(std::make_pair(std::string("parse"), &instantiate<op_parse_ifc_file>));
 		m.insert(std::make_pair(std::string("create_geometry"), &instantiate<op_create_geometry>));
+#endif
 		m.insert(std::make_pair(std::string("voxelize"), &instantiate<op_voxelize>));
 		m.insert(std::make_pair(std::string("fill_gaps"), &instantiate<op_fill_gaps>));
 		m.insert(std::make_pair(std::string("offset"), &instantiate<op_offset>));
