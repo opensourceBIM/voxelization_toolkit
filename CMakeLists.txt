@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 2.8.11)
-project (ifc_voxelizer)
+project (voxel)
 
 OPTION(IFC_SUPPORT "Build Volization Toolkit with IFC support (requires IfcOpenShell/master)." ON)
 
