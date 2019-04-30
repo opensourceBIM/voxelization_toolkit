@@ -11,6 +11,8 @@
 #ifdef WITH_IFC
 #include <ifcparse/IfcFile.h>
 #include <ifcgeom/IfcGeomIterator.h>
+
+#include <boost/filesystem.hpp>
 #else
 namespace IfcParse {
 	class IfcFile {};
@@ -27,7 +29,6 @@ namespace IfcParse {
 
 #include <boost/variant/apply_visitor.hpp>
 #include <boost/tokenizer.hpp>
-#include <boost/filesystem.hpp>
 #include <boost/range/iterator_range.hpp>
 
 typedef boost::variant<std::vector<IfcParse::IfcFile*>, geometry_collection_t*, abstract_voxel_storage*, function_arg_value_type> symbol_value;

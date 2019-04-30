@@ -77,7 +77,10 @@ else()
     set(WS2_LIBRARIES ws2_32.lib)
 endif()
 
+set(BOOST_COMPONENTS regex program_options iostreams system)
+
 if(IFC_SUPPORT)
+set(BOOST_COMPONENTS ${BOOST_COMPONENTS} filesystem)
 if(UNIX)
     set(ICU_LIBRARY_NAMES icuuc icudata)
     
@@ -110,7 +113,7 @@ else()
 endif()
 endif()
 
-find_package(Boost REQUIRED COMPONENTS regex program_options iostreams filesystem system)
+find_package(Boost REQUIRED COMPONENTS ${BOOST_COMPONENTS})
 
 message(STATUS "Boost include files found in ${Boost_INCLUDE_DIRS}")
 message(STATUS "Boost libraries found in ${Boost_LIBRARY_DIRS}")
