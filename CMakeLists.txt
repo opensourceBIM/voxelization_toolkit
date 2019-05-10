@@ -157,13 +157,13 @@ add_subdirectory(${CMAKE_BINARY_DIR}/googletest-src
 
 set(LIBVOXELIZER_HEADER_FILES progress.h dim3.h sweep.h shift.h collapse.h edge_detect.h fill_gaps.h offset.h polyfill.h resample.h storage.h writer.h factory.h processor.h volume.h voxelizer.h traversal.h)
 set(LIBVOXELIZER_SOURCE_FILES tribox3.cpp polyfill.cpp progress.cpp set_voxel_iterator.cpp factory.cpp)
-add_library(libifcvoxelizer STATIC ${LIBVOXELIZER_HEADER_FILES} ${LIBVOXELIZER_SOURCE_FILES})
-target_link_libraries(libifcvoxelizer ${IFC_LIBRARIES} ${ICU_LIBRARIES} ${Boost_LIBRARIES} ${OCC_LIBRARIES} ${LIB_RT} ${dl} ${CMAKE_THREAD_LIBS_INIT} ${WS2_LIBRARIES})
+add_library(libvoxel STATIC ${LIBVOXELIZER_HEADER_FILES} ${LIBVOXELIZER_SOURCE_FILES})
+target_link_libraries(libvoxel ${IFC_LIBRARIES} ${ICU_LIBRARIES} ${Boost_LIBRARIES} ${OCC_LIBRARIES} ${LIB_RT} ${dl} ${CMAKE_THREAD_LIBS_INIT} ${WS2_LIBRARIES})
 
 set(LIBVOXEC_HEADER_FILES voxelfile.h voxec.h)
 set(LIBVOXEC_SOURCE_FILES voxec.cpp)
 add_library(libvoxec STATIC ${LIBVOXEC_HEADER_FILES} ${LIBVOXEC_SOURCE_FILES})
-target_link_libraries(libvoxec libifcvoxelizer)
+target_link_libraries(libvoxec libvoxel)
 
 file(GLOB test_filenames tests/*.cpp)
 foreach(filename ${test_filenames})
@@ -173,12 +173,15 @@ foreach(filename ${test_filenames})
     if ("${test_name}" MATCHES "parser")
     SET(libvoxec_IF_USED libvoxec)
     endif()
-    target_link_libraries("${test_name}" gtest_main libifcvoxelizer ${libvoxec_IF_USED} ${IFC_LIBRARIES} ${ICU_LIBRARIES} ${Boost_LIBRARIES} ${OCC_LIBRARIES} ${LIB_RT} ${dl} ${CMAKE_THREAD_LIBS_INIT})
+    target_link_libraries("${test_name}" gtest_main libvoxel ${libvoxec_IF_USED} ${IFC_LIBRARIES} ${ICU_LIBRARIES} ${Boost_LIBRARIES} ${OCC_LIBRARIES} ${LIB_RT} ${dl} ${CMAKE_THREAD_LIBS_INIT})
     add_test(NAME "${test_name}" COMMAND "${test_name}")
 endforeach()
 
 add_executable(voxec voxec_main.cpp)
 target_link_libraries(voxec libvoxec)
 
-install(TARGETS voxec RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin)
+install(TARGETS voxec libvoxel libvoxec
+    RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
+    LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
 install(FILES ${LIBVOXELIZER_HEADER_FILES} ${LIBVOXEC_HEADER_FILES} DESTINATION ${CMAKE_INSTALL_PREFIX}/include/voxel)
