@@ -1792,18 +1792,6 @@ public:
 	}
 };
 
-regular_voxel_storage* storage_for(std::array< vec_n<3, double>, 2 >& bounds, size_t max_extents = 1024U, size_t padding = 0U, size_t chunk_size = 64U) {
-	auto bounds_size = bounds[1] - bounds[0];
-	auto voxel_size = (bounds_size / (double)max_extents).min_element();
-	auto extents = (bounds_size / voxel_size).ceil().as<size_t>();
-	
-	double x1, y1, z1;
-	decltype(extents)::element_type nx, ny, nz;
-	
-	(bounds[0] - (padding*voxel_size)).tie(x1, y1, z1);
-	(extents + 2 * padding).tie(nx, ny, nz);
-
-	return new chunked_voxel_storage<bit_t>(x1, y1, z1, voxel_size, nx, ny, nz, chunk_size);
-}
+regular_voxel_storage* storage_for(std::array< vec_n<3, double>, 2 >& bounds, size_t max_extents = 1024U, size_t padding = 0U, size_t chunk_size = 64U);
 
 #endif

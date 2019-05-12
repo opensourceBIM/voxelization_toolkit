@@ -151,7 +151,7 @@ if(result)
   message(FATAL_ERROR "Build step for googletest failed: ${result}")
 endif()
 
-if(not IFC_SUPPORT)
+if(NOT IFC_SUPPORT)
 	# Prevent overriding the parent project's compiler/linker
 	# settings on Windows
 	set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
@@ -164,7 +164,7 @@ add_subdirectory(${CMAKE_BINARY_DIR}/googletest-src
                  EXCLUDE_FROM_ALL)
 
 set(LIBVOXELIZER_HEADER_FILES progress.h dim3.h sweep.h shift.h collapse.h edge_detect.h fill_gaps.h offset.h polyfill.h resample.h storage.h writer.h factory.h processor.h volume.h voxelizer.h traversal.h util.h)
-set(LIBVOXELIZER_SOURCE_FILES tribox3.cpp polyfill.cpp progress.cpp set_voxel_iterator.cpp factory.cpp)
+set(LIBVOXELIZER_SOURCE_FILES tribox3.cpp polyfill.cpp progress.cpp storage.cpp factory.cpp)
 add_library(libvoxel STATIC ${LIBVOXELIZER_HEADER_FILES} ${LIBVOXELIZER_SOURCE_FILES})
 target_link_libraries(libvoxel ${IFC_LIBRARIES} ${ICU_LIBRARIES} ${Boost_LIBRARIES} ${OCC_LIBRARIES} ${LIB_RT} ${dl} ${CMAKE_THREAD_LIBS_INIT} ${WS2_LIBRARIES})
 
