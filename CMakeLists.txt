@@ -66,20 +66,20 @@ else()
 		# this is probably a dependency for IfcOpenShell 0.7.0. The first
 		# uses a static runtime on win.
 		set(Boost_USE_STATIC_RUNTIME ON)
-	endif()
     
-    # Copied from IfcOpenShell to match compilation flags, todo detect whether necessary
-    FOREACH(flag CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE CMAKE_CXX_FLAGS_MINSIZEREL
-			CMAKE_CXX_FLAGS_RELWITHDEBINFO CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
-			CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO)
-		IF(${flag} MATCHES "/MD")
-			STRING(REGEX REPLACE "/MD" "/MT" ${flag} "${${flag}}")
-		ENDIF()
-		IF(${flag} MATCHES "/MDd")
-			STRING(REGEX REPLACE "/MDd" "/MTd" ${flag} "${${flag}}")
-		ENDIF()
-	ENDFOREACH()
-    
+		# Copied from IfcOpenShell to match compilation flags, todo detect whether necessary
+		FOREACH(flag CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE CMAKE_CXX_FLAGS_MINSIZEREL
+				CMAKE_CXX_FLAGS_RELWITHDEBINFO CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
+				CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO)
+			IF(${flag} MATCHES "/MD")
+				STRING(REGEX REPLACE "/MD" "/MT" ${flag} "${${flag}}")
+			ENDIF()
+			IF(${flag} MATCHES "/MDd")
+				STRING(REGEX REPLACE "/MDd" "/MTd" ${flag} "${${flag}}")
+			ENDIF()
+		ENDFOREACH()
+    endif()
+
     set(WS2_LIBRARIES ws2_32.lib)
 endif()
 
