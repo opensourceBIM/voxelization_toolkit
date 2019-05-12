@@ -358,8 +358,8 @@ public:
 	T max_element() const {
 		T v = std::numeric_limits<T>::min();
 		for (size_t i = 0; i < N; ++i) {
-			if (r.get(i) > v) {
-				v = r.get(i);
+			if (get(i) > v) {
+				v = get(i);
 			}
 		}
 		return v;
@@ -368,8 +368,8 @@ public:
 	T min_element() const {
 		T v = std::numeric_limits<T>::max();
 		for (size_t i = 0; i < N; ++i) {
-			if (r.get(i) < v) {
-				v = r.get(i);
+			if (get(i) < v) {
+				v = get(i);
 			}
 		}
 		return v;
