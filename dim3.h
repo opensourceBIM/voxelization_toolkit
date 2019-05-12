@@ -355,6 +355,26 @@ public:
 		return r;
 	}
 
+	T max_element() const {
+		T v = std::numeric_limits<T>::min();
+		for (size_t i = 0; i < N; ++i) {
+			if (r.get(i) > v) {
+				v = r.get(i);
+			}
+		}
+		return v;
+	}
+
+	T min_element() const {
+		T v = std::numeric_limits<T>::max();
+		for (size_t i = 0; i < N; ++i) {
+			if (r.get(i) < v) {
+				v = r.get(i);
+			}
+		}
+		return v;
+	}
+
 	template<typename ... Ts>
 	void tie(Ts&... ts) const {
 		static_assert(sizeof...(ts) == N, "Number of arguments does not match template type");
