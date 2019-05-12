@@ -57,10 +57,16 @@ else()
     
     string(REGEX REPLACE "([^;]+)" "${OCC_LIBRARY_DIR}/\\1.lib" OCC_LIBRARIES "${OCC_LIBRARY_NAMES}")
     
-    # todo detect
-    set(Boost_USE_STATIC_LIBS    ON)
-	set(Boost_USE_STATIC_RUNTIME ON)
-	set(Boost_USE_MULTITHREADED  ON)
+	set(Boost_USE_STATIC_LIBS   ON)
+	set(Boost_USE_MULTITHREADED ON)
+
+	if(IFC_SUPPORT)
+		# todo detect
+		# With IFC_SUPPORT we link against IfcOpenShell 0.5.0, otherwise
+		# this is probably a dependency for IfcOpenShell 0.7.0. The first
+		# uses a static runtime on win.
+		set(Boost_USE_STATIC_RUNTIME ON)
+	endif()
     
     # Copied from IfcOpenShell to match compilation flags, todo detect whether necessary
     FOREACH(flag CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE CMAKE_CXX_FLAGS_MINSIZEREL
