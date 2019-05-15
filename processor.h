@@ -236,6 +236,7 @@ public:
 	threaded_processor(abstract_voxel_storage* storage, progress_writer& progress)
 		: voxels_(storage)
 		, p_(progress)
+		, result_(nullptr)
 	{}
 
 	~threaded_processor() {
