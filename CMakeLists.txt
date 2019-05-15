@@ -2,6 +2,7 @@ cmake_minimum_required (VERSION 2.8.11)
 project (voxel)
 
 OPTION(IFC_SUPPORT "Build Volization Toolkit with IFC support (requires IfcOpenShell/master)." ON)
+OPTION(USE_STATIC_MSVC_RUNTIME "Link to the static runtime on MSVC." ON)
 
 include(CTest)
 
@@ -60,11 +61,7 @@ else()
 	set(Boost_USE_STATIC_LIBS   ON)
 	set(Boost_USE_MULTITHREADED ON)
 
-	if(IFC_SUPPORT)
-		# todo detect
-		# With IFC_SUPPORT we link against IfcOpenShell 0.5.0, otherwise
-		# this is probably a dependency for IfcOpenShell 0.7.0. The first
-		# uses a static runtime on win.
+	if(USE_STATIC_MSVC_RUNTIME)
 		set(Boost_USE_STATIC_RUNTIME ON)
     
 		# Copied from IfcOpenShell to match compilation flags, todo detect whether necessary
@@ -151,7 +148,7 @@ if(result)
   message(FATAL_ERROR "Build step for googletest failed: ${result}")
 endif()
 
-if(NOT IFC_SUPPORT)
+if(NOT USE_STATIC_MSVC_RUNTIME)
 	# Prevent overriding the parent project's compiler/linker
 	# settings on Windows
 	set(gtest_force_shared_crt ON CACHE BOOL "" FORCE)
