@@ -151,7 +151,8 @@ private:
 	abstract_voxel_storage* voxels_temp_;
 	std::function<void(int)> progress_;
 	int nx_, ny_, nz_;
-	double x1_, y1_, z1_, d_;	
+	double x1_, y1_, z1_, d_;
+	bool use_copy_;
 public:
 	processor(double x1, double y1, double z1, double d, int nx, int ny, int nz, size_t chunk_size, const std::function<void(int)>& progress)
 		: factory_(factory().chunk_size(chunk_size))
@@ -159,8 +160,15 @@ public:
 		, voxels_temp_(factory_.create(x1, y1, z1, d, nx, ny, nz))
 		, progress_(progress)
 		, nx_(nx), ny_(ny), nz_(nz)
-		, x1_(x1), y1_(y1), z1_(z1), d_(d) {}
+		, x1_(x1), y1_(y1), z1_(z1), d_(d)
+		, use_copy_(false) {}
 
+	processor(abstract_voxel_storage* storage, const std::function<void(int)>& progress)
+		: voxels_(storage)
+		, voxels_temp_(storage->empty_copy())
+		, progress_(progress)
+		, use_copy_(true) {}
+	
 	~processor() {
 		delete voxels_;
 		delete voxels_temp_;
@@ -181,16 +189,15 @@ public:
 
 				output.intermediate_result(it->first, voxels_, voxels_temp_);
 				
-				// voxels_temp_->SetZero();
 				delete voxels_temp_;
-				voxels_temp_ = factory_.create(x1_, y1_, z1_, d_, nx_, ny_, nz_);
+				if (use_copy_) {
+					voxels_temp_ = voxels_temp_->empty_copy();
+				} else {
+					voxels_temp_ = factory_.create(x1_, y1_, z1_, d_, nx_, ny_, nz_);
+				}
 			} else {
 				voxelizer voxeliser(it->second, (regular_voxel_storage*) to_write);
 				voxeliser.epsilon() = 1e-9;
-				
-				/* if (it->first & 2) {
-					voxeliser.epsilon() = 0.0125; //  d_;
-				} */
 				voxeliser.Convert();
 			}
 
@@ -218,6 +225,7 @@ class threaded_processor : public abstract_processor {
 	progress_writer& p_;
 	size_t chunk_size_;
 	abstract_voxel_storage* result_;
+	abstract_voxel_storage* voxels_;
 public:
 	threaded_processor(double x1, double y1, double z1, double d, int nx, int ny, int nz, size_t chunk_size, progress_writer& p)
 		: x1_(x1), y1_(y1), z1_(z1), d_(d), nx_(nx), ny_(ny), nz_(nz), chunk_size_(chunk_size), num_threads_(std::thread::hardware_concurrency()), p_(p), result_(nullptr) {}
@@ -225,6 +233,10 @@ public:
 	threaded_processor(double x1, double y1, double z1, double d, int nx, int ny, int nz, size_t chunk_size, size_t num_threads, progress_writer& p)
 		: x1_(x1), y1_(y1), z1_(z1), d_(d), nx_(nx), ny_(ny), nz_(nz), chunk_size_(chunk_size), num_threads_(num_threads > 0 ? num_threads : std::thread::hardware_concurrency()), p_(p), result_(nullptr) {}
 
+	threaded_processor(abstract_voxel_storage* storage, progress_writer& progress)
+		: voxels_(storage)
+		, p_(progress)
+	{}
 
 	~threaded_processor() {
 		for (auto it = cs.begin(); it != cs.end(); ++it) {
@@ -241,20 +253,32 @@ public:
 		ts.reserve(num_threads_);
 		auto progress = p_.thread(num_threads_);
 		size_t x0 = 0;
-		for (size_t i = 0; i < num_threads_; ++i) {
+		bool first = true;
+		for (size_t i = 0; i < num_threads_; ++i, first = false) {
 			size_t x1 = (size_t)floor((i + 1) * d);
 			if (x1 == x0) continue;
 			if (i == num_threads_ - 1) {
 				x1 = N;
 			}
-			// std::cerr << x0 << " - " << x1 << std::endl;
-			ts.emplace_back(std::thread([this, x0, x1, i, &start, &volume, &output, &progress]() {
-				processor* vf = new processor(x1_, y1_, z1_, d_, nx_, ny_, nz_, chunk_size_,[i, &progress](int p) {
-					progress(i, p);
-				});
-				cs[i] = vf;
-				vf->process(start + x0, start + x1, volume, output.parallelize());
-			}));
+			if (voxels_) {
+				auto local_storage = first ? voxels_ : voxels_->empty_copy();
+				ts.emplace_back(std::thread([this, local_storage, x0, x1, i, &start, &volume, &output, &progress]() {
+					processor* vf = new processor(local_storage, [i, &progress](int p) {
+						progress(i, p);
+					});
+					cs[i] = vf;
+					vf->process(start + x0, start + x1, volume, output.parallelize());
+				}));
+			} else {
+				// @todo refactor this.
+				ts.emplace_back(std::thread([this, x0, x1, i, &start, &volume, &output, &progress]() {
+					processor* vf = new processor(x1_, y1_, z1_, d_, nx_, ny_, nz_, chunk_size_, [i, &progress](int p) {
+						progress(i, p);
+					});
+					cs[i] = vf;
+					vf->process(start + x0, start + x1, volume, output.parallelize());
+				}));
+			}
 			x0 = x1;
 		}
 		for (auto jt = ts.begin(); jt != ts.end(); ++jt) {

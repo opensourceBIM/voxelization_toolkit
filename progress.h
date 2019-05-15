@@ -35,22 +35,31 @@ class progress_writer {
 private:
 	std::string item_;
 	mutable bool ended_;
+	bool silent_;
 public:
+	progress_writer() : silent_(true) {}
+
 	progress_writer(const std::string& item)
-		: item_(item), ended_(false) {}
+		: item_(item), ended_(false), silent_(false) {}
+
 	~progress_writer() {
 		end();
 	}
+
 	void operator()(int i) const {
-		std::cerr << "\r" << item_ << " " << i;
-		std::cerr.flush();
+		if (!silent_) {
+			std::cerr << "\r" << item_ << " " << i;
+			std::cerr.flush();
+		}
 	}
+
 	void end() const {
-		if (!ended_) {
+		if (!silent_ && !ended_) {
 			std::cerr << std::endl;
 			ended_ = true;
 		}
 	}
+
 	threaded_progress_writer thread(int n) {
 		return threaded_progress_writer(item_, n);
 	}
