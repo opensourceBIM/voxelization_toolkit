@@ -170,7 +170,9 @@ public:
 		, use_copy_(true) {}
 	
 	~processor() {
-		delete voxels_;
+		if (!use_copy_) {
+			delete voxels_;
+		}
 		delete voxels_temp_;
 	}
 
