@@ -29,6 +29,7 @@ voxel_operation_map::map_t& voxel_operation_map::map() {
 		m.insert(std::make_pair(std::string("constant_like"), &instantiate<op_constant_like>));
 		m.insert(std::make_pair(std::string("resample"), &instantiate<op_resample>));
 		m.insert(std::make_pair(std::string("collapse"), &instantiate<op_collapse>));
+		m.insert(std::make_pair(std::string("print_components"), &instantiate<op_print_components>));
 		initialized = true;
 	}
 	return m;
@@ -94,6 +95,10 @@ std::ostream& operator<<(std::ostream& a, const statement_type& b) {
 class print_visitor {
 public:
 	typedef void result_type;
+
+	void operator()(boost::blank&) const {
+		std::cerr << "(void:)" << std::endl;
+	}
 
 	void operator()(int v) const {
 		std::cerr << "(integer:)" << v << std::endl;

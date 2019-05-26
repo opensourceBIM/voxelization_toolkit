@@ -79,5 +79,12 @@ int main(int argc, char** argv) {
 		std::cerr << "Parse errors parsing voxelfile" << std::endl;
 	}
 
-	run(tree, d, threads.get_value_or(1), chunk.get_value_or(128), with_mesh);
+	try {
+		run(tree, d, threads.get_value_or(1), chunk.get_value_or(128), with_mesh);
+		return 0;
+	} catch (const std::runtime_error& e) {
+		std::cerr << "Errors while running voxelfile:" << std::endl;
+		std::cerr << e.what() << std::endl;
+		return 1;
+	}
 }

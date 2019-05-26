@@ -31,7 +31,7 @@ namespace IfcParse {
 #include <boost/tokenizer.hpp>
 #include <boost/range/iterator_range.hpp>
 
-typedef boost::variant<std::vector<IfcParse::IfcFile*>, geometry_collection_t*, abstract_voxel_storage*, function_arg_value_type> symbol_value;
+typedef boost::variant<boost::blank, std::vector<IfcParse::IfcFile*>, geometry_collection_t*, abstract_voxel_storage*, function_arg_value_type> symbol_value;
 
 class voxel_operation;
 
@@ -297,6 +297,22 @@ public:
 		threaded_processor p(x1, y1, z1, vsize, nx, ny, nz, scope.get_value<int>("CHUNKSIZE"), scope.get_value<int>("THREADS"), progress);
 		p.process(surfaces->begin(), surfaces->end(), SURFACE(), output(MERGED()));
 		return p.voxels();
+	}
+};
+
+class op_print_components : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" } };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input");
+		connected_components((regular_voxel_storage*) voxels, [](regular_voxel_storage* c) {
+			std::cout << "Component " << c->count() << std::endl;
+		});
+		symbol_value v;
+		return v;
 	}
 };
 
@@ -642,6 +658,10 @@ void operator()(const std::vector<std::string>& v) const {
 
 void operator()(const function_arg_value_type& v) const {
 	v.apply_visitor(*this);
+}
+
+void operator()(const boost::blank&) const {
+	// throw error?
 }
 };
 
