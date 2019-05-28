@@ -45,7 +45,7 @@ bool set_voxel_iterator::neighbour(const vec_n<3, size_t>& d) const {
 
 void regular_voxel_storage::obj_export(std::ostream& fs, bool with_components) {
 	obj_export_helper helper(fs);
-	obj_export(helper);
+	obj_export(helper, with_components);
 }
 
 void regular_voxel_storage::obj_export(obj_export_helper& obj, bool with_components) {
