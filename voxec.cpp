@@ -184,10 +184,10 @@ scope_map run(const std::vector<statement_type>& statements, double size, size_t
 		}
 
 		n++;
-
-		print_visitor v;
-		context[statements.back().assignee()].apply_visitor(v);
 	}
+
+	print_visitor v;
+	context[statements.back().assignee()].apply_visitor(v);
 
 	return context;
 }
