@@ -97,7 +97,10 @@ add_definitions("-DIFCOPENSHELL_05")
 else()
 set(IFC_LIBRARY_NAMES IfcGeom IfcGeom_ifc2x3 IfcGeom_ifc4 IfcParse)
 endif()
+endif()
 
+if (UNIX)
+set(IFC_LIBRARY_NAMES ${IFC_LIBRARY_NAMES} ${IFC_LIBRARY_NAMES})
 endif()
 
 if(IFC_SUPPORT)
