@@ -2,7 +2,7 @@
 #include "../writer.h"
 #include "../processor.h"
 
-#ifdef WITH_IFC
+#if defined(WITH_IFC) && defined(IFCOPENSHELL_05)
 #include <ifcparse/IfcFile.h>
 #include <ifcgeom/IfcGeomIterator.h>
 using namespace Ifc2x3;
@@ -20,7 +20,7 @@ using namespace Ifc2x3;
 #define DIRSEP "/"
 #endif
 
-#ifdef WITH_IFC
+#if defined(WITH_IFC) && defined(IFCOPENSHELL_05)
 TEST(Voxelization, Foundation) {
 	const std::string input_filename = ".." DIRSEP "tests" DIRSEP "fixtures" DIRSEP "schependom_foundation.ifc";
 
