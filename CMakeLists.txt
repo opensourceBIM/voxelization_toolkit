@@ -17,6 +17,8 @@ endif()
 
 
 if(UNIX)
+    set(IFCOPENSHELL_INSTALL ${IFCOPENSHELL_ROOT}/build/Linux/x86_64/install)
+    
     if(IFC_SUPPORT)
         set(OCC_LIBRARY_DIR  ${IFCOPENSHELL_INSTALL}/occt-7.3.0/lib)
         set(OCC_INCLUDE_DIR  ${IFCOPENSHELL_INSTALL}/occt-7.3.0/include/opencascade)
@@ -102,8 +104,6 @@ if(IFC_SUPPORT)
 set(BOOST_COMPONENTS ${BOOST_COMPONENTS} filesystem)
 if(UNIX)
     set(ICU_LIBRARY_NAMES icuuc icudata)
-    
-    set(IFCOPENSHELL_INSTALL ${IFCOPENSHELL_ROOT}/build/Linux/x86_64/install)
     
     set(BOOST_ROOT       ${IFCOPENSHELL_INSTALL}/boost-1.59.0)
     
