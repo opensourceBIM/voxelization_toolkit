@@ -10,7 +10,11 @@
 
 #ifdef WITH_IFC
 #include <ifcparse/IfcFile.h>
+#ifdef IFCOPENSHELL_05
 #include <ifcgeom/IfcGeomIterator.h>
+#else
+#include <ifcgeom_schema_agnostic/IfcGeomIterator.h>
+#endif
 
 #include <boost/filesystem.hpp>
 #else
@@ -128,10 +132,16 @@ public:
 						throw std::runtime_error("Unable to open file " + filename);
 					}
 				}
+#ifdef IFCOPENSHELL_05
 				IfcParse::IfcFile* f = new IfcParse::IfcFile();
-				if (!f->Init(filename)) {
+				if (!f->Init()) {
+#else
+				IfcParse::IfcFile* f = new IfcParse::IfcFile(filename);
+				if (!f->good()) {
+#endif
 					throw std::runtime_error("Unable to open file " + filename);
 				}
+
 				files.push_back(f);
 			}
 		}
@@ -152,12 +162,32 @@ public:
 	}
 		
 	symbol_value invoke(const scope_map& scope) const {
+
+		IfcGeom::entity_filter ef;
+
+#ifdef IFCOPENSHELL_05
+		auto ifc_roof = IfcSchema::Type::IfcRoof;
+		auto ifc_slab = IfcSchema::Type::IfcSlab;
+		auto ifc_space = IfcSchema::Type::IfcSpace;
+		auto ifc_opening = IfcSchema::Type::IfcOpeningElement;
+		auto ifc_furnishing = IfcSchema::Type::IfcFurnishingElement;
+		auto& ef_elements = ef_elements;
+#else
+		// From IfcOpenShell v0.6.0 onwards, there is support for multiple
+		// schemas at runtime so type identification is based on strings.
+		std::string ifc_roof = "IfcRoof";
+		std::string ifc_slab = "IfcSlab";
+		std::string ifc_space = "IfcSpace";
+		std::string ifc_opening = "IfcOpeningElement";
+		std::string ifc_furnishing = "IfcFurnishingElement";
+		auto& ef_elements = ef.entity_names;
+#endif
+
 		const std::vector<IfcParse::IfcFile*>& ifc_files = scope.get_value<std::vector<IfcParse::IfcFile*>>("input");
 
 		IfcGeom::IteratorSettings settings_surface;
 		settings_surface.set(IfcGeom::IteratorSettings::DISABLE_TRIANGULATION, true);
-
-		IfcGeom::entity_filter ef_surface;
+		settings_surface.set(IfcGeom::IteratorSettings::USE_WORLD_COORDS, true);
 
 		boost::optional<bool> include, roof_slabs;
 		std::vector<std::string> entities;
@@ -174,32 +204,38 @@ public:
 		}
 
 		if (include) {
-			ef_surface.include = *include;
-			ef_surface.traverse = true;
-			std::transform(entities.begin(), entities.end(), std::inserter(ef_surface.values, ef_surface.values.begin()), [](const std::string& v) {
+			ef.include = *include;
+			ef.traverse = true;
+
+
+#ifdef IFCOPENSHELL_05
+			std::transform(entities.begin(), entities.end(), std::inserter(ef_elements, ef_elements.begin()), [](const std::string& v) {
 				return IfcSchema::Type::FromString(boost::to_upper_copy(v.substr(1, v.size() - 2)));
 			});
+#else
+			ef_elements.insert(entities.begin(), entities.end());
+#endif
 
 			if (*include) {
-				if (ef_surface.values.find(IfcSchema::Type::IfcRoof) != ef_surface.values.end()) {
-					ef_surface.values.insert(IfcSchema::Type::IfcSlab);
+				if (ef_elements.find(ifc_roof) != ef_elements.end()) {
+					ef_elements.insert(ifc_slab);
 					roof_slabs = true;
 				}
 			} else {
-				if (ef_surface.values.find(IfcSchema::Type::IfcRoof) == ef_surface.values.end()) {
-					ef_surface.values.erase(IfcSchema::Type::IfcSlab);
+				if (ef_elements.find(ifc_roof) == ef_elements.end()) {
+					ef_elements.erase(ifc_slab);
 					roof_slabs = false;
 				}
 			}
 		} else {
-			ef_surface.include = false;
-			ef_surface.traverse = false;
-			ef_surface.values = { IfcSchema::Type::IfcSpace, IfcSchema::Type::IfcOpeningElement, IfcSchema::Type::IfcFurnishingElement };
+			ef.include = false;
+			ef.traverse = false;
+			ef_elements = { ifc_space, ifc_opening, ifc_furnishing };
 		}
 
 		geometry_collection_t* geometries = new geometry_collection_t;
 
-		auto filters_surface = std::vector<IfcGeom::filter_t>({ ef_surface });
+		auto filters_surface = std::vector<IfcGeom::filter_t>({ ef });
 
 		bool at_least_one_succesful = false;
 
@@ -223,17 +259,22 @@ public:
 					process = false;
 				}
 
+#ifdef IFCOPENSHELL_05
 				if (roof_slabs && elem->product()->as<IfcSchema::IfcSlab>()) {
 					auto pdt = elem->product()->as<IfcSchema::IfcSlab>()->PredefinedType();
 					process = (pdt == IfcSchema::IfcSlabTypeEnum::IfcSlabType_ROOF) == *roof_slabs;
 				}
+#else
+				if (roof_slabs && elem->product()->declaration().is("IfcSlab")) {
+					std::string pdt = *elem->product()->get("PredefinedType");
+					process = (pdt == "ROOF") == *roof_slabs;
+				}
+#endif
 
 				if (process) {
 					TopoDS_Compound compound = elem->geometry().as_compound();
-					const gp_Trsf& product_trsf = elem->transformation().data();
 					BRepMesh_IncrementalMesh(compound, 0.001);
-					TopoDS_Shape moved_shape = IfcGeom::Kernel::apply_transformation(compound, product_trsf);
-					geometries->push_back(std::make_pair(elem->id(), TopoDS::Compound(moved_shape)));
+					geometries->push_back(std::make_pair(elem->id(), compound));
 				}
 
 				if (old_progress != iterator.progress()) {

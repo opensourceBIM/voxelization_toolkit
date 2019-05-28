@@ -82,6 +82,22 @@ endif()
 
 set(BOOST_COMPONENTS regex program_options iostreams system)
 
+if (IFC_SUPPORT)
+# Find IfcOpenShell version, v0.6.0 does not have the IfcSchema namespace anymore
+file(READ "${IFCOPENSHELL_ROOT}/src/ifcparse/IfcParse.h" header)
+string(REGEX MATCH "#define IFCOPENSHELL_VERSION \"[0-9a-zA-Z\\.\\-]+\"" ifcopenshell_version "${header}")
+string(REGEX MATCH "[0-9]\\.[0-9]" ifcopenshell_major_version "${ifcopenshell_version}")
+message(STATUS "IfcOpenShell version ${ifcopenshell_major_version}")
+
+if (${ifcopenshell_major_version} STREQUAL "0.5")
+set(IFC_LIBRARY_NAMES IfcGeom IfcParse)
+add_definitions("-DIFCOPENSHELL_05")
+else()
+set(IFC_LIBRARY_NAMES IfcGeom IfcGeom_ifc2x3 IfcGeom_ifc4 IfcParse)
+endif()
+
+endif()
+
 if(IFC_SUPPORT)
 set(BOOST_COMPONENTS ${BOOST_COMPONENTS} filesystem)
 if(UNIX)
@@ -96,8 +112,8 @@ if(UNIX)
     
     set(IFC_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/src)
     set(IFC_LIBRARY_DIR  ${IFCOPENSHELL_INSTALL}/ifcopenshell/lib)
-    set(IFC_LIBRARIES    ${IFC_LIBRARY_DIR}/libIfcGeom.a ${IFC_LIBRARY_DIR}/libIfcParse.a)
     
+    string(REGEX REPLACE "([^;]+)" "${IFC_LIBRARY_DIR}/lib\\1.a" IFC_LIBRARIES "${IFC_LIBRARY_NAMES}")
     string(REGEX REPLACE "([^;]+)" "${ICU_LIBRARY_DIR}/lib\\1.a" ICU_LIBRARIES "${ICU_LIBRARY_NAMES}")
 else()
     set(ICU_LIBRARY_NAMES icuuc icudt)
@@ -110,8 +126,8 @@ else()
     
     set(IFC_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/src)
     set(IFC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/build-vs${MSVC_YEAR}-x86/${CMAKE_BUILD_TYPE})
-    set(IFC_LIBRARIES    ${IFC_LIBRARY_DIR}/IfcParse.lib ${IFC_LIBRARY_DIR}/IfcGeom.lib)
     
+    string(REGEX REPLACE "([^;]+)" "${IFC_LIBRARY_DIR}/\\1.lib" IFC_LIBRARIES "${IFC_LIBRARY_NAMES}")
     string(REGEX REPLACE "([^;]+)" "${ICU_LIBRARY_DIR}/\\1.lib" ICU_LIBRARIES "${ICU_LIBRARY_NAMES}")
 endif()
 endif()

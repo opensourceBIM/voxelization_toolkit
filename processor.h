@@ -16,7 +16,6 @@
 #ifdef WITH_IFC
 #include <map>                    // @todo < commit in IfcopenShell
 #include <ifcparse/IfcLogger.h>   // @todo < commit in IfcopenShell
-#include <ifcgeom/IfcGeom.h>      // @todo for ALMOST_ZERO
 #include <ifcgeom/IfcGeomElement.h>
 
 typedef IfcGeom::BRepElement<double> elem_t;
