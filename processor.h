@@ -229,10 +229,10 @@ class threaded_processor : public abstract_processor {
 	abstract_voxel_storage* voxels_;
 public:
 	threaded_processor(double x1, double y1, double z1, double d, int nx, int ny, int nz, size_t chunk_size, progress_writer& p)
-		: x1_(x1), y1_(y1), z1_(z1), d_(d), nx_(nx), ny_(ny), nz_(nz), chunk_size_(chunk_size), num_threads_(std::thread::hardware_concurrency()), p_(p), result_(nullptr) {}
+		: x1_(x1), y1_(y1), z1_(z1), d_(d), nx_(nx), ny_(ny), nz_(nz), chunk_size_(chunk_size), num_threads_(std::thread::hardware_concurrency()), p_(p), result_(nullptr), voxels_(nullptr) {}
 
 	threaded_processor(double x1, double y1, double z1, double d, int nx, int ny, int nz, size_t chunk_size, size_t num_threads, progress_writer& p)
-		: x1_(x1), y1_(y1), z1_(z1), d_(d), nx_(nx), ny_(ny), nz_(nz), chunk_size_(chunk_size), num_threads_(num_threads > 0 ? num_threads : std::thread::hardware_concurrency()), p_(p), result_(nullptr) {}
+		: x1_(x1), y1_(y1), z1_(z1), d_(d), nx_(nx), ny_(ny), nz_(nz), chunk_size_(chunk_size), num_threads_(num_threads > 0 ? num_threads : std::thread::hardware_concurrency()), p_(p), result_(nullptr), voxels_(nullptr) {}
 
 	threaded_processor(abstract_voxel_storage* storage, progress_writer& progress)
 		: voxels_(storage)
