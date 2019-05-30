@@ -66,6 +66,7 @@ public:
 			auto block = make_vec<int>(factor_, factor_, factor_).as<size_t>();
 
 			BEGIN_LOOP_ZERO_2(input->num_chunks())
+				const auto& chunk_idx = ijk;
 				auto c = input->get_chunk(ijk);
 				auto ijk2 = ijk * ((size_t)factor_);
 				if (c != nullptr) {
@@ -86,7 +87,7 @@ public:
 						auto cv = (continuous_voxel_storage<bit_t>*) c;
 						for (auto& v : (*cv)) {
 							BEGIN_LOOP_ZERO_2(block)
-								result->Set(v * ((size_t)factor_) + ijk);
+								result->Set((v + chunk_idx * input->chunk_size()) * ((size_t)factor_) + ijk);
 							END_LOOP;
 						}
 					}
