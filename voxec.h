@@ -569,11 +569,20 @@ class op_collapse : public op_geom<collapse> {};
 class op_traverse : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "seed", "voxels" } };
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "seed", "voxels" }, { false, "depth", "integer|real"} };
 		return nm_;
 	}
 	symbol_value invoke(const scope_map& scope) const {
 		visitor<> v;
+
+		double voxel_size = scope.get_value<double>("VOXELSIZE");
+		try {
+			v.max_depth = scope.get_value<int>("depth");
+		} catch (...) {
+			try {
+				v.max_depth = (int) std::ceil(scope.get_value<double>("depth") / voxel_size);
+			} catch (...) {	}
+		}
 
 		regular_voxel_storage* voxels = (regular_voxel_storage*) scope.get_value<abstract_voxel_storage*>("input");
 		regular_voxel_storage* seed = (regular_voxel_storage*) scope.get_value<abstract_voxel_storage*>("seed");

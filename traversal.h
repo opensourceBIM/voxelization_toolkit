@@ -32,6 +32,8 @@ struct tagged_index {
 
 template <typename DofT = DOF_XYZ, typename PostT = POST_CHECK_ALWAYS>
 class visitor {
+public:
+	typedef std::pair<size_t, vec_n<3, size_t>> queue_elem_t;
 private:
 	regular_voxel_storage* storage_;
 	regular_voxel_storage* visited_;
@@ -112,7 +114,11 @@ private:
 		}
 	}
 
-	void chunk_neighbours_queue_add_(const vec_n<3, size_t>& cijk) {
+	size_t manhattan_distance(const vec_n<3, size_t>& a, const vec_n<3, size_t>& b) {
+		return (b.as<int>() - a.as<int>()).abs().sum();
+	}
+
+	void chunk_neighbours_queue_add_(size_t current_depth, const vec_n<3, size_t>& previous_ijk, const vec_n<3, size_t>& cijk) {
 		for (size_t i = 0; i < 3; ++i) {
 			for (size_t j = 0; j < 2; ++j) {
 				if (j == 0 && cijk.get(i) == 0) {
@@ -138,7 +144,7 @@ private:
 					// neighbour chunk is same constant value
 					// only a single voxel position within the chunk is added to queue
 					auto lower = cijk2 * chunk_size_;
-					queue.push_back(lower);
+					queue.push_back({ manhattan_distance(previous_ijk, lower), lower });
 				} else if (v == CHUNK_MIXED) {
 					// calculate neighbour plane
 					// @todo is it necessary to cast to long here?
@@ -151,7 +157,7 @@ private:
 					}
 					BEGIN_LOOP2(lower, upper)
 						if (get_(ijk.as<size_t>()) == search_value_) {
-							queue.push_back(ijk.as<size_t>());
+							queue.push_back({ manhattan_distance(previous_ijk, ijk.as<size_t>()), ijk.as<size_t>() });
 						}
 					END_LOOP;
 				}
@@ -159,15 +165,15 @@ private:
 		}
 	}
 
-	void neighbours_queue_add_(const vec_n<3, size_t>& current) {
+	void neighbours_queue_add_(const queue_elem_t& current) {
 		for (size_t i = 0; i < 3; ++i) {
 			for (size_t j = 0; j < 2; ++j) {
-				if (j == 0 && current.get(i) == 0) {
+				if (j == 0 && current.second.get(i) == 0) {
 					went_out_of_bounds = true;
 					continue;
 				}
 
-				auto pos = current;
+				auto pos = current.second;
 
 				if (j == 0) {
 					pos.get(i)--;
@@ -182,37 +188,43 @@ private:
 
 				auto v = get_(pos);
 				if (v == search_value_) {
-					queue.push_back(pos);
+					queue.push_back({ current.first + 1, pos });
 				}
 			}
 		}
 	}
 
 	template <typename Fn>
-	void process_(Fn fn, const vec_n<3, size_t>& pos) {
-		if (is_visited_(pos)) {
+	void process_(Fn fn, const queue_elem_t& pos) {
+		if (is_visited_(pos.second)) {
 			return;
 		}
 
-		auto c = pos / chunk_size_;
+		if (max_depth && pos.first > max_depth.get()) {
+			return;
+		}
+
+		auto c = pos.second / chunk_size_;
 		if (DofT::use_chunks && is_chunked_ && chunks_.get(c.get<0>(), c.get<1>(), c.get<2>()) != CHUNK_MIXED) {
 			auto lower = c * chunk_size_;
 			auto upper = (c + 1U) * chunk_size_;
 
 			fn(tagged_index{ tagged_index::CHUNK, c });
 
-			chunk_neighbours_queue_add_(c);
+			chunk_neighbours_queue_add_(pos.first, pos.second, c);
 			set_visited_chunk_(c);
-		} else if (post_condition_(pos)) {
-			fn(tagged_index{ tagged_index::VOXEL, pos });
+		} else if (post_condition_(pos.second)) {
+			fn(tagged_index{ tagged_index::VOXEL, pos.second });
 
 			neighbours_queue_add_(pos);
-			set_visited_(pos);
+			set_visited_(pos.second);
 		}
 	}
 
 public:
-	std::deque<vec_n<3, size_t>> queue;
+	// @todo max_depth doesn't work correctly with implicit voxel storage
+	boost::optional<int> max_depth;
+	std::deque<queue_elem_t> queue;
 	bool went_out_of_bounds;
 
 	visitor() : post_condition_(POST_CHECK_ALWAYS()) {}
@@ -225,10 +237,10 @@ public:
 
 		search_value_ = get_(seed);
 		queue = { };
-		process_(fn, seed);
+		process_(fn, { 0, seed });
 
 		while (!queue.empty()) {
-			const vec_n<3, size_t>& current = queue.front();
+			const queue_elem_t& current = queue.front();
 			process_(fn, current);
 			queue.pop_front();
 		}		
@@ -243,11 +255,11 @@ public:
 
 		for (const auto& pos : *seed) {
 			search_value_ = get_(pos);
-			process_(fn, pos);
+			process_(fn, { 0, pos });
 		}
 
 		while (!queue.empty()) {
-			const vec_n<3, size_t>& current = queue.front();
+			const queue_elem_t& current = queue.front();
 			process_(fn, current);
 			queue.pop_front();
 		}
