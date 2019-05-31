@@ -313,9 +313,12 @@ public:
 		return t;
 	}
 
+	template <typename U = T, typename std::enable_if<std::is_signed<U>::value, int>::type = 0>
 	vec_n<N, T> abs() {
 		vec_n<N, T> r;
-		unary_map_(r, std::abs<T>);
+		unary_map_(r, [](auto&& v) {
+			return ::abs(v);
+		});
 		return r;
 	}
 
