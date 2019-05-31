@@ -475,6 +475,18 @@ public:
 	}
 };
 
+class op_volume_inverted : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" } };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input");
+		return threaded_post_process<traversal_voxel_filler_inverted>(1)((regular_voxel_storage*)voxels);
+	}
+};
+
 class op_fill_volume : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {

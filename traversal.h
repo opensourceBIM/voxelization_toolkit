@@ -347,8 +347,9 @@ public:
 	
 	regular_voxel_storage* output;
 	bool start_outside;
+	bool invert;
 
-	traversal_voxel_filler() : output(nullptr), start_outside(false) {}
+	traversal_voxel_filler() : output(nullptr), start_outside(false), invert(true) {}
 
 	regular_voxel_storage * operator()(regular_voxel_storage* storage) {
 		// NB: this only works for one single connected component
@@ -392,7 +393,7 @@ public:
 			throw std::runtime_error("Failed to select seed out of voxel volume");
 		}
 
-		if (v.went_out_of_bounds) {
+		if (v.went_out_of_bounds && invert) {
 			// Invert if we detect we detect left storage bounds
 
 			regular_voxel_storage* inverted = (regular_voxel_storage*) output->inverted();
@@ -442,6 +443,19 @@ public:
 	regular_voxel_storage * operator()(regular_voxel_storage* storage) {
 		traversal_voxel_filler filler;
 		filler.start_outside = true;
+		filler.progress_callback = boost::none;
+		return filler(storage);
+	}
+};
+
+class traversal_voxel_filler_inverted : public post_process {
+public:
+	static const bool UNION_INPUT = false;
+
+	regular_voxel_storage * operator()(regular_voxel_storage* storage) {
+		traversal_voxel_filler filler;
+		filler.start_outside = true;
+		filler.invert = false;
 		filler.progress_callback = boost::none;
 		return filler(storage);
 	}
