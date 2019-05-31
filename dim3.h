@@ -78,6 +78,16 @@ private:
 		binary_map_scalar_<i + 1>(other, dest, fn);
 	}
 
+	template<size_t i = 0, typename Fn>
+	inline typename std::enable_if<i == N, T>::type reduce_(Fn fn, T v = T(0)) const {
+		return v;
+	}
+
+	template<size_t i = 0, typename Fn>
+	inline typename std::enable_if<i < N, T>::type reduce_(Fn fn, T v = T(0)) const {
+		return reduce_<i + 1>(fn, fn(v, get<i>()));
+	}
+
 public:
 	vec_n() {
 		ts_.fill((T)0);
@@ -305,9 +315,7 @@ public:
 
 	vec_n<N, T> abs() {
 		vec_n<N, T> r;
-		unary_map_(r, [](auto&& v) {
-			return std::abs(v);
-		});
+		unary_map_(r, std::abs<T>);
 		return r;
 	}
 
@@ -390,6 +398,10 @@ public:
 	}
 
 	////
+
+	T sum() const {
+		return reduce_<>(std::plus<T>());
+	}
 
 	template <typename U = T, typename std::enable_if<std::is_integral<U>::value, int>::type = 0>
 	self_type ceil_div(T t) const {

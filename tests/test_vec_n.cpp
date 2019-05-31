@@ -24,4 +24,6 @@ TEST(VecN, Arithmetic) {
 	EXPECT_EQ(a, 1);
 
 	EXPECT_TRUE((vec123.maximum(vec003 + 1) == vec124).all());
+
+	EXPECT_EQ(vec123.sum(), 6);
 }
