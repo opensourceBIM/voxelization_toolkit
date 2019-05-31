@@ -253,10 +253,18 @@ public:
 		
 		queue = { };
 
+		bool first = true;
 		for (const auto& pos : *seed) {
-			search_value_ = get_(pos);
+			auto v = get_(pos);
+			if (!first && v != search_value_) {
+				throw std::runtime_error("Valuation for seed not constant");
+			}
+			search_value_ = v;
 			process_(fn, { 0, pos });
+			first = false;
 		}
+
+		std::cerr << "Search value " << search_value_ << std::endl;
 
 		while (!queue.empty()) {
 			const queue_elem_t& current = queue.front();
