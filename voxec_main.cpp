@@ -77,6 +77,7 @@ int main(int argc, char** argv) {
 
 	if (std::distance(f, first) != size) {
 		std::cerr << "Parse errors parsing voxelfile" << std::endl;
+		return 1;
 	}
 
 	try {
