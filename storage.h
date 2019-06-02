@@ -966,6 +966,9 @@ protected:
 			auto a = Sa == CK_EMPTY ? nullptr : get_chunk(this, ijk);
 			auto b = Sb == CK_EMPTY ? nullptr : get_chunk(other, ijk);
 
+			// static const char* const css[] =  { "CK_EMPTY", "CK_MIXED_IMPL", "CK_MIXED_EXPL", "CK_FULL" };
+			// std::cout << "boolean operatoin of chunk " << ijk.format() << " " << css[Sa] << " " << css[Sb] << std::endl;  
+
 			if (mode == OP_UNION) {
 				if ((Sa == CK_FULL || Sb == CK_FULL) && get_chunk(n, ijk) == nullptr) {
 					n->create_constant((ijk - left).as<size_t>(), 1U);

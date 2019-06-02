@@ -20,6 +20,7 @@ voxel_operation_map::map_t& voxel_operation_map::map() {
 		m.insert(std::make_pair(std::string("volume"), &instantiate<op_volume>));
 		m.insert(std::make_pair(std::string("volume2"), &instantiate<op_volume_2>));
 		m.insert(std::make_pair(std::string("volume_inverted"), &instantiate<op_volume_inverted>));
+		m.insert(std::make_pair(std::string("invert"), &instantiate<op_invert>));
 		m.insert(std::make_pair(std::string("fill_volume"), &instantiate<op_fill_volume>));
 		m.insert(std::make_pair(std::string("union"), &instantiate<op_union>));
 		m.insert(std::make_pair(std::string("subtract"), &instantiate<op_subtract>));
