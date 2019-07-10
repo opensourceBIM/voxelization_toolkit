@@ -20,8 +20,14 @@ if(UNIX)
     set(IFCOPENSHELL_INSTALL ${IFCOPENSHELL_ROOT}/build/Linux/x86_64/install)
     
     if(IFC_SUPPORT)
-        set(OCC_LIBRARY_DIR  ${IFCOPENSHELL_INSTALL}/occt-7.3.0/lib)
-        set(OCC_INCLUDE_DIR  ${IFCOPENSHELL_INSTALL}/occt-7.3.0/include/opencascade)
+        foreach(occt_dir occt-7.3.0 occt-7.3.0p3)
+            if(EXISTS "${IFCOPENSHELL_INSTALL}/${occt_dir}/")
+                set(OCCT_PATH "${IFCOPENSHELL_INSTALL}/${occt_dir}/")
+            endif()
+        endforeach()
+
+        set(OCC_LIBRARY_DIR  ${OCCT_PATH}/lib)
+        set(OCC_INCLUDE_DIR  ${OCCT_PATH}/include/opencascade)
     endif()
     
     string(REGEX REPLACE "([^;]+)" "${OCC_LIBRARY_DIR}/lib\\1.a" OCC_LIBRARIES "${OCC_LIBRARY_NAMES}")
