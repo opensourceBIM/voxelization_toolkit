@@ -207,13 +207,17 @@ public:
 			ef.include = *include;
 			ef.traverse = true;
 
+			std::vector<std::string> entities_without_quotes;
+			std::transform(entities.begin(), entities.end(), std::back_inserter(entities_without_quotes), [](const std::string& v) {
+				return v.substr(1, v.size() - 2);
+			});
 
 #ifdef IFCOPENSHELL_05
-			std::transform(entities.begin(), entities.end(), std::inserter(ef_elements, ef_elements.begin()), [](const std::string& v) {
-				return IfcSchema::Type::FromString(boost::to_upper_copy(v.substr(1, v.size() - 2)));
+			std::transform(entities_without_quotes.begin(), entities_without_quotes.end(), std::inserter(ef_elements, ef_elements.begin()), [](const std::string& v) {
+				return IfcSchema::Type::FromString(boost::to_upper_copy(v));
 			});
 #else
-			ef_elements.insert(entities.begin(), entities.end());
+			ef_elements.insert(entities_without_quotes.begin(), entities_without_quotes.end());
 #endif
 
 			if (*include) {
