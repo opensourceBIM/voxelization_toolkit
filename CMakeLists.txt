@@ -112,32 +112,34 @@ endif()
 if(IFC_SUPPORT)
 set(BOOST_COMPONENTS ${BOOST_COMPONENTS} filesystem)
 if(UNIX)
-    set(ICU_LIBRARY_NAMES icuuc icudata)
-    
     set(BOOST_ROOT       ${IFCOPENSHELL_INSTALL}/boost-1.59.0)
-    
-    set(ICU_LIBRARY_DIR  ${IFCOPENSHELL_INSTALL}/icu-56.1/lib)
-    set(ICU_INCLUDE_DIR  ${IFCOPENSHELL_INSTALL}/icu-56.1/include)
     
     set(IFC_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/src)
     set(IFC_LIBRARY_DIR  ${IFCOPENSHELL_INSTALL}/ifcopenshell/lib)
     
     string(REGEX REPLACE "([^;]+)" "${IFC_LIBRARY_DIR}/lib\\1.a" IFC_LIBRARIES "${IFC_LIBRARY_NAMES}")
-    string(REGEX REPLACE "([^;]+)" "${ICU_LIBRARY_DIR}/lib\\1.a" ICU_LIBRARIES "${ICU_LIBRARY_NAMES}")
+
+    if (${ifcopenshell_major_version} STREQUAL "0.5")
+        set(ICU_LIBRARY_NAMES icuuc icudata)
+        set(ICU_LIBRARY_DIR  ${IFCOPENSHELL_INSTALL}/icu-56.1/lib)
+        set(ICU_INCLUDE_DIR  ${IFCOPENSHELL_INSTALL}/icu-56.1/include)
+        string(REGEX REPLACE "([^;]+)" "${ICU_LIBRARY_DIR}/lib\\1.a" ICU_LIBRARIES "${ICU_LIBRARY_NAMES}")
+    endif()
 else()
-    set(ICU_LIBRARY_NAMES icuuc icudt)
-    
     set(BOOST_ROOT       ${IFCOPENSHELL_ROOT}/deps/boost_1_67_0)
     set(BOOST_LIBRARYDIR ${IFCOPENSHELL_ROOT}/deps/boost_1_67_0/stage/vs${MSVC_YEAR}-Win32/lib)
 	
-    set(ICU_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/icu/lib)
-    set(ICU_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/icu/include)
-    
     set(IFC_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/src)
     set(IFC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/build-vs${MSVC_YEAR}-x86/${CMAKE_BUILD_TYPE})
     
     string(REGEX REPLACE "([^;]+)" "${IFC_LIBRARY_DIR}/\\1.lib" IFC_LIBRARIES "${IFC_LIBRARY_NAMES}")
-    string(REGEX REPLACE "([^;]+)" "${ICU_LIBRARY_DIR}/\\1.lib" ICU_LIBRARIES "${ICU_LIBRARY_NAMES}")
+
+    if (${ifcopenshell_major_version} STREQUAL "0.5")
+        set(ICU_LIBRARY_NAMES icuuc icudt)
+        set(ICU_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/icu/lib)
+        set(ICU_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/icu/include)
+        string(REGEX REPLACE "([^;]+)" "${ICU_LIBRARY_DIR}/\\1.lib" ICU_LIBRARIES "${ICU_LIBRARY_NAMES}")
+    endif()
 endif()
 endif()
 
@@ -146,10 +148,10 @@ find_package(Boost REQUIRED COMPONENTS ${BOOST_COMPONENTS})
 message(STATUS "Boost include files found in ${Boost_INCLUDE_DIRS}")
 message(STATUS "Boost libraries found in ${Boost_LIBRARY_DIRS}")
 
-include_directories(${IFC_INCLUDE_DIR} ${OCC_INCLUDE_DIR} ${ICU_INCLUDE_DIR} ${Boost_INCLUDE_DIRS})
+include_directories(${IFC_INCLUDE_DIR} ${OCC_INCLUDE_DIR} ${Boost_INCLUDE_DIRS})
 link_directories(${Boost_LIBRARY_DIRS})
 
-include_directories(${INCLUDE_DIRECTORIES} ${OCC_INCLUDE_DIR} ${ICU_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${IFC_INCLUDE_DIR})
+include_directories(${INCLUDE_DIRECTORIES} ${OCC_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${IFC_INCLUDE_DIR})
 include(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG("-std=c++14" COMPILER_SUPPORTS_CXX11)
 if(COMPILER_SUPPORTS_CXX11)
