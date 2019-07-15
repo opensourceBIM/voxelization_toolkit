@@ -87,6 +87,9 @@ void regular_voxel_storage::obj_export(obj_export_helper& obj, bool with_compone
 				vs[2].get(o0) += d;
 				vs[2].get(o1) += d;
 				vs[3].get(o1) += d;
+				if (!side) {
+					std::reverse(vs.begin(), vs.end());
+				}
 				for (auto& v : vs) {
 					if (side) {
 						v.get(normal) += d;
