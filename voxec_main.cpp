@@ -76,7 +76,7 @@ int main(int argc, char** argv) {
 	phrase_parse(first, last, parser, blank, tree);
 
 	if (std::distance(f, first) != size) {
-		std::cerr << "Parse errors parsing voxelfile" << std::endl;
+		std::cerr << "Parse errors parsing voxelfile at " << std::distance(f, first) << std::endl;
 		return 1;
 	}
 
