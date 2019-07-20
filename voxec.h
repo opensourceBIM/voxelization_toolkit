@@ -25,6 +25,7 @@ namespace IfcParse {
 
 #include <Bnd_Box.hxx>
 #include <BRepBndLib.hxx>
+#include <BRep_Builder.hxx>
 
 #include <set>
 #include <map>
@@ -34,6 +35,13 @@ namespace IfcParse {
 #include <boost/variant/apply_visitor.hpp>
 #include <boost/tokenizer.hpp>
 #include <boost/range/iterator_range.hpp>
+
+
+#ifdef WIN32
+#define DIRSEP "\\"
+#else
+#define DIRSEP "/"
+#endif
 
 typedef boost::variant<boost::blank, std::vector<IfcParse::IfcFile*>, geometry_collection_t*, abstract_voxel_storage*, function_arg_value_type> symbol_value;
 
@@ -305,19 +313,10 @@ public:
 };
 #endif
 
-class op_voxelize : public voxel_operation {
-public:
-	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "input", "surfaceset" }, {false, "VOXELSIZE", "real"} };
-		return nm_;
-	}
-	symbol_value invoke(const scope_map& scope) const {
-		geometry_collection_t* surfaces = scope.get_value<geometry_collection_t*>("input");
-
-		double x1, y1, z1, x2, y2, z2, vsize;
+namespace {
+	abstract_voxel_storage* voxelize(geometry_collection_t* surfaces, double vsize, int chunksize, const boost::optional<int>& threads) {
+		double x1, y1, z1, x2, y2, z2;
 		int nx, ny, nz;
-
-		vsize = scope.get_value<double>("VOXELSIZE");
 
 		Bnd_Box global_bounds;
 		for (auto& p : *surfaces) {
@@ -339,9 +338,34 @@ public:
 		nz += PADDING * 2;
 
 		progress_writer progress("voxelize");
-		threaded_processor p(x1, y1, z1, vsize, nx, ny, nz, scope.get_value<int>("CHUNKSIZE"), scope.get_value<int>("THREADS"), progress);
-		p.process(surfaces->begin(), surfaces->end(), SURFACE(), output(MERGED()));
-		return p.voxels();
+		if (threads) {
+			threaded_processor p(x1, y1, z1, vsize, nx, ny, nz, chunksize, *threads, progress);
+			p.process(surfaces->begin(), surfaces->end(), SURFACE(), output(MERGED()));
+			return p.voxels();
+		} else {
+			auto voxels = factory().chunk_size(chunksize).create(x1, y1, z1, vsize, nx, ny, nz);
+			// nb: the other constructor would tell the constructor to delete the created voxels
+			processor p(voxels, progress);
+			p.process(surfaces->begin(), surfaces->end(), SURFACE(), output(MERGED()));
+			return voxels;
+		}
+	}
+}
+
+class op_voxelize : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "surfaceset" }, {false, "VOXELSIZE", "real"} };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		geometry_collection_t* surfaces = scope.get_value<geometry_collection_t*>("input");
+
+		double vsize = scope.get_value<double>("VOXELSIZE");
+		int cs = scope.get_value<int>("CHUNKSIZE");
+		int t = scope.get_value<int>("THREADS");
+
+		return voxelize(surfaces, vsize, cs, t);
 	}
 };
 
@@ -356,6 +380,71 @@ public:
 		connected_components((regular_voxel_storage*) voxels, [](regular_voxel_storage* c) {
 			std::cout << "Component " << c->count() << std::endl;
 		});
+		symbol_value v;
+		return v;
+	}
+};
+
+class op_dump_surfaces : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input_voxels", "voxels" }, { true, "input_surfaces", "surfaceset" }, { true, "output_path", "string" } };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input_voxels");
+		
+		auto scope_copy = scope;
+		geometry_collection_t* surfaces = scope.get_value<geometry_collection_t*>("input_surfaces");
+
+		const std::string output_path = scope.get_value<std::string>("output_path");
+		
+		double vsize = scope.get_value<double>("VOXELSIZE");
+		int cs = scope.get_value<int>("CHUNKSIZE");
+
+		BRep_Builder B;
+
+		TopoDS_Compound face_subset_all_elem;
+		B.MakeCompound(face_subset_all_elem);
+
+		for (auto& pair : *surfaces) {
+			TopoDS_Compound face_subset;
+			B.MakeCompound(face_subset);
+
+			bool any = false;
+
+			TopExp_Explorer exp(pair.second, TopAbs_FACE);
+			
+			for (; exp.More(); exp.Next()) {
+				TopoDS_Compound C;
+				B.MakeCompound(C);
+				B.Add(C, exp.Current());
+				geometry_collection_t single = { { pair.first, C} };				
+
+				auto vs = voxelize(&single, vsize, cs, boost::none);
+				auto x = vs->boolean_intersection(voxels);
+				
+				if (x->count() * 2 >= vs->count()) {
+					B.Add(face_subset, exp.Current());
+					B.Add(face_subset_all_elem, exp.Current());
+					any = true;
+				}
+
+				delete vs;
+				delete x;
+			}
+
+			if (any) {
+				std::string fn = output_path + DIRSEP + std::to_string(pair.first) + ".brep";
+				std::ofstream fs(fn.c_str());
+				BRepTools::Write(face_subset, fs);
+			}
+		}
+
+		std::string fn = output_path + DIRSEP + "all.brep";
+		std::ofstream fs(fn.c_str());
+		BRepTools::Write(face_subset_all_elem , fs);
+
 		symbol_value v;
 		return v;
 	}
