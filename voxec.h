@@ -230,13 +230,16 @@ public:
 
 			if (*include) {
 				if (ef_elements.find(ifc_roof) != ef_elements.end()) {
+					// Including { IfcRoof, ... } then we need to include Slabs (as they are potentially roof slabs)
 					ef_elements.insert(ifc_slab);
 					roof_slabs = true;
 				}
 			} else {
 				if (ef_elements.find(ifc_roof) == ef_elements.end()) {
-					ef_elements.erase(ifc_slab);
-					roof_slabs = false;
+					// Excluding NOT IfcRoof then we need to exclude Slabs as well (as they are potentially roof slabs)
+					if (ef_elements.erase(ifc_slab) > 0) {
+						roof_slabs = false;
+					}
 				}
 			}
 		} else {
@@ -254,6 +257,9 @@ public:
 		for (auto ifc_file : ifc_files) {
 
 			IfcGeom::Iterator<double> iterator(settings_surface, ifc_file, filters_surface);
+			
+			// For debugging geometry creation from IfcOpenShell
+			// Logger::SetOutput(&std::cout, &std::cout);
 
 			if (!iterator.initialize()) {
 				continue;
@@ -385,6 +391,27 @@ public:
 	}
 };
 
+namespace {
+	void dump_info(abstract_voxel_storage* voxels) {
+		if (dynamic_cast<abstract_chunked_voxel_storage*>(voxels)) {
+			auto left = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->grid_offset();
+			auto nc = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->num_chunks();
+			auto right = (left + nc.as<long>()) - (decltype(left)::element_type)1;
+			auto sz = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->voxel_size();
+			auto szl = (long)dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->chunk_size();
+			auto left_world = ((voxels->bounds()[0].as<long>() + left * szl).as<double>() * sz);
+			auto right_world = ((voxels->bounds()[1].as<long>() + left * szl).as<double>() * sz);
+			std::cerr << "voxels: "
+				<< left.format() << " - " << right.format()
+				<< " ; count: " << voxels->count()
+				<< " ; bounds: " << voxels->bounds()[0].format()
+				<< " - " << voxels->bounds()[1].format() << std::endl
+				<< " ; world: " << left_world.format()
+				<< " - " << right_world.format() << std::endl;
+		}
+	}
+}
+
 class op_dump_surfaces : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
@@ -423,8 +450,17 @@ public:
 
 				auto vs = voxelize(&single, vsize, cs, boost::none);
 				auto x = vs->boolean_intersection(voxels);
-				
-				if (x->count() * 2 >= vs->count()) {
+
+				// std::cout << "#" << pair.first << std::endl;
+				// std::cout << "vs ";
+				// dump_info(vs);
+				// std::cout << "x  ";
+				// dump_info(x);
+
+				if (vs->count() > 0 && x->count() * 2 >= vs->count()) {
+					// @todo I thought that a valid non-null face would result in at least once voxel.
+					//       there might be differences here with the scanline algorithm and box intersect
+					//       algorithm.
 					B.Add(face_subset, exp.Current());
 					B.Add(face_subset_all_elem, exp.Current());
 					any = true;
