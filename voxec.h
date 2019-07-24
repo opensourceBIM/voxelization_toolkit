@@ -62,6 +62,9 @@ protected:
 	}
 
 public:
+	class not_in_scope : public std::runtime_error {
+		using std::runtime_error::runtime_error;
+	};
 
 	template <typename T>
 	const T& get_value_or(const std::string& symbol, const T& default_value) const {
@@ -76,9 +79,21 @@ public:
 	const T& get_value(const std::string& symbol) const {
 		auto it = find(symbol);
 		if (it == end()) {
-			throw std::runtime_error("Not in scope " + symbol);
+			throw not_in_scope("Not in scope " + symbol);
 		}
 		return get_value_<T>(it->second);
+	}
+
+	const int get_length(const std::string& symbol) const {
+		auto it = find(symbol);
+		if (it == end()) {
+			throw not_in_scope("Not in scope " + symbol);
+		}
+		try {
+			return get_value_<int>(it->second);
+		} catch (boost::bad_get&) {
+			return std::ceil(get_value_<double>(it->second) / get_value<double>("VOXELSIZE"));
+		}
 	}
 
 	bool has(const std::string& symbol) const {
@@ -343,12 +358,13 @@ namespace {
 		ny += PADDING * 2;
 		nz += PADDING * 2;
 
-		progress_writer progress("voxelize");
 		if (threads) {
+			progress_writer progress("voxelize");
 			threaded_processor p(x1, y1, z1, vsize, nx, ny, nz, chunksize, *threads, progress);
 			p.process(surfaces->begin(), surfaces->end(), SURFACE(), output(MERGED()));
 			return p.voxels();
 		} else {
+			progress_writer progress;
 			auto voxels = factory().chunk_size(chunksize).create(x1, y1, z1, vsize, nx, ny, nz);
 			// nb: the other constructor would tell the constructor to delete the created voxels
 			processor p(voxels, progress);
@@ -517,14 +533,7 @@ public:
 		return nm_;
 	}
 	symbol_value invoke(const scope_map& scope) const {
-		double voxel_size = scope.get_value<double>("VOXELSIZE");
-
-		int d;
-		try {
-			d = scope.get_value<int>("d");
-		} catch (...) {
-			d = std::ceil(scope.get_value<double>("d") / voxel_size);
-		}
+		int d = scope.get_length("d");
 		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input");
 
 #if 0
@@ -690,25 +699,9 @@ public:
 	symbol_value invoke(const scope_map& scope) const {
 		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input");
 
-		double voxel_size = scope.get_value<double>("VOXELSIZE");
-		int dx, dy, dz;
-		try {
-			dx = scope.get_value<int>("dx");
-		} catch (...) {
-			dx = std::ceil(scope.get_value<double>("dx") / voxel_size);
-		}
-
-		try {
-			dy = scope.get_value<int>("dy");
-		} catch (...) {
-			dy = std::ceil(scope.get_value<double>("dy") / voxel_size);
-		}
-
-		try {
-			dz = scope.get_value<int>("dz");
-		} catch (...) {
-			dz = std::ceil(scope.get_value<double>("dz") / voxel_size);
-		}
+		int dx = scope.get_length("dx");
+		int dy = scope.get_length("dy");
+		int dz = scope.get_length("dz");
 
 		T s;
 		return s(voxels, dx, dy, dz);
@@ -728,13 +721,10 @@ public:
 	symbol_value invoke(const scope_map& scope) const {
 		visitor<> v;
 
-		double voxel_size = scope.get_value<double>("VOXELSIZE");
 		try {
-			v.max_depth = scope.get_value<int>("depth");
-		} catch (...) {
-			try {
-				v.max_depth = (int) std::ceil(scope.get_value<double>("depth") / voxel_size);
-			} catch (...) {	}
+			v.max_depth = scope.get_length("depth");
+		} catch (scope_map::not_in_scope&) {
+			// traversal with unconstrained depth
 		}
 
 		regular_voxel_storage* voxels = (regular_voxel_storage*) scope.get_value<abstract_voxel_storage*>("input");
