@@ -33,7 +33,7 @@ struct tagged_index {
 template <typename DofT = DOF_XYZ, typename PostT = POST_CHECK_ALWAYS>
 class visitor {
 public:
-	typedef std::pair<size_t, vec_n<3, size_t>> queue_elem_t;
+	typedef std::pair<double, vec_n<3, size_t>> queue_elem_t;
 private:
 	regular_voxel_storage* storage_;
 	regular_voxel_storage* visited_;
@@ -114,11 +114,34 @@ private:
 		}
 	}
 
-	size_t manhattan_distance(const vec_n<3, size_t>& a, const vec_n<3, size_t>& b) {
-		return (b.as<int>() - a.as<int>()).abs().sum();
+	double calc_distance(const vec_n<3, size_t>& a, const vec_n<3, size_t>& b) {
+		if (connectedness == 6) {
+			// Use manhattan distance
+			return (b.as<int>() - a.as<int>()).abs().sum();
+		} else if (connectedness == 26) {
+			// this is not a euclidean distance, but rather
+			// the sum of euclidean distances of the shortest
+			// chain of voxel neighbours
+			const auto d = (b.as<int>() - a.as<int>());
+			int a = d.get<0>(), b = d.get<1>(), c = d.get<2>();
+			if (a > b) {
+				std::swap(a, b);
+			}
+			if (a > c) {
+				std::swap(a, c);
+			}
+			if (b > c) {
+				std::swap(b, c);
+			}
+			int ab = b - a;
+			int bc = c - b;
+			return std::sqrt(a * a + a * a + a * a) + std::sqrt(ab * ab + ab * ab) + bc;
+		} else {
+			return std::numeric_limits<double>::infinity();
+		}
 	}
 
-	void chunk_neighbours_queue_add_(size_t current_depth, const vec_n<3, size_t>& previous_ijk, const vec_n<3, size_t>& cijk) {
+	void chunk_neighbours_queue_add_(double current_depth, const vec_n<3, size_t>& previous_ijk, const vec_n<3, size_t>& cijk) {
 		for (size_t i = 0; i < 3; ++i) {
 			for (size_t j = 0; j < 2; ++j) {
 				if (j == 0 && cijk.get(i) == 0) {
@@ -144,7 +167,7 @@ private:
 					// neighbour chunk is same constant value
 					// only a single voxel position within the chunk is added to queue
 					auto lower = cijk2 * chunk_size_;
-					queue.push_back({ manhattan_distance(previous_ijk, lower), lower });
+					queue.push_back({ current_depth + calc_distance(previous_ijk, lower), lower });
 				} else if (v == CHUNK_MIXED) {
 					// calculate neighbour plane
 					// @todo is it necessary to cast to long here?
@@ -157,7 +180,7 @@ private:
 					}
 					BEGIN_LOOP2(lower, upper)
 						if (get_(ijk.as<size_t>()) == search_value_) {
-							queue.push_back({ manhattan_distance(previous_ijk, ijk.as<size_t>()), ijk.as<size_t>() });
+							queue.push_back({ current_depth + calc_distance(previous_ijk, ijk.as<size_t>()), ijk.as<size_t>() });
 						}
 					END_LOOP;
 				}
@@ -166,31 +189,72 @@ private:
 	}
 
 	void neighbours_queue_add_(const queue_elem_t& current) {
-		for (size_t i = 0; i < 3; ++i) {
-			for (size_t j = 0; j < 2; ++j) {
-				if (j == 0 && current.second.get(i) == 0) {
-					went_out_of_bounds = true;
-					continue;
-				}
+		if (connectedness == 6) {
+			for (size_t i = 0; i < 3; ++i) {
+				for (size_t j = 0; j < 2; ++j) {
+					if (j == 0 && current.second.get(i) == 0) {
+						went_out_of_bounds = true;
+						continue;
+					}
 
-				auto pos = current.second;
+					auto pos = current.second;
 
-				if (j == 0) {
-					pos.get(i)--;
-				} else {
-					pos.get(i)++;
-				}
+					if (j == 0) {
+						pos.get(i)--;
+					} else {
+						pos.get(i)++;
+					}
 
-				if (j == 1 && (pos >= extents_).any()) {
-					went_out_of_bounds = true;
-					continue;
-				}
+					if (j == 1 && (pos >= extents_).any()) {
+						went_out_of_bounds = true;
+						continue;
+					}
 
-				auto v = get_(pos);
-				if (v == search_value_) {
-					queue.push_back({ current.first + 1, pos });
+					auto v = get_(pos);
+					if (v == search_value_) {
+						queue.push_back({ current.first + 1., pos });
+					}
 				}
 			}
+		} else if (connectedness == 26) {
+			for (size_t i = 0; i < 3; ++i) {
+				if (i == 0 && current.second.get(0) == 0) {
+					went_out_of_bounds = true;
+					continue;
+				}
+				for (size_t j = 0; j < 3; ++j) {
+					if (j == 0 && current.second.get(1) == 0) {
+						went_out_of_bounds = true;
+						continue;
+					}
+					for (size_t k = 0; k < 3; ++k) {
+						if (k == 0 && current.second.get(2) == 0) {
+							went_out_of_bounds = true;
+							continue;
+						}
+
+						if (i == 1 && j == 1 && k == 1) {
+							continue;
+						}
+
+						auto pos = (current.second - make_vec<size_t>(1U, 1U, 1U)) + make_vec(i, j, k);
+
+						if ((pos >= extents_).any()) {
+							went_out_of_bounds = true;
+							continue;
+						}
+
+						auto v = get_(pos);
+						if (v == search_value_) {
+							int manhattan_dist = (i != 1) + (j != 1) + (k != 1);
+							static const double manhatten_to_euclidian[] = { 0., 1., sqrt(2.), sqrt(3.) };
+							const double d = manhatten_to_euclidian[manhattan_dist];
+							queue.push_back({ current.first + d, pos });
+						}						
+					}
+				}
+			}
+
 		}
 	}
 
@@ -200,7 +264,7 @@ private:
 			return;
 		}
 
-		if (max_depth && pos.first > max_depth.get()) {
+		if (max_depth && pos.first + 1.e-5 > max_depth.get()) {
 			return;
 		}
 
@@ -223,12 +287,13 @@ private:
 
 public:
 	// @todo max_depth doesn't work correctly with implicit voxel storage
-	boost::optional<int> max_depth;
+	boost::optional<double> max_depth;
 	std::deque<queue_elem_t> queue;
+	int connectedness;
 	bool went_out_of_bounds;
 
-	visitor() : post_condition_(POST_CHECK_ALWAYS()) {}
-	explicit visitor(const PostT& p) : post_condition_(p) {}
+	visitor() : connectedness(6), post_condition_(POST_CHECK_ALWAYS()) {}
+	explicit visitor(const PostT& p) : connectedness(6), post_condition_(p) {}
 
 	template <typename Fn>
 	void operator()(Fn fn, regular_voxel_storage* storage, const vec_n<3, size_t>& seed) {

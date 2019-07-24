@@ -715,7 +715,7 @@ class op_collapse : public op_geom<collapse> {};
 class op_traverse : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "seed", "voxels" }, { false, "depth", "integer|real"} };
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "seed", "voxels" }, { false, "depth", "integer|real" }, { false, "connectedness", "integer" } };
 		return nm_;
 	}
 	symbol_value invoke(const scope_map& scope) const {
@@ -723,6 +723,15 @@ public:
 
 		try {
 			v.max_depth = scope.get_length("depth");
+		} catch (scope_map::not_in_scope&) {
+			// traversal with unconstrained depth
+		}
+
+		try {
+			v.connectedness = scope.get_value<int>("connectedness");
+			if (v.connectedness != 6 && v.connectedness != 26) {
+				throw std::runtime_error("Connectedness should be 6 or 26");
+			}
 		} catch (scope_map::not_in_scope&) {
 			// traversal with unconstrained depth
 		}
