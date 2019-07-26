@@ -264,7 +264,7 @@ private:
 			return;
 		}
 
-		if (max_depth && pos.first + 1.e-5 > max_depth.get()) {
+		if (max_depth && pos.first - 1.e-9 > max_depth.get()) {
 			return;
 		}
 
