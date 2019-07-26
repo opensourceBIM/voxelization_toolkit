@@ -217,6 +217,9 @@ private:
 				}
 			}
 		} else if (connectedness == 26) {
+
+			std::vector<queue_elem_t> temp_queue;
+
 			for (size_t i = 0; i < 3; ++i) {
 				if (i == 0 && current.second.get(0) == 0) {
 					went_out_of_bounds = true;
@@ -249,10 +252,19 @@ private:
 							int manhattan_dist = (i != 1) + (j != 1) + (k != 1);
 							static const double manhatten_to_euclidian[] = { 0., 1., sqrt(2.), sqrt(3.) };
 							const double d = manhatten_to_euclidian[manhattan_dist];
-							queue.push_back({ current.first + d, pos });
+							temp_queue.push_back({ current.first + d, pos });
 						}						
 					}
 				}
+			}
+
+			// Insert smallest distances first.
+			std::sort(temp_queue.begin(), temp_queue.end(), [](const queue_elem_t& a, const queue_elem_t& b) {
+				return a.first < b.first;
+			});
+
+			for (auto& e : temp_queue) {
+				queue.push_back(e);
 			}
 
 		}
