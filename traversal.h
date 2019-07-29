@@ -4,6 +4,8 @@
 #include "storage.h"
 #include "edge_detect.h"
 
+#include <set>
+#include <queue>
 #include <deque>
 
 struct DOF_XYZ {
@@ -30,10 +32,67 @@ struct tagged_index {
 	vec_n<3, size_t> pos;
 };
 
-template <typename DofT = DOF_XYZ, typename PostT = POST_CHECK_ALWAYS>
-class visitor {
+typedef std::pair<double, vec_n<3, size_t>> traversal_queue_elem_t;
+
+template <int c>
+struct queue_type {};
+
+template<>
+struct queue_type<6> {
+	typedef std::deque<traversal_queue_elem_t> type;
+};
+
+struct smaller_distance {
+	bool operator()(const traversal_queue_elem_t& lhs, const traversal_queue_elem_t& rhs) const {
+		return lhs.first > rhs.first;
+	}
+};
+
+struct smaller_distance_2 {
+	bool operator()(const traversal_queue_elem_t& lhs, const traversal_queue_elem_t& rhs) const {
+		return lhs.first < rhs.first;
+	}
+};
+
+// A quick hack to match the deque interface
+class pc_with_pb : public std::priority_queue<traversal_queue_elem_t, std::vector<traversal_queue_elem_t>, smaller_distance> {
 public:
-	typedef std::pair<double, vec_n<3, size_t>> queue_elem_t;
+	void push_back(const traversal_queue_elem_t& e) {
+		push(e);
+	}
+
+	const traversal_queue_elem_t& front() const {
+		return top();
+	}
+
+	void pop_front() {
+		pop();
+	}
+};
+
+class ms_with_pb : public std::multiset<traversal_queue_elem_t, smaller_distance_2> {
+public:
+	void push_back(const traversal_queue_elem_t& e) {
+		insert(e);
+	}
+
+	const traversal_queue_elem_t& front() const {
+		return *begin();
+	}
+
+	void pop_front() {
+		erase(begin());
+	}
+};
+
+
+template<>
+struct queue_type<26> {
+	typedef ms_with_pb type;
+};
+
+template <int CONNECTEDNESS = 6, typename DofT = DOF_XYZ, typename PostT = POST_CHECK_ALWAYS>
+class visitor {
 private:
 	regular_voxel_storage* storage_;
 	regular_voxel_storage* visited_;
@@ -115,10 +174,10 @@ private:
 	}
 
 	double calc_distance(const vec_n<3, size_t>& a, const vec_n<3, size_t>& b) {
-		if (connectedness == 6) {
+		if (CONNECTEDNESS == 6) {
 			// Use manhattan distance
 			return (b.as<int>() - a.as<int>()).abs().sum();
-		} else if (connectedness == 26) {
+		} else if (CONNECTEDNESS == 26) {
 			// this is not a euclidean distance, but rather
 			// the sum of euclidean distances of the shortest
 			// chain of voxel neighbours
@@ -188,8 +247,8 @@ private:
 		}
 	}
 
-	void neighbours_queue_add_(const queue_elem_t& current) {
-		if (connectedness == 6) {
+	void neighbours_queue_add_(const traversal_queue_elem_t& current) {
+		if (CONNECTEDNESS == 6) {
 			for (size_t i = 0; i < 3; ++i) {
 				for (size_t j = 0; j < 2; ++j) {
 					if (j == 0 && current.second.get(i) == 0) {
@@ -216,9 +275,9 @@ private:
 					}
 				}
 			}
-		} else if (connectedness == 26) {
+		} else if (CONNECTEDNESS == 26) {
 
-			std::vector<queue_elem_t> temp_queue;
+			// std::vector<traversal_queue_elem_t> temp_queue;
 
 			for (size_t i = 0; i < 3; ++i) {
 				if (i == 0 && current.second.get(0) == 0) {
@@ -252,26 +311,27 @@ private:
 							int manhattan_dist = (i != 1) + (j != 1) + (k != 1);
 							static const double manhatten_to_euclidian[] = { 0., 1., sqrt(2.), sqrt(3.) };
 							const double d = manhatten_to_euclidian[manhattan_dist];
-							temp_queue.push_back({ current.first + d, pos });
+							// std::cout << "+ " << (current.first + d) << " " << pos.format() << std::endl;
+							queue.push_back({ current.first + d, pos });
 						}						
 					}
 				}
 			}
 
 			// Insert smallest distances first.
-			std::sort(temp_queue.begin(), temp_queue.end(), [](const queue_elem_t& a, const queue_elem_t& b) {
+			/*std::sort(temp_queue.begin(), temp_queue.end(), [](const traversal_queue_elem_t& a, const traversal_queue_elem_t& b) {
 				return a.first < b.first;
 			});
 
 			for (auto& e : temp_queue) {
 				queue.push_back(e);
-			}
+			}*/
 
 		}
 	}
 
 	template <typename Fn>
-	void process_(Fn fn, const queue_elem_t& pos) {
+	void process_(Fn fn, const traversal_queue_elem_t& pos) {
 		if (is_visited_(pos.second)) {
 			return;
 		}
@@ -300,12 +360,11 @@ private:
 public:
 	// @todo max_depth doesn't work correctly with implicit voxel storage
 	boost::optional<double> max_depth;
-	std::deque<queue_elem_t> queue;
-	int connectedness;
+	typename queue_type<CONNECTEDNESS>::type queue;
 	bool went_out_of_bounds;
 
-	visitor() : connectedness(6), post_condition_(POST_CHECK_ALWAYS()) {}
-	explicit visitor(const PostT& p) : connectedness(6), post_condition_(p) {}
+	visitor() : post_condition_(POST_CHECK_ALWAYS()) {}
+	explicit visitor(const PostT& p) : CONNECTEDNESS(6), post_condition_(p) {}
 
 	template <typename Fn>
 	void operator()(Fn fn, regular_voxel_storage* storage, const vec_n<3, size_t>& seed) {
@@ -317,7 +376,7 @@ public:
 		process_(fn, { 0, seed });
 
 		while (!queue.empty()) {
-			const queue_elem_t& current = queue.front();
+			const traversal_queue_elem_t& current = queue.front();
 			process_(fn, current);
 			queue.pop_front();
 		}		
@@ -337,14 +396,27 @@ public:
 				throw std::runtime_error("Valuation for seed not constant");
 			}
 			search_value_ = v;
+			// I'm not entirely certain of this, but it necessary to keep
+			// the queue in sorted order.
 			process_(fn, { 0, pos });
+			// queue.push_back({ 0, pos });
 			first = false;
 		}
 
-		std::cerr << "Search value " << search_value_ << std::endl;
+		// std::cerr << "Search value " << search_value_ << std::endl;
+
+		double last_d = -1.;
 
 		while (!queue.empty()) {
-			const queue_elem_t& current = queue.front();
+			const traversal_queue_elem_t& current = queue.front();
+			/*
+			std::cout << current.first << " " << current.second.format() << std::endl;
+			double d = current.first;
+			if (d < last_d) {
+				// throw std::runtime_error("unordered queue detected");
+			}
+			last_d = d;
+			*/
 			process_(fn, current);
 			queue.pop_front();
 		}

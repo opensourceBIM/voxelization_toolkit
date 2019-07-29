@@ -719,35 +719,51 @@ public:
 		return nm_;
 	}
 	symbol_value invoke(const scope_map& scope) const {
-		visitor<> v;
-
-		try {
-			v.max_depth = scope.get_length("depth");
-		} catch (scope_map::not_in_scope&) {
-			// traversal with unconstrained depth
-		}
-
-		try {
-			v.connectedness = scope.get_value<int>("connectedness");
-			if (v.connectedness != 6 && v.connectedness != 26) {
-				throw std::runtime_error("Connectedness should be 6 or 26");
-			}
-		} catch (scope_map::not_in_scope&) {
-			// traversal with unconstrained depth
-		}
-
 		regular_voxel_storage* voxels = (regular_voxel_storage*) scope.get_value<abstract_voxel_storage*>("input");
 		regular_voxel_storage* seed = (regular_voxel_storage*) scope.get_value<abstract_voxel_storage*>("seed");
 
 		regular_voxel_storage* output = (regular_voxel_storage*)voxels->empty_copy();
 
-		v([this, output, &v](const tagged_index& pos) {
+		auto callback = [this, output](const tagged_index& pos) {
 			if (pos.which == tagged_index::VOXEL) {
 				output->Set(pos.pos);
 			} else {
 				((abstract_chunked_voxel_storage*)output)->create_constant(pos.pos, 1U);
 			}
-		}, voxels, seed);
+		};
+
+		boost::optional<double> max_depth;
+		try {
+			max_depth = scope.get_length("depth");
+		} catch (scope_map::not_in_scope&) {
+			// traversal with unconstrained depth
+		}
+
+		// Type erasure to get a runtime argument into a template arg.
+		std::function<void(decltype(callback), decltype(voxels), decltype(seed))> run_visitor;
+
+		int C = 6;
+		try {
+			C = scope.get_value<int>("connectedness");
+		} catch (scope_map::not_in_scope&) {
+			// default 6 connectedness
+		}
+
+		if (C != 6 && C != 26) {
+			throw std::runtime_error("Connectedness should be 6 or 26");
+		}
+		
+		if (C == 6) {
+			visitor<6> v;
+			v.max_depth = max_depth;
+			run_visitor = v;
+		} else {
+			visitor<26> v;
+			v.max_depth = max_depth;
+			run_visitor = v;
+		}
+
+		run_visitor(callback, voxels, seed);
 
 		return output;
 	}

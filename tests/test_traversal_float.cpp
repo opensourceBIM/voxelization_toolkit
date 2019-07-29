@@ -26,9 +26,8 @@ TEST(Traversal, Float) {
 		}
 	}
 
-	visitor<> v;
+	visitor<26> v;
 	v.max_depth = sqrt(3.);
-	v.connectedness = 26;
 	int count = 0;
 	v([&count](const tagged_index& v) {
 		count++;
@@ -58,13 +57,12 @@ TEST(Traversal, Float2) {
 		}
 	}
 
-	visitor<> v;
+	visitor<26> v;
 	v.max_depth = 2.;
-	v.connectedness = 26;
 	int count = 0;
 	v([&count](const tagged_index& v) {
 		count++;
 	}, storage, seed);
 
-	ASSERT_EQ(count, 17);
+	ASSERT_EQ(count, 21);
 }
