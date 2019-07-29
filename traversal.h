@@ -364,7 +364,7 @@ public:
 	bool went_out_of_bounds;
 
 	visitor() : post_condition_(POST_CHECK_ALWAYS()) {}
-	explicit visitor(const PostT& p) : CONNECTEDNESS(6), post_condition_(p) {}
+	explicit visitor(const PostT& p) : post_condition_(p) {}
 
 	template <typename Fn>
 	void operator()(Fn fn, regular_voxel_storage* storage, const vec_n<3, size_t>& seed) {
