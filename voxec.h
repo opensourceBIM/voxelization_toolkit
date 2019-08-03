@@ -26,6 +26,7 @@ namespace IfcParse {
 #include <Bnd_Box.hxx>
 #include <BRepBndLib.hxx>
 #include <BRep_Builder.hxx>
+#include <BRepTools.hxx>
 
 #include <set>
 #include <map>
