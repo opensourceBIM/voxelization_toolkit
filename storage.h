@@ -1586,8 +1586,8 @@ public:
 		vec_n<3, size_t> m1 = ijk1 % chunk_size_;
 
 		// index in chunk on edge -> 1
-		vec_n<3, size_t> m0_0 = (m0 != 0U).as<size_t>();
-		vec_n<3, size_t> m1_0 = (m1 != (chunk_size_ - 1U)).as<size_t>();
+		vec_n<3, size_t> m0_0 = (m0 != 0U).template as<size_t>();
+		vec_n<3, size_t> m1_0 = (m1 != (chunk_size_ - 1U)).template as<size_t>();
 
 		// direction ortho to plane not shifted
 		m0_0.get(ignore_dim) = 0;
@@ -1634,7 +1634,7 @@ public:
 			throw std::runtime_error("Invalid");
 		}
 		if (value == 1) {
-			vec_n<3, double> O = vec_n<3, double>(ox_, oy_, oz_) + (c * chunk_size_).as<double>() * d_;
+			vec_n<3, double> O = vec_n<3, double>(ox_, oy_, oz_) + (c * chunk_size_).template as<double>() * d_;
 			set_chunk(c, new constant_voxel_storage<T>(
 				O.get(0), O.get(1), O.get(2),
 				d_, chunk_size_, chunk_size_, chunk_size_, value));
@@ -1655,7 +1655,7 @@ public:
 				return true;
 			}
 		} else {
-			vec_n<3, double> O = vec_n<3, double>(ox_, oy_, oz_) + (c * chunk_size_).as<double>() * d_;
+			vec_n<3, double> O = vec_n<3, double>(ox_, oy_, oz_) + (c * chunk_size_).template as<double>() * d_;
 			set_chunk(c, new planar_voxel_storage<T>(
 				O.get(0), O.get(1), O.get(2),
 				d_, chunk_size_, chunk_size_, chunk_size_, axis, offset));
