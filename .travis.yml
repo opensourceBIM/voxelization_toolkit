@@ -1,0 +1,27 @@
+language: cpp
+sudo: required
+compiler:
+  - gcc
+  - clang
+
+before_install:
+  - "sudo add-apt-repository -y ppa:freecad-community/ppa"
+  - sudo apt-get update -qq
+
+install:
+  - |
+    sudo apt-get install -y \
+    libocct-data-exchange-dev libocct-foundation-dev libocct-modeling-algorithms-dev libocct-modeling-data-dev \
+    libboost-all-dev
+    
+script:
+  - mkdir build && cd build
+  - | 
+    cmake ..
+    -DIFC_SUPPORT=Off \
+    -DOCC_INCLUDE_DIR=/usr/include/opencascade \
+    -DOCC_LIBRARY_DIR=/usr/lib/x86_64-linux-gnu \
+  - make -j2
+  - make test
+  - make install
+  
