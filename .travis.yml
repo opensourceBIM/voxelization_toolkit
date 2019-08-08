@@ -17,7 +17,7 @@ install:
 script:
   - mkdir build && cd build
   - | 
-    cmake ..
+    cmake .. \
     -DIFC_SUPPORT=Off \
     -DOCC_INCLUDE_DIR=/usr/include/opencascade \
     -DOCC_LIBRARY_DIR=/usr/lib/x86_64-linux-gnu \
