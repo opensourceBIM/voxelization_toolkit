@@ -230,8 +230,8 @@ private:
 				} else if (v == CHUNK_MIXED) {
 					// calculate neighbour plane
 					// @todo is it necessary to cast to long here?
-					auto lower = (cijk2 * chunk_size_).as<long>();
-					auto upper = ((cijk2 + 1U) * chunk_size_).as<long>();
+					auto lower = (cijk2 * chunk_size_).template as<long>();
+					auto upper = ((cijk2 + 1U) * chunk_size_).template as<long>();
 					if (j == 0) {
 						lower.get(i) = upper.get(i) - 1;
 					} else {
