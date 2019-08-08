@@ -30,7 +30,10 @@ if(UNIX)
         set(OCC_INCLUDE_DIR  ${OCCT_PATH}/include/opencascade)
     endif()
     
-    string(REGEX REPLACE "([^;]+)" "${OCC_LIBRARY_DIR}/lib\\1.a" OCC_LIBRARIES "${OCC_LIBRARY_NAMES}")
+    foreach(libname ${OCC_LIBRARY_NAMES})
+    	find_library(lib NAMES "${libname}" PATHS "${OCC_LIBRARY_DIR}" NO_DEFAULT_PATH)
+    	list(APPEND OCC_LIBRARIES "${lib}")
+    endforeach()
 
     if(NOT APPLE)
         set(LIB_RT rt)
