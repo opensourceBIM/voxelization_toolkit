@@ -23,5 +23,3 @@ script:
     -DOCC_LIBRARY_DIR=/usr/lib/x86_64-linux-gnu \
   - make -j2
   - make test
-  - make install
-  
