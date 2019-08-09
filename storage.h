@@ -28,9 +28,9 @@
 		for (ijk.get(1) = j0; ijk.get(1) <= j1; ++ijk.get(1)) {\
 			for (ijk.get(2) = k0; ijk.get(2) <= k1; ++ijk.get(2)) {
 
-#define BEGIN_LOOP2(v0, v1) BEGIN_LOOP(v0.get<0>(), v1.get<0>(), v0.get<1>(), v1.get<1>(), v0.get<2>(), v1.get<2>())
+#define BEGIN_LOOP2(v0, v1) BEGIN_LOOP(v0.template get<0>(), v1.template get<0>(), v0.template get<1>(), v1.template get<1>(), v0.template get<2>(), v1.template get<2>())
 
-#define BEGIN_LOOP_I2(v0, v1) BEGIN_LOOP_I(v0.get<0>(), v1.get<0>(), v0.get<1>(), v1.get<1>(), v0.get<2>(), v1.get<2>())
+#define BEGIN_LOOP_I2(v0, v1) BEGIN_LOOP_I(v0.template get<0>(), v1.template get<0>(), v0.template get<1>(), v1.template get<1>(), v0.template get<2>(), v1.template get<2>())
 
 #define BEGIN_LOOP_ZERO_2(v1) BEGIN_LOOP2(make_vec<decltype(v1)::element_type>((decltype(v1)::element_type)0, (decltype(v1)::element_type)0, (decltype(v1)::element_type)0), v1)
 
