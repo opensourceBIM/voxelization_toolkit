@@ -31,6 +31,7 @@ if(UNIX)
     endif()
     
     foreach(libname ${OCC_LIBRARY_NAMES})
+        unset(lib CACHE)
     	find_library(lib NAMES "${libname}" PATHS "${OCC_LIBRARY_DIR}" NO_DEFAULT_PATH)
     	list(APPEND OCC_LIBRARIES "${lib}")
     endforeach()
