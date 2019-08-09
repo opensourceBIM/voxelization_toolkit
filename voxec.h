@@ -212,6 +212,9 @@ public:
 		IfcGeom::IteratorSettings settings_surface;
 		settings_surface.set(IfcGeom::IteratorSettings::DISABLE_TRIANGULATION, true);
 		settings_surface.set(IfcGeom::IteratorSettings::USE_WORLD_COORDS, true);
+		// Only to determine whether building element parts decompositions of slabs should be processed as roofs
+		settings_surface.set(IfcGeom::IteratorSettings::SEARCH_FLOOR, true);
+		
 
 		boost::optional<bool> include, roof_slabs;
 		std::vector<std::string> entities;
@@ -299,8 +302,18 @@ public:
 					process = (pdt == IfcSchema::IfcSlabTypeEnum::IfcSlabType_ROOF) == *roof_slabs;
 				}
 #else
-				if (roof_slabs && elem->product()->declaration().is("IfcSlab")) {
-					std::string pdt = *elem->product()->get("PredefinedType");
+				auto elem_product = elem->product();
+				if (elem->product()->declaration().is("IfcBuildingElementPart")) {
+					auto parents = elem->parents();
+					if (parents.size()) {
+						// Assume the first parent of a building element part is
+						// the element that got it included by the hierarchical
+						// processing of element filters.
+						elem_product = parents.back()->product();
+					}
+				}
+				if (roof_slabs && elem_product->declaration().is("IfcSlab")) {
+					std::string pdt = *elem_product->get("PredefinedType");
 					process = (pdt == "ROOF") == *roof_slabs;
 				}
 #endif
@@ -388,7 +401,12 @@ public:
 		int cs = scope.get_value<int>("CHUNKSIZE");
 		int t = scope.get_value<int>("THREADS");
 
-		return voxelize(surfaces, vsize, cs, t);
+		if (surfaces->size() == 0) {
+			// Just some arbitrary empty region
+			return new chunked_voxel_storage<bit_t>(make_vec<long>(0,0,0), vsize, cs, make_vec<size_t>(1U,1U,1U));
+		} else {
+			return voxelize(surfaces, vsize, cs, t);
+		}
 	}
 };
 
@@ -610,6 +628,9 @@ public:
 	}
 	symbol_value invoke(const scope_map& scope) const {
 		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input");
+		if (voxels->count() == 0) {
+			return voxels->empty_copy();
+		}
 		return threaded_post_process<traversal_voxel_filler_inverse>(1)((regular_voxel_storage*)voxels);
 	}
 };
