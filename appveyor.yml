@@ -15,3 +15,4 @@ build_script:
   - mkdir build
   - cd build
   - cmake .. -DIFC_SUPPORT=Off -DBOOST_ROOT=C:\Libraries\boost_1_67_0 -DOCC_INCLUDE_DIR=C:\projects\voxelization_toolkit_build\occt\Library\include\opencascade\ -DOCC_LIBRARY_DIR=C:\projects\voxelization_toolkit_build\occt\Library\lib
+  - cmake --build
