@@ -107,7 +107,9 @@ public:
 	template<typename ... Ts>
 	// typename std::enable_if<std::is_same<Ts, T>::value, Ts>::type
 	vec_n(Ts... ts) : ts_{ ts... } {
-		// static_assert(sizeof...(ts) == N, "Number of arguments does not match template type");
+#if !defined(_MSC_VER) || _MSC_VER >= 1910
+		static_assert(sizeof...(ts) == N, "Number of arguments does not match template type");
+#endif
 	}
 	
 	template <size_t i>
