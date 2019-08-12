@@ -1,0 +1,13 @@
+version: 1.0.{build}-{branch}
+image: Visual Studio 2015
+clone_depth: 5
+configuration: Release
+
+build_script:
+  - curl -fsSL -o opencascade.tar.bz2 https://anaconda.org/conda-forge/occt/7.3.0/download/win-64/occt-7.3.0-hd7db75f_1002.tar.bz2
+  - 7z x opencascade.tar.bz2
+  - 7z x opencascade.tar
+
+  - mkdir build
+  - cd build
+  - cmake .. -DIFC_SUPPORT=Off -DBOOST_ROOT=C:\Libraries\boost_1_67_0
