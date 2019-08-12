@@ -2,12 +2,16 @@ version: 1.0.{build}-{branch}
 image: Visual Studio 2015
 clone_depth: 5
 configuration: Release
+clone_folder: C:\projects\voxelization_toolkit_build
 
 build_script:
+  - mkdir occt
+  - cd occt
   - curl -fsSL -o opencascade.tar.bz2 https://anaconda.org/conda-forge/occt/7.3.0/download/win-64/occt-7.3.0-hd7db75f_1002.tar.bz2
   - 7z x opencascade.tar.bz2
   - 7z x opencascade.tar
+  - cd ..
 
   - mkdir build
   - cd build
-  - cmake .. -DIFC_SUPPORT=Off -DBOOST_ROOT=C:\Libraries\boost_1_67_0
+  - cmake .. -DIFC_SUPPORT=Off -DBOOST_ROOT=C:\Libraries\boost_1_67_0 -DOCC_INCLUDE_DIR=C:\projects\voxelization_toolkit_build\occt\Library\include\opencascade\ -DOCC_LIBRARY_DIR=C:\projects\voxelization_toolkit_build\occt\Library\lib
