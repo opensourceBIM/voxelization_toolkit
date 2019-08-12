@@ -3,6 +3,7 @@ image: Visual Studio 2015
 clone_depth: 5
 configuration: Release
 clone_folder: C:\projects\voxelization_toolkit_build
+platform: x64
 
 build_script:
   - mkdir occt
