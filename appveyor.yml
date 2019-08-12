@@ -16,5 +16,5 @@ build_script:
   - cmake --build .
 
 test_script:
-  - for %%i in (C:\projects\voxelization_toolkit_build\build\Debug\test_*) do ("%%i")
+  - for %%i in (C:\projects\voxelization_toolkit_build\build\Debug\test_*.exe) do ("%%i")
 
