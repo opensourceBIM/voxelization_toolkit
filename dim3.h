@@ -443,15 +443,11 @@ public:
 
 #include <type_traits>
 
-template <typename... T>
-constexpr auto make_vec(T... values) ->
+template <typename T, typename... ARGS>
+constexpr auto make_vec(T const & value0, ARGS const & ... values) ->
 vec_n<
-	sizeof...(T), typename std::decay<
-	typename std::common_type<T...>::type>::type
-> {
-	return vec_n<sizeof...(T),
-		typename std::decay<
-		typename std::common_type<T...>::type>::type
-	>{std::forward<T>(values)...};
+	sizeof...(ARGS) + 1U, T> {
+	return vec_n<sizeof...(ARGS) + 1U, T
+	>{value0, static_cast<T>(values)...};
 }
 #endif
