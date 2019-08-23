@@ -756,11 +756,11 @@ private:
 
 	template<int i = 0, long long M = N, typename... Tp>
 	inline typename std::enable_if< i < M, size_t>::type calculate_index_(const std::tuple<Tp...>& idx) const {
-		// #ifndef _NDEBUG
+#ifndef NDEBUG
 		if (std::get<i>(idx) >= dims_.at(i)) {
 			throw std::runtime_error("Index out of bounds");
 		}
-		// #endif
+#endif
 		return reduce_multiply_<0, i>() * std::get<i>(idx) + calculate_index_<i + 1, M>(idx);
 	}
 
@@ -855,11 +855,11 @@ protected:
 	vec_n<3, long> grid_offset_;
 
 	inline void validate_chunk_index(const vec_n<3, size_t>& c) const {
-// #ifndef NDEBUG
+#ifndef NDEBUG
 		if ((c >= vec_n<3, size_t>(nchunksx_, nchunksy_, nchunksz_)).any()) {
 			throw std::runtime_error("Chunk index out of range");
 		}
-// #endif
+#endif
 	}
 
 	/////
