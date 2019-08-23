@@ -3,6 +3,7 @@ project (voxel)
 
 OPTION(IFC_SUPPORT "Build Volization Toolkit with IFC support (requires IfcOpenShell/master)." ON)
 OPTION(USE_STATIC_MSVC_RUNTIME "Link to the static runtime on MSVC." ON)
+OPTION(ENABLE_TESTS "Enable tests." ON)
 
 include(CTest)
 
@@ -164,6 +165,8 @@ else()
     message(FATAL_ERROR "requires a compiler with C++11 support")
 endif()
 
+if (ENABLE_TESTS)
+
 # Download and unpack googletest at configure time
 configure_file(CMakeLists.txt.in googletest-download/CMakeLists.txt)
 execute_process(COMMAND ${CMAKE_COMMAND} -G "${CMAKE_GENERATOR}" .
@@ -190,6 +193,7 @@ endif()
 add_subdirectory(${CMAKE_BINARY_DIR}/googletest-src
                  ${CMAKE_BINARY_DIR}/googletest-build
                  EXCLUDE_FROM_ALL)
+endif()
 
 set(LIBVOXELIZER_HEADER_FILES progress.h dim3.h sweep.h shift.h collapse.h edge_detect.h fill_gaps.h offset.h polyfill.h resample.h storage.h writer.h factory.h processor.h volume.h voxelizer.h traversal.h util.h)
 set(LIBVOXELIZER_SOURCE_FILES tribox3.cpp polyfill.cpp progress.cpp storage.cpp factory.cpp)
@@ -201,6 +205,7 @@ set(LIBVOXEC_SOURCE_FILES voxec.cpp)
 add_library(libvoxec STATIC ${LIBVOXEC_HEADER_FILES} ${LIBVOXEC_SOURCE_FILES})
 target_link_libraries(libvoxec libvoxel)
 
+if (ENABLE_TESTS)
 file(GLOB test_filenames tests/*.cpp)
 foreach(filename ${test_filenames})
     get_filename_component(test_name ${filename} NAME_WE)
@@ -212,6 +217,7 @@ foreach(filename ${test_filenames})
     target_link_libraries("${test_name}" gtest_main libvoxel ${libvoxec_IF_USED} ${IFC_LIBRARIES} ${ICU_LIBRARIES} ${Boost_LIBRARIES} ${OCC_LIBRARIES} ${LIB_RT} ${dl} ${CMAKE_THREAD_LIBS_INIT})
     add_test(NAME "${test_name}" COMMAND "${test_name}")
 endforeach()
+endif()
 
 add_executable(voxec voxec_main.cpp)
 target_link_libraries(voxec libvoxec)
