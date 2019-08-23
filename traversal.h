@@ -508,12 +508,18 @@ public:
 
 	traversal_voxel_filler() : output(nullptr), start_outside(false), invert(true) {}
 
-	regular_voxel_storage * operator()(regular_voxel_storage* storage) {
-		// NB: this only works for one single connected component
+	regular_voxel_storage* operator()(regular_voxel_storage* storage) {
+		if (storage->count() == 0) {
+			// Don't attempt to fill empty surface
+			return (regular_voxel_storage*) storage->copy();
+		}
+
+		if (start_outside && (storage->bounds()[0] == make_vec<size_t>(0, 0, 0)).all()) {
+			throw std::runtime_error("Not enough padding for outside fill");
+		}
 
 		visitor<> v;
 		auto seed = start_outside
-			// Assumes there is enough padding
 			? (storage->bounds()[0] - make_vec(size_t(1), size_t(1), size_t(1)))
 			: (storage->bounds()[0] + storage->bounds()[1]) / 2U;
 
