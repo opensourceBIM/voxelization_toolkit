@@ -24,10 +24,10 @@ private:
 	regular_voxel_storage* ds_;
 	double eps_;
 
-	bool generate_primitives_;
+	bool generate_primitives_, use_scanline_;
 public:
-	voxelizer(const TopoDS_Shape& shape, regular_voxel_storage* ds, bool generate_primitives = true)
-		: shape_(shape), ds_(ds), eps_(0.), generate_primitives_(generate_primitives) {}
+	voxelizer(const TopoDS_Shape& shape, regular_voxel_storage* ds, bool generate_primitives = true, bool use_scanline = true)
+		: shape_(shape), ds_(ds), eps_(0.), generate_primitives_(generate_primitives), use_scanline_(use_scanline) {}
 
 	double& epsilon() { return eps_; }
 
@@ -425,7 +425,7 @@ public:
 	void Convert() {
 		for (TopExp_Explorer exp(shape_, TopAbs_FACE); exp.More(); exp.Next()) {
 			TopoDS_Face face = TopoDS::Face(exp.Current());
-			if (is_ortho_polygon(face)) {
+			if (use_scanline_ && is_ortho_polygon(face)) {
 				process_scanline(face);
 			} else {
 				process_triangulated(face);

@@ -151,7 +151,7 @@ private:
 	std::function<void(int)> progress_;
 	int nx_, ny_, nz_;
 	double x1_, y1_, z1_, d_;
-	bool use_copy_;
+	bool use_copy_, use_scanline_;
 public:
 	processor(double x1, double y1, double z1, double d, int nx, int ny, int nz, size_t chunk_size, const std::function<void(int)>& progress)
 		: factory_(factory().chunk_size(chunk_size))
@@ -160,13 +160,17 @@ public:
 		, progress_(progress)
 		, nx_(nx), ny_(ny), nz_(nz)
 		, x1_(x1), y1_(y1), z1_(z1), d_(d)
-		, use_copy_(false) {}
+		, use_copy_(false)
+		, use_scanline_(true) {}
 
 	processor(abstract_voxel_storage* storage, const std::function<void(int)>& progress)
 		: voxels_(storage)
 		, voxels_temp_(storage->empty_copy())
 		, progress_(progress)
-		, use_copy_(true) {}
+		, use_copy_(true)
+		, use_scanline_(true) {}
+
+	bool& use_scanline() { return use_scanline_; }
 	
 	~processor() {
 		if (!use_copy_) {
