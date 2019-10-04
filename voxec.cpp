@@ -33,6 +33,9 @@ voxel_operation_map::map_t& voxel_operation_map::map() {
 		m.insert(std::make_pair(std::string("collapse"), &instantiate<op_collapse>));
 		m.insert(std::make_pair(std::string("print_components"), &instantiate<op_print_components>));
 		m.insert(std::make_pair(std::string("dump_surfaces"), &instantiate<op_dump_surfaces>));
+		m.insert(std::make_pair(std::string("filter_attributes"), &instantiate<op_create_attr_filter>));
+		m.insert(std::make_pair(std::string("filter_properties"), &instantiate<op_create_prop_filter>));
+		m.insert(std::make_pair(std::string("mesh"), &instantiate<op_mesh>));
 		initialized = true;
 	}
 	return m;
@@ -121,7 +124,7 @@ public:
 		v.apply_visitor(*this);
 	}
 
-	void operator()(std::vector<IfcParse::IfcFile*> const v) const {	}
+	void operator()(filtered_files_t const v) const {	}
 
 	void operator()(geometry_collection_t* const v) const {	}
 

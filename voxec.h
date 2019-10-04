@@ -44,7 +44,16 @@ namespace IfcParse {
 #define DIRSEP "/"
 #endif
 
-typedef boost::variant<boost::blank, std::vector<IfcParse::IfcFile*>, geometry_collection_t*, abstract_voxel_storage*, function_arg_value_type> symbol_value;
+struct instance_filter_t {
+	virtual bool operator()(const IfcUtil::IfcBaseEntity*) const = 0;
+};
+
+struct filtered_files_t {
+	std::vector<IfcParse::IfcFile*> files;
+	instance_filter_t* filter = nullptr;
+};
+
+typedef boost::variant<boost::blank, filtered_files_t, geometry_collection_t*, abstract_voxel_storage*, function_arg_value_type> symbol_value;
 
 class voxel_operation;
 
@@ -128,6 +137,12 @@ class voxel_operation {
 public:
 	virtual const std::vector<argument_spec>& arg_names() const = 0;
 	virtual symbol_value invoke(const scope_map& scope) const = 0;
+	virtual bool catch_all() const {
+		return false;
+	}
+	virtual bool only_local() const {
+		return false;
+	}
 };
 
 #ifdef WITH_IFC
@@ -174,7 +189,10 @@ public:
 			throw std::runtime_error("Not a single file matched pattern");
 		}
 
-		return files;
+		filtered_files_t ff;
+		ff.files = files;
+
+		return ff;
 	}
 };
 
@@ -207,7 +225,7 @@ public:
 		auto& ef_elements = ef.entity_names;
 #endif
 
-		const std::vector<IfcParse::IfcFile*>& ifc_files = scope.get_value<std::vector<IfcParse::IfcFile*>>("input");
+		const filtered_files_t& ifc_files = scope.get_value<filtered_files_t>("input");
 
 		IfcGeom::IteratorSettings settings_surface;
 		settings_surface.set(IfcGeom::IteratorSettings::DISABLE_TRIANGULATION, true);
@@ -273,7 +291,7 @@ public:
 
 		bool at_least_one_succesful = false;
 
-		for (auto ifc_file : ifc_files) {
+		for (auto ifc_file : ifc_files.files) {
 
 			IfcGeom::Iterator<double> iterator(settings_surface, ifc_file, filters_surface);
 			
@@ -299,7 +317,7 @@ public:
 #ifdef IFCOPENSHELL_05
 				if (roof_slabs && elem->product()->as<IfcSchema::IfcSlab>()) {
 					auto pdt = elem->product()->as<IfcSchema::IfcSlab>()->PredefinedType();
-					process = (pdt == IfcSchema::IfcSlabTypeEnum::IfcSlabType_ROOF) == *roof_slabs;
+					process = process && (pdt == IfcSchema::IfcSlabTypeEnum::IfcSlabType_ROOF) == *roof_slabs;
 				}
 #else
 				auto elem_product = elem->product();
@@ -314,9 +332,21 @@ public:
 				}
 				if (roof_slabs && elem_product->declaration().is("IfcSlab")) {
 					std::string pdt = *elem_product->get("PredefinedType");
-					process = (pdt == "ROOF") == *roof_slabs;
+					process = process && (pdt == "ROOF") == *roof_slabs;
 				}
 #endif
+
+				if (ifc_files.filter) {
+					try {
+						process = process && (*ifc_files.filter)(elem_product);
+					} catch (...) {
+#ifdef IFCOPENSHELL_05
+						throw std::runtime_error("Error evaluating filter on " + elem_product->toString());
+#else
+						throw std::runtime_error("Error evaluating filter on " + elem_product->data().toString());
+#endif
+					}
+				}
 
 				if (process) {
 					TopoDS_Compound compound = elem->geometry().as_compound();
@@ -812,6 +842,119 @@ public:
 	}
 };
 
+namespace {
+	class instance_by_attribute_map_filter : public instance_filter_t {
+	public:
+		typedef std::vector<std::pair<std::string, std::string> > values_t;
+	private:
+		values_t attr_pattern_;
+	public:
+		instance_by_attribute_map_filter(const values_t& pattern)
+			: attr_pattern_(pattern)
+		{}
+
+		bool operator()(const IfcUtil::IfcBaseEntity* inst) const {
+#ifdef IFCOPENSHELL_05
+			throw std::runtime_error("Not implemented");
+#else
+			for (auto& p : attr_pattern_) {
+				auto idx = inst->declaration().as_entity()->attribute_index(p.first);
+				if (idx == -1) {
+					throw std::runtime_error(inst->declaration().name() + " has no attribute " + p.first);
+				}
+				auto attr = inst->data().getArgument(idx);
+				if (!attr || attr->isNull()) {
+					return false;
+				}
+				if (attr->type() == IfcUtil::Argument_DOUBLE) {
+					auto op = p.second.at(0);
+					auto v = p.second.substr(1);
+					auto attr_type = inst->declaration().attribute_by_index(idx);
+					double d0 = *attr;
+					if (attr_type->type_of_attribute()->is("IfcLengthMeasure")) {
+						d0 *= inst->data().file->getUnit("LENGTHUNIT").second;
+					}
+					auto d1 = boost::lexical_cast<double>(v);
+					if (op == '<') {
+						if (!(d0 < d1)) {
+							return false;
+						}
+					} else if (op == '>') {
+						if (!(d0 > d1)) {
+							return false;
+						}
+					} else if (op == '=') {
+						if (!(d0 == d1)) {
+							return false;
+						}
+					} else {
+						throw std::runtime_error("Invalid binary predicate " + p.second);
+					}
+				} else {
+					throw std::runtime_error("Not implemented");
+				}
+			}
+
+			return true;
+#endif			
+		}
+	};
+}
+
+class op_create_attr_filter : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "ifcfile" } };
+		return nm_;
+	}
+	bool catch_all() const {
+		return true;
+	}
+	bool only_local() const {
+		return true;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		static std::set<std::string> to_exclude{ "input" };
+		filtered_files_t ifc_files_copy = scope.get_value<filtered_files_t>("input");
+		instance_by_attribute_map_filter::values_t vs;
+		for (auto& p : scope) {
+			if (to_exclude.find(p.first) == to_exclude.end()) {
+				auto s = boost::get<std::string>(boost::get<function_arg_value_type>(p.second));
+				vs.push_back({ p.first, s });
+			}
+		}
+		ifc_files_copy.filter = new instance_by_attribute_map_filter(vs);
+		return ifc_files_copy;
+	}
+};
+
+class op_create_prop_filter : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "ifcfile" } };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		throw std::runtime_error("Not implemented");
+	}
+};
+
+class op_mesh : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "filename", "string"} };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		auto voxels = scope.get_value<abstract_voxel_storage*>("input");
+		auto filename = scope.get_value<std::string>("filename");
+		std::ofstream ofs(filename.c_str());
+		((regular_voxel_storage*)voxels)->obj_export(ofs);
+		symbol_value v;
+		return v;
+	}
+};
+
 template <typename T>
 T* instantiate() {
 	return new T();
@@ -819,12 +962,15 @@ T* instantiate() {
 
 class symbol_value_assignment_visitor {
 private:
+	bool all_;
 	symbol_value* v_;
 	std::set<std::string> type_;
 	const scope_map& context_;
 
 	void assert_type(const std::string& t) const {
-		if (type_.find(t) == type_.end()) {
+		if (all_) {
+			return;
+		} else if (type_.find(t) == type_.end()) {
 			std::stringstream ss;
 			ss << "Expected value of type ";
 			bool first = true;
@@ -844,16 +990,21 @@ public:
 	typedef void result_type;
 
 	symbol_value_assignment_visitor(symbol_value* v, const std::string& type, const scope_map& context)
-		: v_(v)
+		: all_(false)
+		, v_(v)
 		, context_(context)
 	{
-		boost::tokenizer<> t(type);
-		for (auto& v: t) {
-			type_.insert(v);
+		if (type == "*") {
+			all_ = true;
+		} else {
+			boost::tokenizer<> t(type);
+			for (auto& v : t) {
+				type_.insert(v);
+			}
 		}
 	}
 
-void operator()(std::vector<IfcParse::IfcFile*> const v) const {
+void operator()(filtered_files_t const v) const {
 	assert_type("ifcfile");
 	(*v_) = v;
 }
@@ -953,9 +1104,22 @@ public:
 			function_values[p.name].apply_visitor(v);
 		}
 
-		for (auto& p : context) {
-			if (function_value_symbols.find(p.first) == function_value_symbols.end()) {
-				function_value_symbols.insert(p);
+		for (auto& arg : statement_.call().args()) {
+			if (arg.has_keyword() && function_value_symbols.find(*arg.keyword()) == function_value_symbols.end()) {
+				if (op->catch_all()) {
+					symbol_value_assignment_visitor v(&function_value_symbols[*arg.keyword()], "*", context);
+					function_values[*arg.keyword()].apply_visitor(v);
+				} else {
+					throw std::runtime_error("Keyword argument " + *arg.keyword() + " unused");
+				}
+			}
+		}
+
+		if (!op->only_local()) {
+			for (auto& p : context) {
+				if (function_value_symbols.find(p.first) == function_value_symbols.end()) {
+					function_value_symbols.insert(p);
+				}
 			}
 		}
 
