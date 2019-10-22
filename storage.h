@@ -1244,11 +1244,11 @@ public:
 				}
 			END_LOOP;
 		} else if (p == file_part_meta) {
-			os << "CHUNK" << std::endl
+			os << "CHUNK2" << std::endl
+				<< d_ << std::endl
 				<< chunk_size_ << std::endl
-				<< nchunksx_ << std::endl
-				<< nchunksy_ << std::endl
-				<< nchunksz_ << std::endl;
+				<< origin_.get<0>() << ";" << origin_.get<1>() << ";" << origin_.get<2>() << std::endl
+				<< nchunksx_ << ";" << nchunksy_ << ";" << nchunksz_ << std::endl;
 		}
 	}
 };
