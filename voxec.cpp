@@ -33,8 +33,10 @@ voxel_operation_map::map_t& voxel_operation_map::map() {
 		m.insert(std::make_pair(std::string("collapse"), &instantiate<op_collapse>));
 		m.insert(std::make_pair(std::string("print_components"), &instantiate<op_print_components>));
 		m.insert(std::make_pair(std::string("dump_surfaces"), &instantiate<op_dump_surfaces>));
+#ifdef WITH_IFC
 		m.insert(std::make_pair(std::string("filter_attributes"), &instantiate<op_create_attr_filter>));
 		m.insert(std::make_pair(std::string("filter_properties"), &instantiate<op_create_prop_filter>));
+#endif
 		m.insert(std::make_pair(std::string("mesh"), &instantiate<op_mesh>));
 		initialized = true;
 	}

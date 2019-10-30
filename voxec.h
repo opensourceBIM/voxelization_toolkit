@@ -17,10 +17,21 @@
 #endif
 
 #include <boost/filesystem.hpp>
+
+struct instance_filter_t {
+	virtual bool operator()(const IfcUtil::IfcBaseEntity*) const = 0;
+};
+
+struct filtered_files_t {
+	std::vector<IfcParse::IfcFile*> files;
+	instance_filter_t* filter = nullptr;
+};
 #else
 namespace IfcParse {
 	class IfcFile {};
 }
+
+struct filtered_files_t {};
 #endif
 
 #include <Bnd_Box.hxx>
@@ -43,15 +54,6 @@ namespace IfcParse {
 #else
 #define DIRSEP "/"
 #endif
-
-struct instance_filter_t {
-	virtual bool operator()(const IfcUtil::IfcBaseEntity*) const = 0;
-};
-
-struct filtered_files_t {
-	std::vector<IfcParse::IfcFile*> files;
-	instance_filter_t* filter = nullptr;
-};
 
 typedef boost::variant<boost::blank, filtered_files_t, geometry_collection_t*, abstract_voxel_storage*, function_arg_value_type> symbol_value;
 
@@ -862,6 +864,8 @@ public:
 	}
 };
 
+#ifdef WITH_IFC
+
 namespace {
 	class instance_by_attribute_map_filter : public instance_filter_t {
 	public:
@@ -958,6 +962,8 @@ public:
 		throw std::runtime_error("Not implemented");
 	}
 };
+
+#endif
 
 class op_mesh : public voxel_operation {
 public:
