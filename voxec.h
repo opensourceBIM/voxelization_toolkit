@@ -337,8 +337,11 @@ public:
 				}
 
 #ifdef IFCOPENSHELL_05
-				if (roof_slabs && elem->product()->as<IfcSchema::IfcSlab>() && elem->product()->as<IfcSchema::IfcSlab>()->hasPredefinedType()) {
-					auto pdt = elem->product()->as<IfcSchema::IfcSlab>()->PredefinedType();
+				if (roof_slabs && elem->product()->as<IfcSchema::IfcSlab>()) {
+					IfcSchema::IfcSlabTypeEnum::IfcSlabTypeEnum pdt = IfcSchema::IfcSlabTypeEnum::NOTDEFINED;
+					if (elem->product()->as<IfcSchema::IfcSlab>()->hasPredefinedType()) {
+						pdt = elem->product()->as<IfcSchema::IfcSlab>()->PredefinedType();
+					}
 					process = process && (pdt == IfcSchema::IfcSlabTypeEnum::IfcSlabType_ROOF) == *roof_slabs;
 				}
 #else
@@ -354,10 +357,8 @@ public:
 				}
 				if (roof_slabs && elem_product->declaration().is("IfcSlab")) {
 					auto attr_value = elem_product->get("PredefinedType");
-					if (!attr_value->isNull()) {
-						std::string pdt = *attr_value;
-						process = process && (pdt == "ROOF") == *roof_slabs;
-					}
+					std::string pdt = attr_value->isNull() ? std::string("") : (std::string)(*attr_value);
+					process = process && (pdt == "ROOF") == *roof_slabs;
 				}
 #endif
 
