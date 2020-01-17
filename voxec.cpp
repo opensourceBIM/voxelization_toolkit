@@ -12,6 +12,7 @@ voxel_operation_map::map_t& voxel_operation_map::map() {
 		m.insert(std::make_pair(std::string("create_geometry"), &instantiate<op_create_geometry>));
 #endif
 		m.insert(std::make_pair(std::string("voxelize"), &instantiate<op_voxelize>));
+		m.insert(std::make_pair(std::string("voxelize_ids"), &instantiate<op_voxelize_ids>));
 		m.insert(std::make_pair(std::string("fill_gaps"), &instantiate<op_fill_gaps>));
 		m.insert(std::make_pair(std::string("offset"), &instantiate<op_offset>));
 		m.insert(std::make_pair(std::string("offset_xy"), &instantiate<op_offset_xy>));

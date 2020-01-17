@@ -1,7 +1,7 @@
 #ifndef PROCESSOR_H
 #define PROCESSOR_H
 
-#include "voxelizer.h"
+#include "traversal.h"
 #include "factory.h"
 #include "storage.h"
 #include "writer.h"
@@ -41,10 +41,15 @@ class SEPARATE_MINUS : public voxelization_mode {
 public:
 	SEPARATE_MINUS() : voxelization_mode(3) {}
 };
+enum VOXEL_VALUATION {
+	CONSTANT_ONE,
+	PRODUCT_ID
+};
 class fill_volume_t {
 public:
 	bool y;
-	fill_volume_t(bool b) : y(b) {}
+	VOXEL_VALUATION value;
+	fill_volume_t(bool b, VOXEL_VALUATION v = CONSTANT_ONE) : y(b), value(v) {}
 };
 class VOLUME : public fill_volume_t {
 public:
@@ -53,6 +58,10 @@ public:
 class SURFACE : public fill_volume_t {
 public:
 	SURFACE() : fill_volume_t(false) {}
+};
+class VOLUME_PRODUCT_ID : public fill_volume_t {
+public:
+	VOLUME_PRODUCT_ID() : fill_volume_t(true, PRODUCT_ID) {}
 };
 
 class output {
@@ -186,22 +195,53 @@ public:
 			abstract_voxel_storage* to_write = volume.y ? voxels_temp_ : voxels_;
 
 			if (volume.y) {
-				voxelizer voxeliser(it->second, (regular_voxel_storage*) to_write);
+				voxelizer voxeliser(it->second, (regular_voxel_storage*) to_write, !use_scanline_, !use_scanline_);
+				voxeliser.epsilon() = 1e-9;
 				voxeliser.Convert();
 
-				volume_filler volume((regular_voxel_storage*) to_write);
-				volume.fill();
+				auto filled = traversal_voxel_filler_inverse()((regular_voxel_storage*)to_write);
+				// @todo this is not very efficient as the above does exactly the inverse subtraction
+				to_write->boolean_union_inplace(filled);
+				delete filled;
 
 				output.intermediate_result(it->first, voxels_, voxels_temp_);
+
+				int n = voxels_->value_bits();
+				if (volume.value == PRODUCT_ID) {
+					if (n != 32) {
+						throw std::runtime_error("Unable to assign product ids to this voxel value type");
+					}
+					if (auto cvs32 = dynamic_cast<chunked_voxel_storage<voxel_uint32_t>*>(voxels_)) {
+						size_t nchunksx, nchunksy, nchunksz;
+						cvs32->num_chunks().tie(nchunksx, nchunksy, nchunksz);
+						BEGIN_LOOP(size_t(0), nchunksx, 0U, nchunksy, 0U, nchunksz)
+							auto c = cvs32->get_chunk(ijk);
+							if (c != nullptr) {
+								if (!c->is_explicit()) {
+									throw std::runtime_error("Not implemented");
+								}
+								auto c32 = (continuous_voxel_storage<voxel_uint32_t>*) c;
+								auto d = c32->data();
+								for (size_t i = 0; i < c32->size(); ++i) {
+									if (d[i] == 1) {
+										d[i] = it->first;
+									}
+								}
+							}
+						END_LOOP;
+					}
+				}
 				
-				delete voxels_temp_;
 				if (use_copy_) {
-					voxels_temp_ = voxels_temp_->empty_copy();
+					auto tmp = voxels_temp_->empty_copy();
+					delete voxels_temp_;
+					voxels_temp_ = tmp;
 				} else {
+					delete voxels_temp_;
 					voxels_temp_ = factory_.create(x1_, y1_, z1_, d_, nx_, ny_, nz_);
 				}
 			} else {
-				voxelizer voxeliser(it->second, (regular_voxel_storage*) to_write);
+				voxelizer voxeliser(it->second, (regular_voxel_storage*) to_write, !use_scanline_, !use_scanline_);
 				voxeliser.epsilon() = 1e-9;
 				voxeliser.Convert();
 			}

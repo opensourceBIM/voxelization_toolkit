@@ -1,6 +1,9 @@
 #include "storage.h"
 #include "traversal.h"
 
+#include <map>
+#include <array>
+
 set_voxel_iterator::set_voxel_iterator(regular_voxel_storage* storage, vec_n<3, size_t> current)
 	: storage_(storage)
 	, current_(current)
@@ -35,23 +38,49 @@ break_out:
 	return *this;
 }
 
-bool set_voxel_iterator::neighbour(const vec_n<3, size_t>& d) const {
-	vec_n<3, size_t> v = current_ + d;
+bool set_voxel_iterator::neighbour(const vec_n<3, long>& d) const {
+	vec_n<3, size_t> v = (current_.as<long>() + d).as<size_t>();
 	if ((v < bounds_[0]).any() || (v > bounds_[1]).any()) {
 		return false;
 	}
 	return storage_->Get(v);
 }
 
-void regular_voxel_storage::obj_export(std::ostream& fs, bool with_components) {
-	obj_export_helper helper(fs);
-	obj_export(helper, with_components);
+void* set_voxel_iterator::value(void* val) const {
+	storage_->Get(current_, val);
+	return val;
 }
 
-void regular_voxel_storage::obj_export(obj_export_helper& obj, bool with_components) {
+void* set_voxel_iterator::neighbour_value(const vec_n<3, long>& d, void* val) const {
+	vec_n<3, size_t> v = (current_.as<long>() + d).as<size_t>();
+	if ((v < bounds_[0]).any() || (v > bounds_[1]).any()) {
+		uint8_t* loc = (uint8_t*)val;
+		// @todo is this correct?
+		for (int i = 0; i < storage_->value_bits() / 8; ++i) {
+			(*loc++) = 0;
+		}
+	} else {
+		storage_->Get(v, val);
+	}
+	return val;
+}
+
+void regular_voxel_storage::obj_export(std::ostream& fs, bool with_components, bool use_value) {
+	obj_export_helper helper(fs);
+	obj_export(helper, with_components, use_value);
+}
+
+void regular_voxel_storage::obj_export(obj_export_helper& obj, bool with_components, bool use_value) {
 	std::ostream& fs = *obj.stream;
 
-	if (with_components) {
+	fs << "vn  1  0  0\n";
+	fs << "vn -1  0  0\n";
+	fs << "vn  0  1  0\n";
+	fs << "vn  0 -1  0\n";
+	fs << "vn  0  0  1\n";
+	fs << "vn  0  0 -1\n";
+
+	if (with_components && !use_value) {
 		size_t counter = 0;
 		connected_components(this, [&obj, &fs, &counter](regular_voxel_storage* component) {
 			fs << "g component" << (counter++) << "\n";
@@ -66,10 +95,18 @@ void regular_voxel_storage::obj_export(obj_export_helper& obj, bool with_compone
 
 	size_t& nv = obj.vert_counter;
 
+	// big enough?
+	char V0[8];
+	char V1[8];
+
+	std::map< std::array<size_t, 3>, size_t > vertex_map;
+	std::map< std::array<long long, 2>, std::vector< std::pair<std::array<size_t, 3>, size_t> > > triangles;
+
 	const double d = voxel_size();
 	for (auto it = begin(); it != end(); ++it) {
+		it.value(V1);
 		for (size_t f = 0; f < 6; ++f) {
-			vec_n<3, size_t> n;
+			vec_n<3, long> n;
 			size_t normal = f / 2;
 			size_t o0 = (normal + 1) % 3;
 			size_t o1 = (normal + 2) % 3;
@@ -80,25 +117,61 @@ void regular_voxel_storage::obj_export(obj_export_helper& obj, bool with_compone
 					break;
 				}
 			}
-			if (!it.neighbour(n)) {
-				std::array<vec_n<3, double >, 4> vs;
-				vs.fill((*it).as<double>() * d + origin());
-				vs[1].get(o0) += d;
-				vs[2].get(o0) += d;
-				vs[2].get(o1) += d;
-				vs[3].get(o1) += d;
+			if (use_value 
+				? (
+					!equal_pointed_to(value_bits() / 8, it.neighbour_value(n, V0), V1) &&
+					(!(!is_zero(value_bits() / 8, V0) && !is_zero(value_bits() / 8, V1)) || side)
+					)
+				: !it.neighbour(n)) 
+			{
+				std::array< std::array<size_t, 3>, 4 > vs;
+				vs.fill((*it).as_array());
+				vs[1][o0] += 1;
+				vs[2][o0] += 1;
+				vs[2][o1] += 1;
+				vs[3][o1] += 1;
 				if (!side) {
 					std::reverse(vs.begin(), vs.end());
 				}
 				for (auto& v : vs) {
 					if (side) {
-						v.get(normal) += d;
+						v[normal] += 1;
 					}
-					fs << "v" << " " << v.format(false) << "\n";
+					auto inserted = vertex_map.insert({ v, vertex_map.size() + 1 });
+					if (inserted.second) {
+						fs << "v";
+						for (int i = 0; i < 3; ++i) {
+							fs << " " << (v[i] * d + origin().get(i));
+						}
+						fs << "\n";
+					}
 				}
-				fs << "f " << (nv + 0) << " " << (nv + 1) << " " << (nv + 2) << "\n";
-				fs << "f " << (nv + 0) << " " << (nv + 2) << " " << (nv + 3) << "\n";
-				nv += 4;
+				static std::array< std::array<int, 3>, 2 > indices = {{
+					{{0,1,2}},
+					{{0,2,3}}
+				}};
+				if (!use_value) {
+					for (auto& i : indices) {
+						fs << "f";
+						for (auto& j : i) {
+							fs << " " << vertex_map.find(vs[j])->second << "//" << (f+1);
+						}
+						fs << "\n";
+					}
+				} else {
+					auto va = to_number(value_bits() / 8, V0);
+					auto vb = to_number(value_bits() / 8, V1);
+					if (va > vb) {
+						std::swap(va, vb);
+					}
+					for (auto& i : indices) {
+						std::array<size_t, 3> arr;
+						for (int j = 0; j < 3; ++j) {
+							arr[j] = vertex_map.find(vs[i[j]])->second;
+						}
+						triangles[{ { va, vb }}].push_back({ arr, f + 1 });
+					}					
+				}
 			}
 		}
 		/*
@@ -107,6 +180,17 @@ void regular_voxel_storage::obj_export(obj_export_helper& obj, bool with_compone
 		}
 		n++;
 		*/
+	}
+
+	for (const auto& p : triangles) {
+		fs << "g " << p.first[0] << "-" << p.first[1] << "\n";
+		for (const auto& t : p.second) {
+			fs << "f";
+			for (auto& i : t.first) {
+				fs << " " << i << "//" << t.second;
+			}
+			fs << "\n";
+		}
 	}
 }
 

@@ -38,16 +38,32 @@
 
 class bit_t {
 public:
+	typedef bool value_type;
+	typedef bool value_type_non_ref;
+	typedef uint8_t storage_type;
 	static const int min_value = 0;
 	static const int max_value = 1;
 	static const size_t size_in_bits = 1;
 };
 
-class byte_t {
+class voxel_uint8_t {
 public:
+	typedef const uint8_t& value_type;
+	typedef uint8_t value_type_non_ref;
+	typedef uint8_t storage_type;
 	static const int min_value = 0;
 	static const int max_value = 255;
 	static const size_t size_in_bits = 8;
+};
+
+class voxel_uint32_t {
+public:
+	typedef const uint32_t& value_type;
+	typedef uint32_t value_type_non_ref;
+	typedef uint32_t storage_type;
+	static const int min_value = 0;
+	static const int max_value = std::numeric_limits<uint32_t>::max();
+	static const size_t size_in_bits = 32;
 };
 
 enum file_part {
@@ -73,6 +89,8 @@ public:
 		bounds_[1] = { mi, mi, mi };
 	}
 
+	virtual int value_bits() const { return 1; }
+
 	virtual ~abstract_voxel_storage() {}
 
 	// virtual size_t size() const = 0;
@@ -80,6 +98,7 @@ public:
 
 	virtual void write(file_part, std::ostream&) = 0;
 
+	virtual void Get(const vec_n<3, size_t>& pos, void*) const = 0;
 	virtual bool Get(const vec_n<3, size_t>& pos) const = 0;
 	virtual void Set(const vec_n<3, size_t>& pos) = 0;
 
@@ -161,7 +180,9 @@ class set_voxel_iterator {
 public:
 	set_voxel_iterator(regular_voxel_storage* storage, vec_n<3, size_t> current);
 	set_voxel_iterator& operator++();
-	bool neighbour(const vec_n<3, size_t>& d) const;
+	bool neighbour(const vec_n<3, long>& d) const;
+	void* value(void*) const;
+	void* neighbour_value(const vec_n<3, long>& d, void*) const;
 
 	bool operator==(set_voxel_iterator other) const { return (current_ == other.current_).all(); }
 	bool operator!=(set_voxel_iterator other) const { return (current_ != other.current_).any(); }
@@ -246,15 +267,35 @@ public:
 
 	const vec_n<3, double>& origin() const { return origin_; }
 
-	void obj_export(std::ostream& fs, bool with_components = true);
-	void obj_export(obj_export_helper& fs, bool with_components = true);
+	void obj_export(std::ostream& fs, bool with_components = true, bool use_value = false);
+	void obj_export(obj_export_helper& fs, bool with_components = true, bool use_value = false);
 };
+
+template<typename U>
+bool RefOrBoolImpl(std::true_type, const U& u, size_t r) {
+	return !!(u & (1 << r));
+}
+
+template<typename U>
+const U& RefOrBoolImpl(std::false_type, const U& u, size_t r) {
+	return u;
+}
+
+namespace {
+	size_t size_in_bytes(size_t n, size_t in_bits) {
+		if (in_bits >= 8U) {
+			return n * in_bits / 8U;
+		} else {
+			return integer_ceil_div(n, 8U / in_bits);
+		}
+	}
+}
 
 template <typename T>
 class continuous_voxel_storage : public regular_voxel_storage {
 private:
 	size_t dimz_bytes_;
-	uint8_t* data_;
+	typename T::storage_type* data_;
 	long long unsigned int count_;
 	bool mapped_;
 
@@ -280,27 +321,29 @@ private:
 
 	}
 public:
+	virtual int value_bits() const { return T::size_in_bits; }
+
 	continuous_voxel_storage(double ox, double oy, double oz, double d, size_t dimx, size_t dimy, size_t dimz, void* location=nullptr)
 		: regular_voxel_storage(ox, oy, oz, d, dimx, dimy, dimz)
-		, dimz_bytes_(integer_ceil_div(dimz, 8U / T::size_in_bits))
+		, dimz_bytes_(size_in_bytes(dimz, T::size_in_bits))
 		, count_(0) 
 	{
 		if (location != nullptr) {
-			data_ = new (location) uint8_t[dimx_*dimy_*dimz_bytes_];
+			data_ = new (location) typename T::storage_type[dimx_*dimy_*dimz_bytes_];
 			mapped_ = true;
 
 			// @todo: store these also in the mmap
 			calculate_count_();
 			calculate_bounds_();
 		} else {
-			data_ = new uint8_t[dimx_*dimy_*dimz_bytes_]{ 0 };
+			data_ = new typename T::storage_type[dimx_*dimy_*dimz_bytes_]{ 0 };
 			mapped_ = false;
 		}
 	}
 
 	void unmap() {
 		auto old = data_;
-		data_ = new uint8_t[dimx_*dimy_*dimz_bytes_];
+		data_ = new typename T::storage_type[dimx_*dimy_*dimz_bytes_];
 		memcpy(data_, old, size());
 		mapped_ = false;
 	}
@@ -311,7 +354,11 @@ public:
 		}
 	}
 
-	const unsigned char* const data() const {
+	const typename T::storage_type* const data() const {
+		return data_;
+	}
+
+	typename T::storage_type* data() {
 		return data_;
 	}
 
@@ -350,16 +397,20 @@ public:
 	}
 
 	void Set(const vec_n<3, size_t>& xyz) {
+		Set(xyz, 1);
+	}
+
+	void Set(const vec_n<3, size_t>& xyz, const typename T::value_type_non_ref& v) {
 		const size_t& x = xyz.get<0>();
 		const size_t& y = xyz.get<1>();
 		const size_t& z = xyz.get<2>();
 
 		bool updated = false;
-		if (T::size_in_bits == 8U) {
+		if (T::size_in_bits >= 8U) {
 			auto& is_set = data_[x + y * dimx_ + z * dimx_ * dimy_];
-			if (!is_set) {
+			if (is_set != v) {
 				count_ += 1;
-				is_set = 1;
+				is_set = v;
 				updated = true;
 			}
 		} else {
@@ -378,24 +429,36 @@ public:
 		}
 	}
 
-	bool Get(const vec_n<3, size_t>& xyz) const {
+	typename T::value_type ValueAt(const vec_n<3, size_t>& xyz) const {
 		const size_t& x = xyz.get<0>();
 		const size_t& y = xyz.get<1>();
 		const size_t& z = xyz.get<2>();
 
-		if (T::size_in_bits == 8U) {
-			return data_[x + y * dimx_ + z * dimx_ * dimy_] != 0;
-		} else {
+		if (T::size_in_bits >= 8U) {
+			return data_[x + y * dimx_ + z * dimx_ * dimy_];
+		} else if (T::size_in_bits < 8U)  {
 			size_t z8 = z / (8U / T::size_in_bits);
 			uint8_t r = z % (8U / T::size_in_bits);
-			return !!(data_[x + y * dimx_ + z8 * dimx_ * dimy_] & (1 << r));
+			return RefOrBoolImpl(std::integral_constant<bool, T::size_in_bits < 8U>{}, data_[x + y * dimx_ + z8 * dimx_ * dimy_], r);
 		}
+	}
+
+	bool Get(const vec_n<3, size_t>& xyz) const {
+		return ValueAt(xyz) != 0;
+	}
+
+	void Get(const vec_n<3, size_t>& pos, void* loc) const {
+		*((typename T::value_type_non_ref*) loc) = ValueAt(pos);
 	}
 
 	abstract_voxel_storage* inverted(void* location = nullptr) const {
 		continuous_voxel_storage* c = new continuous_voxel_storage(ox_, oy_, oz_, d_, dimx_, dimy_, dimz_, location);
 		for (size_t i = 0; i < size(); ++i) {
-			c->data_[i] = ~data_[i];
+			if (T::size_in_bits < 8U) {
+				c->data_[i] = ~data_[i];
+			} else {
+				c->data_[i] = data_[i] ? 0 : 1;
+			}
 		}
 		c->count_ = (dimx_ * dimy_ * dimz_) - count();
 		c->calculate_bounds_();
@@ -410,7 +473,11 @@ public:
 	void boolean_union_inplace(const abstract_voxel_storage* other_) {
 		const continuous_voxel_storage<T>* other = (const continuous_voxel_storage<T>*) other_;
 		for (size_t i = 0; i < size(); ++i) {
-			data_[i] |= other->data_[i];
+			if (T::size_in_bits < 8U) {
+				data_[i] |= other->data_[i];
+			} else if (other->data_[i]) {
+				data_[i] = other->data_[i];
+			}
 		}
 		calculate_count_();
 
@@ -427,7 +494,11 @@ public:
 	void boolean_subtraction_inplace(const abstract_voxel_storage* other_) {
 		const continuous_voxel_storage<T>* other = (const continuous_voxel_storage<T>*) other_;
 		for (size_t i = 0; i < size(); ++i) {
-			data_[i] &= ~other->data_[i];
+			if (T::size_in_bits < 8U) {
+				data_[i] &= ~other->data_[i];
+			} else if (other->data_[i]) {
+				data_[i] = 0;
+			}
 		}
 		calculate_count_();
 		calculate_bounds_();
@@ -472,6 +543,7 @@ template <typename T>
 class planar_voxel_storage : public regular_voxel_storage {
 private:
 	size_t axis_;
+	// @todo should become a map?
 	std::set<size_t> offsets_;
 	std::string text_;
 
@@ -493,6 +565,8 @@ private:
 	}
 
 public:
+	virtual int value_bits() const { return T::size_in_bits; }
+
 	planar_voxel_storage(double ox, double oy, double oz, double d, size_t dimx, size_t dimy, size_t dimz, size_t axis, size_t offset)
 		: regular_voxel_storage(ox, oy, oz, d, dimx, dimy, dimz)
 		, axis_(axis)
@@ -553,6 +627,10 @@ public:
 	bool Get(const vec_n<3, size_t>& xyz) const {
 		const size_t& o = xyz.get(axis_);
 		return offsets_.find(o) != offsets_.end();
+	}
+
+	void Get(const vec_n<3, size_t>& xyz, void* loc) const {
+		*((T::value_type_non_ref*)loc) = Get(xyz);
 	}
 
 	abstract_voxel_storage* boolean_union(const abstract_voxel_storage* other_) {
@@ -639,6 +717,8 @@ class constant_voxel_storage : public regular_voxel_storage {
 protected:
 	size_t value_;
 public:
+	virtual int value_bits() const { return T::size_in_bits; }
+
 	constant_voxel_storage(double ox, double oy, double oz, double d, size_t dimx, size_t dimy, size_t dimz, size_t value)
 		: regular_voxel_storage(ox, oy, oz, d, dimx, dimy, dimz)
 		, value_(value)
@@ -674,6 +754,10 @@ public:
 
 	bool Get(const vec_n<3, size_t>&) const {
 		return !!value_;
+	}
+
+	void Get(const vec_n<3, size_t>& pos, void* loc) const {
+		*((typename T::value_type_non_ref*)loc) = value_;
 	}
 
 	abstract_voxel_storage* inverted(void* location = nullptr) const {
@@ -1253,6 +1337,7 @@ public:
 	}
 };
 
+// @todo why is this not a template class?
 class memory_mapped_chunked_voxel_storage : public abstract_chunked_voxel_storage {
 private:
 	std::string filename_;
@@ -1396,6 +1481,15 @@ public:
 		return c->Get(xyz - cxyz * chunk_size_);
 	}
 
+	void Get(const vec_n<3, size_t>& xyz, void* loc) const {
+		vec_n<3, size_t> cxyz = xyz / chunk_size_;
+		abstract_voxel_storage* c = get_chunk(cxyz);
+		if (c == nullptr) {
+			throw std::runtime_error("Not implemented, no template arg");
+		}
+		c->Get(xyz - cxyz * chunk_size_, loc);
+	}
+
 	abstract_voxel_storage* empty_copy() const {
 		auto nc = num_chunks();
 		return new memory_mapped_chunked_voxel_storage(grid_offset_, d_, chunk_size_, nc, factory::mmap_filename());
@@ -1467,6 +1561,8 @@ private:
 	}
 
 public:
+	virtual int value_bits() const { return T::size_in_bits; }
+
 	chunked_voxel_storage(double ox, double oy, double oz, double d, size_t dimx, size_t dimy, size_t dimz, size_t chunk_size)
 		: abstract_chunked_voxel_storage(ox, oy, oz, d, dimx, dimy, dimz, chunk_size)
 		, chunks_(new abstract_voxel_storage*[total_nchunks_] {0})
@@ -1534,6 +1630,15 @@ public:
 			return false;
 		}
 		return c->Get(xyz - cxyz * chunk_size_);
+	}
+
+	void Get(const vec_n<3, size_t>& xyz, void* loc) const {
+		vec_n<3, size_t> cxyz = xyz / chunk_size_;
+		abstract_voxel_storage* c = get_chunk(cxyz);
+		if (c == nullptr) {
+			(*(T::value_type_non_ref*) loc) = 0;
+		}
+		c->Get(xyz - cxyz * chunk_size_, loc);
 	}
 	
 	void set_chunk(const vec_n<3, size_t>& ijk, abstract_voxel_storage* s) {
@@ -1740,6 +1845,10 @@ public:
 		return base_->Get(xyz);
 	}
 
+	virtual void Get(const vec_n<3, size_t>& xyz, void* loc) const {
+		return base_->Get(xyz, loc);
+	}
+
 	abstract_voxel_storage* inverted(void* location = nullptr) const {
 		throw std::runtime_error("Not implemented");
 	}
@@ -1796,5 +1905,39 @@ public:
 };
 
 regular_voxel_storage* storage_for(std::array< vec_n<3, double>, 2 >& bounds, size_t max_extents = 1024U, size_t padding = 0U, size_t chunk_size = 64U);
+
+namespace {
+	bool equal_pointed_to(int w, void* a, void* b) {
+		uint8_t* A = (uint8_t*)a;
+		uint8_t* B = (uint8_t*)b;
+		for (int i = 0; i < w; ++i) {
+			if (*A != *B) {
+				return false;
+			}
+			++A, ++B;
+		}
+		return true;
+	}
+
+	bool is_zero(int w, void* a) {
+		uint8_t* A = (uint8_t*)a;
+		for (int i = 0; i < w; ++i) {
+			if (*A != 0) {
+				return false;
+			}
+			++A;
+		}
+		return true;
+	}
+
+	long long to_number(int w, void* a) {
+		if (w == 4) {
+			// @todo std::is_integral, std::is_signed, ...
+			return *((uint32_t*)a);
+		} else {
+			throw std::runtime_error("Not implemented");
+		}
+	}
+}
 
 #endif
