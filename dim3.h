@@ -93,6 +93,10 @@ public:
 		ts_.fill((T)0);
 	}
 
+	const std::array<T, N>& as_array() const {
+		return ts_;
+	}
+
 	// Otherwise the variadic template constructor becomes our copy constructor
 	vec_n(const self_type& other) {
 		ts_ = other.ts_;
