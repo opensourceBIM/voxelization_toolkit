@@ -19,8 +19,10 @@ TEST(Volume, DISABLED_Edges) {
 		}
 	}
 
+	/*
 	volume_filler volume(storage);
 	volume.fill();
+	*/
 
 	auto storage2 = edge_detect()(storage);
 

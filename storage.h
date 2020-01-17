@@ -630,7 +630,7 @@ public:
 	}
 
 	void Get(const vec_n<3, size_t>& xyz, void* loc) const {
-		*((T::value_type_non_ref*)loc) = Get(xyz);
+		*((typename T::value_type_non_ref*)loc) = Get(xyz);
 	}
 
 	abstract_voxel_storage* boolean_union(const abstract_voxel_storage* other_) {
@@ -1636,7 +1636,7 @@ public:
 		vec_n<3, size_t> cxyz = xyz / chunk_size_;
 		abstract_voxel_storage* c = get_chunk(cxyz);
 		if (c == nullptr) {
-			(*(T::value_type_non_ref*) loc) = 0;
+			(*(typename T::value_type_non_ref*) loc) = 0;
 		}
 		c->Get(xyz - cxyz * chunk_size_, loc);
 	}
