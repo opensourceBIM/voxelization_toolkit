@@ -7,6 +7,7 @@
 #include "writer.h"
 #include "progress.h"
 #include "volume.h"
+#include "voxelizer.h"
 
 #include <TopoDS_Shape.hxx>
 #include <TopoDS_Compound.hxx>
