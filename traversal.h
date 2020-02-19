@@ -421,6 +421,10 @@ public:
 			queue.pop_front();
 		}
 	}
+
+	~visitor() {
+		delete visited_;
+	}
 };
 
 class query_leftmost {
