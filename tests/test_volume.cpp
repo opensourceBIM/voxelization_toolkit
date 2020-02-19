@@ -145,3 +145,27 @@ TEST(Voxelizer, TraversalVolumeTripleSeparate) {
 	delete surface;
 	delete volume;
 }
+
+TEST(Voxelizer, TraversalVolumeTripleInverted) {
+	auto surface = new chunked_voxel_storage<bit_t>(0., 0., 0., 0.1, 300, 100, 100, 32);
+
+	for (int i = 0; i < 3; ++i) {
+		BRepPrimAPI_MakeBox mb(gp_Pnt(i * 10. + 1., 1., 1.), 8., 8., 8.);
+		auto vox = voxelizer(mb.Solid(), surface);
+		vox.Convert();
+	}
+
+	// Traversal is done on external and then inverted
+	traversal_voxel_filler_inverse filler;
+	auto volume = filler(surface);
+	auto A = surface->count();
+	auto B = volume->count();
+
+	ASSERT_EQ(A, 3 * (81 * 81 * 2 + 81 * 79 * 2 + 79 * 79 * 2));
+	ASSERT_EQ(B, 3 * (79 * 79 * 79));
+	ASSERT_EQ(A + B, 3 * (81 * 81 * 81));
+
+	delete surface;
+	delete volume;
+}
+
