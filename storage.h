@@ -1095,20 +1095,26 @@ protected:
 				release(get_chunk(this, ijk));
 			}
 
-			abstract_voxel_storage* a2 = a->is_explicit() ? a->copy(n->next_slot()) : a->make_explicit(n->next_slot());
+			abstract_voxel_storage* a_explicit = a->is_explicit() ? (inplace ? a : a->copy(n->next_slot())) : a->make_explicit(n->next_slot());
 			// b is temporary, so not assigned next_slot
-			abstract_voxel_storage* b2 = b->is_explicit() ? nullptr : b->make_explicit();
-			abstract_voxel_storage* b3 = b2 ? b2 : b;
+			abstract_voxel_storage* b_temp = b->is_explicit() ? nullptr : b->make_explicit();
+			abstract_voxel_storage* b_forced_explicit = b_temp ? b_temp : b;
 			if (mode == OP_UNION) {
-				a2->boolean_union(b3);
+				a_explicit->boolean_union(b_forced_explicit);
 			} else if (mode == OP_SUBTRACTION) {
-				a2->boolean_subtraction(b3);
+				a_explicit->boolean_subtraction(b_forced_explicit);
 			} else if (mode == OP_INTERSECTION) {
-				a2->boolean_intersection(b3);
+				a_explicit->boolean_intersection(b_forced_explicit);
 			}
-			delete b2;
-			set_chunk(n, ijk, a2);
+			delete b_temp;
 
+			if (inplace && a_explicit != a) {
+				delete a;
+			}
+			if (!inplace || a_explicit != a) {
+				set_chunk(n, ijk, a_explicit);
+			}			
+			
 		END_LOOP;
 
 		return n;
