@@ -405,6 +405,13 @@ public:
 #endif
 
 namespace {
+	abstract_voxel_storage* voxelize(abstract_voxel_storage* voxels, geometry_collection_t* surfaces) {
+		progress_writer progress;
+		processor p(voxels, progress);
+		p.process(surfaces->begin(), surfaces->end(), SURFACE(), output(MERGED()));
+		return voxels;
+	}
+
 	abstract_voxel_storage* voxelize(geometry_collection_t* surfaces, double vsize, int chunksize, const boost::optional<int>& threads) {
 		double x1, y1, z1, x2, y2, z2;
 		int nx, ny, nz;
@@ -459,7 +466,7 @@ public:
 
 		if (surfaces->size() == 0) {
 			// Just some arbitrary empty region
-			return new chunked_voxel_storage<bit_t>(make_vec<long>(0,0,0), vsize, cs, make_vec<size_t>(1U,1U,1U));
+			return (abstract_voxel_storage*) new chunked_voxel_storage<bit_t>(make_vec<long>(0,0,0), vsize, cs, make_vec<size_t>(1U,1U,1U));
 		} else {
 			return voxelize(surfaces, vsize, cs, t);
 		}
@@ -501,45 +508,30 @@ namespace {
 				<< " - " << right_world.format() << std::endl;
 		}
 	}
-}
-
-class op_dump_surfaces : public voxel_operation {
-public:
-	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "input_voxels", "voxels" }, { true, "input_surfaces", "surfaceset" }, { true, "output_path", "string" } };
-		return nm_;
-	}
-	symbol_value invoke(const scope_map& scope) const {
-		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input_voxels");
-		
-		auto scope_copy = scope;
-		geometry_collection_t* surfaces = scope.get_value<geometry_collection_t*>("input_surfaces");
-
-		const std::string output_path = scope.get_value<std::string>("output_path");
-		
-		double vsize = scope.get_value<double>("VOXELSIZE");
-		int cs = scope.get_value<int>("CHUNKSIZE");
-
+	
+	template <typename Fn, typename Fn2>
+	void revoxelize_and_check_overlap(abstract_voxel_storage* voxels, const geometry_collection_t& surfaces, Fn fn, Fn2 fn2) {
 		BRep_Builder B;
 
 		TopoDS_Compound face_subset_all_elem;
 		B.MakeCompound(face_subset_all_elem);
 
-		for (auto& pair : *surfaces) {
+		for (auto& pair : surfaces) {
 			TopoDS_Compound face_subset;
 			B.MakeCompound(face_subset);
 
 			bool any = false;
 
 			TopExp_Explorer exp(pair.second, TopAbs_FACE);
-			
+
 			for (; exp.More(); exp.Next()) {
 				TopoDS_Compound C;
 				B.MakeCompound(C);
 				B.Add(C, exp.Current());
-				geometry_collection_t single = { { pair.first, C} };				
+				geometry_collection_t single = { { pair.first, C} };
 
-				auto vs = voxelize(&single, vsize, cs, boost::none);
+				auto vs = voxels->empty_copy();
+				voxelize(vs, &single);
 				auto x = vs->boolean_intersection(voxels);
 
 				// std::cout << "#" << pair.first << std::endl;
@@ -562,15 +554,132 @@ public:
 			}
 
 			if (any) {
-				std::string fn = output_path + DIRSEP + std::to_string(pair.first) + ".brep";
-				std::ofstream fs(fn.c_str());
-				BRepTools::Write(face_subset, fs);
+				fn(pair.first, face_subset);
 			}
 		}
 
-		std::string fn = output_path + DIRSEP + "all.brep";
-		std::ofstream fs(fn.c_str());
-		BRepTools::Write(face_subset_all_elem , fs);
+		fn2(face_subset_all_elem);
+	}
+
+}
+
+#ifdef WITH_IFC
+
+class op_export_elements : public voxel_operation {
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "ifcfile" }, { true, "input_voxels", "voxels" }, { true, "input_surfaces", "surfaceset" }, { true, "output_path", "string" } };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		const filtered_files_t& ifc_files = scope.get_value<filtered_files_t>("input");
+		if (ifc_files.files.size() != 1) {
+			throw std::runtime_error("Only single file inputs supported for this operation");
+		}
+		auto f0 = ifc_files.files[0];
+
+		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input_voxels");
+		geometry_collection_t* surfaces = scope.get_value<geometry_collection_t*>("input_surfaces");
+		const std::string output_path = scope.get_value<std::string>("output_path");
+
+		std::ofstream json(output_path.c_str());
+		json << "[\n";
+		int n = 0;
+
+		revoxelize_and_check_overlap(voxels, *surfaces, [&f0, &json, &n](int iden, const TopoDS_Compound& face_subset) {
+			TopExp_Explorer exp(face_subset, TopAbs_FACE);
+			int num_faces = 0;
+			for (; exp.More(); exp.Next()) {
+				num_faces++;
+			}
+
+			// @todo arbitary value alert
+			if (num_faces > 3) {
+				std::string guid = *((IfcUtil::IfcBaseEntity*)f0->instance_by_id(iden))->get("GlobalId");
+				if (n) {
+					json << ",\n";
+				}
+				n += 1;
+				json << "{\"id\":" << iden << ",\"guid\":\"" << guid << "\"}";
+			}
+		}, [&output_path](const TopoDS_Compound& face_subset_all_elem) {
+		});
+
+		json << "\n]";
+
+		symbol_value v;
+		return v;
+	}
+};
+
+class op_export_ifc : public voxel_operation  {
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "ifcfile" }, { true, "input_voxels", "voxels" }, { true, "input_surfaces", "surfaceset" }, { true, "output_path", "string" } };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		const filtered_files_t& ifc_files = scope.get_value<filtered_files_t>("input");
+		if (ifc_files.files.size() != 1) {
+			throw std::runtime_error("Only single file inputs supported for this operation");
+		}
+		auto f0 = ifc_files.files[0];
+#ifndef IFCOPENSHELL_05
+#endif
+		IfcParse::IfcFile new_file(f0->schema());
+		auto ps = f0->instances_by_type("IfcProject");
+		for (auto& p : *ps) {
+			new_file.addEntity(p);
+		}
+		
+		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input_voxels");
+		geometry_collection_t* surfaces = scope.get_value<geometry_collection_t*>("input_surfaces");
+		const std::string output_path = scope.get_value<std::string>("output_path");
+
+		revoxelize_and_check_overlap(voxels, *surfaces, [&f0, &new_file](int iden, const TopoDS_Compound& face_subset) {
+			TopExp_Explorer exp(face_subset, TopAbs_FACE);
+			int num_faces = 0;
+			for (; exp.More(); exp.Next()) {
+				num_faces++;
+			}
+
+			// @todo arbitary value alert
+			if (num_faces > 3) {
+				new_file.addEntity(f0->instance_by_id(iden));
+			}
+		}, [&output_path](const TopoDS_Compound& face_subset_all_elem) {
+		});
+
+		{
+			std::ofstream fs(output_path.c_str());
+			fs << new_file;
+		}
+
+		symbol_value v;
+		return v;
+	}
+};
+
+#endif
+
+class op_dump_surfaces : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input_voxels", "voxels" }, { true, "input_surfaces", "surfaceset" }, { true, "output_path", "string" } };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input_voxels");
+		geometry_collection_t* surfaces = scope.get_value<geometry_collection_t*>("input_surfaces");
+		const std::string output_path = scope.get_value<std::string>("output_path");
+
+		revoxelize_and_check_overlap(voxels, *surfaces, [&output_path](int iden, const TopoDS_Compound& face_subset) {
+			std::string fn = output_path + DIRSEP + std::to_string(iden) + ".brep";
+			std::ofstream fs(fn.c_str());
+			BRepTools::Write(face_subset, fs);
+		}, [&output_path](const TopoDS_Compound& face_subset_all_elem) {
+			std::string fn = output_path + DIRSEP + "all.brep";
+			std::ofstream fs(fn.c_str());
+			BRepTools::Write(face_subset_all_elem, fs);
+		});		
 
 		symbol_value v;
 		return v;

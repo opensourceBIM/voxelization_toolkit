@@ -34,6 +34,8 @@ voxel_operation_map::map_t& voxel_operation_map::map() {
 		m.insert(std::make_pair(std::string("print_components"), &instantiate<op_print_components>));
 		m.insert(std::make_pair(std::string("dump_surfaces"), &instantiate<op_dump_surfaces>));
 #ifdef WITH_IFC
+		m.insert(std::make_pair(std::string("export_ifc"), &instantiate<op_export_ifc>));
+		m.insert(std::make_pair(std::string("export_json"), &instantiate<op_export_elements>));
 		m.insert(std::make_pair(std::string("filter_attributes"), &instantiate<op_create_attr_filter>));
 		m.insert(std::make_pair(std::string("filter_properties"), &instantiate<op_create_prop_filter>));
 #endif
