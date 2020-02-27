@@ -430,12 +430,12 @@ namespace {
 		nz += PADDING * 2;
 
 		if (std::is_same<V, voxel_uint32_t>::value) {
-			chunked_voxel_storage<voxel_uint32_t>* storage = new chunked_voxel_storage<voxel_uint32_t>(x1, y1, z1, d, nx, ny, nz, 64);
+			chunked_voxel_storage<voxel_uint32_t>* storage = new chunked_voxel_storage<voxel_uint32_t>(x1, y1, z1, vsize, nx, ny, nz, 64);
 			progress_writer progress("voxelize");
 			processor pr(storage, progress);
 			pr.use_scanline() = false;
 			// @uint32 defaults to VOLUME_PRODUCT_ID
-			pr.process(geoms.begin(), geoms.end(), VOLUME_PRODUCT_ID(), output(MERGED()));
+			pr.process(surfaces->begin(), surfaces->end(), VOLUME_PRODUCT_ID(), output(MERGED()));
 			return storage;
 		} else {
 			if (threads) {
