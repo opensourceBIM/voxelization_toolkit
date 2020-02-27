@@ -405,6 +405,7 @@ public:
 #endif
 
 namespace {
+	template <typename V = bit_t>
 	abstract_voxel_storage* voxelize(geometry_collection_t* surfaces, double vsize, int chunksize, const boost::optional<int>& threads) {
 		double x1, y1, z1, x2, y2, z2;
 		int nx, ny, nz;
@@ -428,18 +429,28 @@ namespace {
 		ny += PADDING * 2;
 		nz += PADDING * 2;
 
-		if (threads) {
+		if (std::is_same<V, voxel_uint32_t>::value) {
+			chunked_voxel_storage<voxel_uint32_t>* storage = new chunked_voxel_storage<voxel_uint32_t>(x1, y1, z1, d, nx, ny, nz, 64);
 			progress_writer progress("voxelize");
-			threaded_processor p(x1, y1, z1, vsize, nx, ny, nz, chunksize, *threads, progress);
-			p.process(surfaces->begin(), surfaces->end(), SURFACE(), output(MERGED()));
-			return p.voxels();
+			processor pr(storage, progress);
+			pr.use_scanline() = false;
+			// @uint32 defaults to VOLUME_PRODUCT_ID
+			pr.process(geoms.begin(), geoms.end(), VOLUME_PRODUCT_ID(), output(MERGED()));
+			return storage;
 		} else {
-			progress_writer progress;
-			auto voxels = factory().chunk_size(chunksize).create(x1, y1, z1, vsize, nx, ny, nz);
-			// nb: the other constructor would tell the constructor to delete the created voxels
-			processor p(voxels, progress);
-			p.process(surfaces->begin(), surfaces->end(), SURFACE(), output(MERGED()));
-			return voxels;
+			if (threads) {
+				progress_writer progress("voxelize");
+				threaded_processor p(x1, y1, z1, vsize, nx, ny, nz, chunksize, *threads, progress);
+				p.process(surfaces->begin(), surfaces->end(), SURFACE(), output(MERGED()));
+				return p.voxels();
+			} else {
+				progress_writer progress;
+				auto voxels = factory().chunk_size(chunksize).create(x1, y1, z1, vsize, nx, ny, nz);
+				// nb: the other constructor would tell the constructor to delete the created voxels
+				processor p(voxels, progress);
+				p.process(surfaces->begin(), surfaces->end(), SURFACE(), output(MERGED()));
+				return voxels;
+			}
 		}
 	}
 }
@@ -447,7 +458,7 @@ namespace {
 class op_voxelize : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "input", "surfaceset" }, {false, "VOXELSIZE", "real"} };
+		static std::vector<argument_spec> nm_ = { { true, "input", "surfaceset" }, {false, "VOXELSIZE", "real"}, {false, "type", "string"} };
 		return nm_;
 	}
 	symbol_value invoke(const scope_map& scope) const {
@@ -456,12 +467,21 @@ public:
 		double vsize = scope.get_value<double>("VOXELSIZE");
 		int cs = scope.get_value<int>("CHUNKSIZE");
 		int t = scope.get_value<int>("THREADS");
+		std::string ty = scope.get_value_or<std::string>("type", "bit");
 
 		if (surfaces->size() == 0) {
 			// Just some arbitrary empty region
-			return new chunked_voxel_storage<bit_t>(make_vec<long>(0,0,0), vsize, cs, make_vec<size_t>(1U,1U,1U));
+			if (ty == "bit") {
+				return new chunked_voxel_storage<bit_t>(make_vec<long>(0, 0, 0), vsize, cs, make_vec<size_t>(1U, 1U, 1U));
+			} else {
+				return new chunked_voxel_storage<voxel_uint32_t>(make_vec<long>(0, 0, 0), vsize, cs, make_vec<size_t>(1U, 1U, 1U));
+			}
 		} else {
-			return voxelize(surfaces, vsize, cs, t);
+			if (ty == "bit") {
+				return voxelize<bit_t>(surfaces, vsize, cs, t);
+			} else {
+				return voxelize<voxel_uint32_t>(surfaces, vsize, cs, t);
+			}
 		}
 	}
 };
@@ -539,7 +559,7 @@ public:
 				B.Add(C, exp.Current());
 				geometry_collection_t single = { { pair.first, C} };				
 
-				auto vs = voxelize(&single, vsize, cs, boost::none);
+				auto vs = voxelize<>(&single, vsize, cs, boost::none);
 				auto x = vs->boolean_intersection(voxels);
 
 				// std::cout << "#" << pair.first << std::endl;
@@ -979,7 +999,11 @@ public:
 		auto voxels = scope.get_value<abstract_voxel_storage*>("input");
 		auto filename = scope.get_value<std::string>("filename");
 		std::ofstream ofs(filename.c_str());
-		((regular_voxel_storage*)voxels)->obj_export(ofs);
+		if (voxels->value_bits() == 1) {
+			((regular_voxel_storage*)voxels)->obj_export(ofs);
+		} else {
+			((regular_voxel_storage*)voxels)->obj_export(ofs, false, true);
+		}
 		symbol_value v;
 		return v;
 	}
