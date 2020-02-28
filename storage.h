@@ -1643,8 +1643,9 @@ public:
 		abstract_voxel_storage* c = get_chunk(cxyz);
 		if (c == nullptr) {
 			(*(typename T::value_type_non_ref*) loc) = 0;
+		} else {
+			c->Get(xyz - cxyz * chunk_size_, loc);
 		}
-		c->Get(xyz - cxyz * chunk_size_, loc);
 	}
 	
 	void set_chunk(const vec_n<3, size_t>& ijk, abstract_voxel_storage* s) {
