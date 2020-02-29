@@ -235,6 +235,7 @@ public:
 		auto ifc_space = IfcSchema::Type::IfcSpace;
 		auto ifc_opening = IfcSchema::Type::IfcOpeningElement;
 		auto ifc_furnishing = IfcSchema::Type::IfcFurnishingElement;
+		// @todo what's this?
 		auto& ef_elements = ef_elements;
 #else
 		// From IfcOpenShell v0.6.0 onwards, there is support for multiple
@@ -272,8 +273,7 @@ public:
 
 		if (include) {
 			ef.include = *include;
-			ef.traverse = true;
-
+			
 			std::vector<std::string> entities_without_quotes;
 			std::transform(entities.begin(), entities.end(), std::back_inserter(entities_without_quotes), [](const std::string& v) {
 				return v.substr(1, v.size() - 2);
@@ -283,8 +283,14 @@ public:
 			std::transform(entities_without_quotes.begin(), entities_without_quotes.end(), std::inserter(ef_elements, ef_elements.begin()), [](const std::string& v) {
 				return IfcSchema::Type::FromString(boost::to_upper_copy(v));
 			});
+
+			ef.traverse = ef_elements != {IfcSchema::Type::IfcSpace};
 #else
 			ef_elements.insert(entities_without_quotes.begin(), entities_without_quotes.end());
+
+			// Normally we want decompositions to be included, so that a wall with IfcBuildingElement parts is processed including it's parts. For spaces we do not want that.
+			static const std::set<std::string> ONLY_SPACES{ { "IfcSpace" } };
+			ef.traverse = ef_elements != ONLY_SPACES;
 #endif
 
 			if (*include) {
