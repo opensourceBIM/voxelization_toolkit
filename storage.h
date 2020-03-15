@@ -301,9 +301,17 @@ private:
 
 	void calculate_count_() {
 		count_ = 0;
-		for (size_t i = 0; i < size(); ++i) {
-			count_ += std::bitset<8>(data_[i]).count();
-		}
+		if (T::size_in_bits >= 8U) {
+			BEGIN_LOOP(size_t(0), dimx_, 0U, dimy_, 0U, dimz_)
+				if (Get(ijk)) {
+					count_ += 1;
+				}
+			END_LOOP;
+		} else {
+			for (size_t i = 0; i < size(); ++i) {
+				count_ += std::bitset<8>(data_[i]).count();
+			}
+		} 
 	}
 
 	void calculate_bounds_() {
@@ -408,8 +416,10 @@ public:
 		bool updated = false;
 		if (T::size_in_bits >= 8U) {
 			auto& is_set = data_[x + y * dimx_ + z * dimx_ * dimy_];
-			if (is_set != v) {
+			if (!is_set) {
 				count_ += 1;
+			}
+			if (is_set != v) {
 				is_set = v;
 				updated = true;
 			}
