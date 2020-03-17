@@ -563,6 +563,87 @@ namespace {
 
 }
 
+namespace {
+	class json_visitor {
+	public:
+		typedef std::string result_type;
+
+		std::string operator()(const boost::blank&) const {
+			return "null";
+		}
+
+		std::string operator()(int v) const {
+			return boost::lexical_cast<std::string>(v);
+		}
+
+		std::string operator()(double v) const {
+			return boost::lexical_cast<std::string>(v);
+		}
+
+		std::string operator()(const std::string& v) const {
+			// assume properly escaped.
+			return "\"" + v + "\"";
+		}
+
+		std::string operator()(const function_arg_value_type& v) const {
+			return v.apply_visitor(*this);
+		}
+
+		std::string operator()(filtered_files_t const v) const {
+			return "{\"num_files\":" + boost::lexical_cast<std::string>(v.files.size()) + "}";
+		}
+
+		std::string operator()(geometry_collection_t* const v) const {
+			return "{\"num_geometries\":" + boost::lexical_cast<std::string>(v->size()) + "}";
+		}
+
+		std::string operator()(abstract_voxel_storage* const v) const {
+			return "{\"count\":" + boost::lexical_cast<std::string>(v->count()) + "}";
+		}
+	};
+}
+
+class op_json_stats : public voxel_operation {
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "output_path", "string" }, { false, "variables", "sequence"} };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {		
+		const std::string output_path = scope.get_value<std::string>("output_path");
+		std::vector<std::string> vars;
+		if (scope.has("variables")) {
+			vars = scope.get_value<std::vector<std::string> >("variables");
+		} else {
+			for (auto& p : scope) {
+				vars.push_back(p.first);
+			}
+		}
+
+		std::ofstream json(output_path.c_str());
+		json << "{";
+
+		int n = 0;
+
+		for (auto& k : vars) {
+			auto it = scope.find(k);
+			if (it != scope.end()) {
+				if (n) {
+					json << ",";
+				}
+				json_visitor v;
+				json << "\"" << k << "\":" << it->second.apply_visitor(v);
+				++n;
+			}			
+		}
+
+		json << "}";
+
+		symbol_value v;
+		return v;
+	}
+};
+
+
 #ifdef WITH_IFC
 
 class op_export_elements : public voxel_operation {

@@ -33,6 +33,7 @@ voxel_operation_map::map_t& voxel_operation_map::map() {
 		m.insert(std::make_pair(std::string("collapse"), &instantiate<op_collapse>));
 		m.insert(std::make_pair(std::string("print_components"), &instantiate<op_print_components>));
 		m.insert(std::make_pair(std::string("dump_surfaces"), &instantiate<op_dump_surfaces>));
+		m.insert(std::make_pair(std::string("json_stats"), &instantiate<op_json_stats>));
 #ifdef WITH_IFC
 		m.insert(std::make_pair(std::string("export_ifc"), &instantiate<op_export_ifc>));
 		m.insert(std::make_pair(std::string("export_json"), &instantiate<op_export_elements>));
@@ -106,7 +107,7 @@ class print_visitor {
 public:
 	typedef void result_type;
 
-	void operator()(boost::blank&) const {
+	void operator()(const boost::blank&) const {
 		std::cerr << "(void:)" << std::endl;
 	}
 
@@ -196,8 +197,12 @@ scope_map run(const std::vector<statement_type>& statements, double size, size_t
 		n++;
 	}
 
-	print_visitor v;
-	context[statements.back().assignee()].apply_visitor(v);
+	if (statements.size()) {
+		print_visitor v;
+		context[statements.back().assignee()].apply_visitor(v);
+	} else {
+		std::cerr << "[Warning] No operations in input" << std::endl;
+	}
 
 	return context;
 }
