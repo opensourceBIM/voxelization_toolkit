@@ -590,7 +590,11 @@ namespace {
 		}
 
 		std::string operator()(filtered_files_t const v) const {
+#ifdef WITH_IFC
 			return "{\"num_files\":" + boost::lexical_cast<std::string>(v.files.size()) + "}";
+#else
+			return "{}";
+#endif
 		}
 
 		std::string operator()(geometry_collection_t* const v) const {
