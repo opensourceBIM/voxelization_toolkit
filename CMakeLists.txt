@@ -9,6 +9,12 @@ include(CTest)
 
 set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 
+if(CMAKE_SIZEOF_VOID_P EQUAL 8)
+    set(WIN_ARCH x64)
+elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
+    set(WIN_ARCH ${WIN_ARCH})
+endif()
+
 set(OCC_LIBRARY_NAMES TKernel TKMath TKBRep TKGeomBase TKGeomAlgo TKG3d TKG2d TKShHealing TKTopAlgo TKMesh TKOffset
                       TKPrim TKBool TKBO TKFillet TKSTEP TKSTEPBase TKSTEPAttr TKXSBase TKSTEP209 TKIGES TKHLR TKFeat)
                       
@@ -55,8 +61,8 @@ else()
         endif()
         
         file(TO_CMAKE_PATH "${IFCOPENSHELL_ROOT}" IFCOPENSHELL_ROOT)
-        if (EXISTS ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/oce/Win32/lib)
-            set(OCC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/oce/Win32/lib)    
+        if (EXISTS ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/oce/${WIN_ARCH}/lib)
+            set(OCC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/oce/${WIN_ARCH}/lib)    
         else()
             set(OCC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/opencascade-7.3.0/win32/lib)
         endif()
@@ -132,7 +138,7 @@ if(UNIX)
     endif()
 else()
     set(BOOST_ROOT       ${IFCOPENSHELL_ROOT}/deps/boost_1_67_0)
-    set(BOOST_LIBRARYDIR ${IFCOPENSHELL_ROOT}/deps/boost_1_67_0/stage/vs${MSVC_YEAR}-Win32/lib)
+    set(BOOST_LIBRARYDIR ${IFCOPENSHELL_ROOT}/deps/boost_1_67_0/stage/vs${MSVC_YEAR}-${WIN_ARCH}/lib)
 	
     set(IFC_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/src)
     set(IFC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/build-vs${MSVC_YEAR}-x86/${CMAKE_BUILD_TYPE})
