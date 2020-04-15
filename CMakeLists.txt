@@ -12,7 +12,7 @@ set(CMAKE_BUILD_TYPE "RelWithDebInfo")
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     set(WIN_ARCH x64)
 elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
-    set(WIN_ARCH ${WIN_ARCH})
+    set(WIN_ARCH Win32)
 endif()
 
 set(OCC_LIBRARY_NAMES TKernel TKMath TKBRep TKGeomBase TKGeomAlgo TKG3d TKG2d TKShHealing TKTopAlgo TKMesh TKOffset
