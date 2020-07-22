@@ -727,8 +727,13 @@ class op_export_ifc : public voxel_operation  {
 			}
 
 			// @todo arbitary value alert
-			if (num_faces > 3) {
-				new_file.addEntity(f0->instance_by_id(iden));
+			if (num_faces >= 1) {
+				auto inst = f0->instance_by_id(iden);
+				new_file.addEntity(inst);
+				auto ops = ((IfcUtil::IfcBaseEntity*) inst)->get_inverse("HasOpenings");
+				for (auto& rel : *ops) {
+					new_file.addEntity(rel);
+				}
 			}
 		}, [&output_path](const TopoDS_Compound& face_subset_all_elem) {
 		});
