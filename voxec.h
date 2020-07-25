@@ -730,6 +730,28 @@ class op_export_ifc : public voxel_operation  {
 			if (num_faces >= 1) {
 				auto inst = f0->instance_by_id(iden);
 				new_file.addEntity(inst);
+				auto refs = f0->traverse(inst);
+				for (auto& r : *refs) {
+					if (r->declaration().is("IfcRepresentationItem")) {
+						auto styles = ((IfcUtil::IfcBaseEntity*)r)->get_inverse("StyledByItem");
+						for (auto& s : *styles) {
+							new_file.addEntity(s);
+						}
+					}
+				}
+				auto asses = ((IfcUtil::IfcBaseEntity*) inst)->get_inverse("HasAssociations");
+				for (auto& rel : *asses) {
+					auto relrefs = f0->traverse(rel);
+					for (auto& r : *relrefs) {
+						if (r->declaration().is("IfcMaterial")) {
+							new_file.addEntity(rel);
+							auto styles = ((IfcUtil::IfcBaseEntity*)r)->get_inverse("HasRepresentation");
+							for (auto& s : *styles) {
+								new_file.addEntity(s);
+							}
+						}
+					}
+				}
 				auto ops = ((IfcUtil::IfcBaseEntity*) inst)->get_inverse("HasOpenings");
 				for (auto& rel : *ops) {
 					new_file.addEntity(rel);
