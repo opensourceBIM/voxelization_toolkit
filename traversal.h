@@ -372,7 +372,7 @@ public:
 		went_out_of_bounds = false;
 
 		search_value_ = get_(seed);
-		queue = { };
+		queue.clear();
 		process_(fn, { 0, seed });
 
 		while (!queue.empty()) {
@@ -387,7 +387,7 @@ public:
 		init_(storage);
 		went_out_of_bounds = false;
 		
-		queue = { };
+		queue.clear();
 
 		bool first = true;
 		for (const auto& pos : *seed) {
