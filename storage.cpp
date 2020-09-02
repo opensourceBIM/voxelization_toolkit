@@ -19,8 +19,8 @@ set_voxel_iterator& set_voxel_iterator::operator++() {
 	for (i = i0; i <= i1; ++i) {
 		for (j = j0; j <= j1; ++j) {
 			for (k = k0; k <= k1; ++k) {
-				if (storage_->Get({ i, j, k })) {
-					current_ = { i,j,k };
+				if (storage_->Get(make_vec(i, j, k))) {
+					current_ = make_vec(i, j, k);
 					goto break_out;
 				}
 			break_into:

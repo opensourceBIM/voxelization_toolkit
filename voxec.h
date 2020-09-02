@@ -145,6 +145,7 @@ public:
 	virtual bool only_local() const {
 		return false;
 	}
+	virtual ~voxel_operation() {}
 };
 
 #ifdef WITH_IFC

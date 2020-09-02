@@ -72,7 +72,7 @@ public:
 };
 
 TEST_F(PolyfillTest, RectanglePolygon) {
-	const std::vector<point_t> verts = { { 5, 5 },{ 5,25 },{ 45,25 },{ 30,5 } };
+	const std::vector<point_t> verts = { make_vec( 5, 5 ),make_vec( 5,25 ),make_vec( 45,25 ),make_vec( 30,5 ) };
 
 	fill(verts);
 	dump();
@@ -95,7 +95,7 @@ TEST_F(PolyfillTest, RectanglePolygon) {
 
 
 TEST_F(PolyfillTest, ConcaveOrthogonal) {
-	const std::vector<point_t> verts = { { 5, 5 },{ 45, 5 },{ 45, 25 },{ 25,25 },{ 25,15 },{ 15,15 },{ 15,25 },{ 5,25 } };
+	const std::vector<point_t> verts = { make_vec( 5, 5 ),make_vec( 45, 5 ),make_vec( 45, 25 ),make_vec( 25,25 ),make_vec( 25,15 ),make_vec( 15,15 ),make_vec( 15,25 ),make_vec( 5,25 ) };
 
 	fill(verts);
 	dump();
@@ -113,7 +113,7 @@ TEST_F(PolyfillTest, ConcaveOrthogonal) {
 
 
 TEST_F(PolyfillTest, ConcaveNonOrtho) {
-	const std::vector<point_t> verts = { { 5, 5 },{ 45, 5 },{ 45, 25 },{ 25,25 },{ 25,15 },{ 15,12 },{ 15,25 },{ 5,25 } };
+	const std::vector<point_t> verts = { make_vec( 5, 5 ),make_vec( 45, 5 ),make_vec( 45, 25 ),make_vec( 25,25 ),make_vec( 25,15 ),make_vec( 15,12 ),make_vec( 15,25 ),make_vec( 5,25 ) };
 
 	fill(verts);
 	dump();
@@ -131,7 +131,7 @@ TEST_F(PolyfillTest, ConcaveNonOrtho) {
 }
 
 TEST_F(PolyfillTest, ConcaveNonOrtho2) {
-	const std::vector<point_t> verts = { { 5, 5 },{ 45, 5 },{ 45, 25 },{ 25,25 },{ 25,12 },{ 15,15 },{ 15,25 },{ 5,25 } };
+	const std::vector<point_t> verts = { make_vec( 5, 5 ),make_vec( 45, 5 ),make_vec( 45, 25 ),make_vec( 25,25 ),make_vec( 25,12 ),make_vec( 15,15 ),make_vec( 15,25 ),make_vec( 5,25 ) };
 
 	fill(verts);
 	dump();

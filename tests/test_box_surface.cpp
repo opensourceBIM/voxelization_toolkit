@@ -18,18 +18,18 @@ TEST(Voxelizer, Volume) {
 	writer.SetVoxels(storage);
 	writer.Write("test_box_surface.vox");
 
-	ASSERT_FALSE(storage->Get({0U, 0U, 1U}));
+	ASSERT_FALSE(storage->Get(make_vec<size_t>(0U, 0U, 1U)));
 	
-	ASSERT_TRUE(storage->Get({1U, 1U, 1U}));
-	ASSERT_TRUE(storage->Get({80U, 1U, 1U}));
-	ASSERT_TRUE(storage->Get({1U, 80U, 1U}));
-	ASSERT_TRUE(storage->Get({80U, 80U, 1U}));
-	ASSERT_TRUE(storage->Get({80U, 80U, 2U}));
+	ASSERT_TRUE(storage->Get(make_vec<size_t>(1U, 1U, 1U)));
+	ASSERT_TRUE(storage->Get(make_vec<size_t>(80U, 1U, 1U)));
+	ASSERT_TRUE(storage->Get(make_vec<size_t>(1U, 80U, 1U)));
+	ASSERT_TRUE(storage->Get(make_vec<size_t>(80U, 80U, 1U)));
+	ASSERT_TRUE(storage->Get(make_vec<size_t>(80U, 80U, 2U)));
 
-	ASSERT_FALSE(storage->Get({81U, 80U, 1U}));
-	ASSERT_FALSE(storage->Get({80U, 81U, 1U}));
-	ASSERT_FALSE(storage->Get({81U, 81U, 1U}));
-	ASSERT_FALSE(storage->Get({81U, 80U, 2U}));
-	ASSERT_FALSE(storage->Get({80U, 81U, 2U}));
-	ASSERT_FALSE(storage->Get({81U, 81U, 2U}));
+	ASSERT_FALSE(storage->Get(make_vec<size_t>(81U, 80U, 1U)));
+	ASSERT_FALSE(storage->Get(make_vec<size_t>(80U, 81U, 1U)));
+	ASSERT_FALSE(storage->Get(make_vec<size_t>(81U, 81U, 1U)));
+	ASSERT_FALSE(storage->Get(make_vec<size_t>(81U, 80U, 2U)));
+	ASSERT_FALSE(storage->Get(make_vec<size_t>(80U, 81U, 2U)));
+	ASSERT_FALSE(storage->Get(make_vec<size_t>(81U, 81U, 2U)));
 }
