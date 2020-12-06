@@ -1052,14 +1052,15 @@ public:
 			throw std::runtime_error("Connectedness should be 6 or 26");
 		}
 		
-		if (C == 6) {
-			visitor<6> v;
-			v.max_depth = max_depth;
-			run_visitor = v;
+		visitor<6> v6;
+		visitor<26> v26;
+		v6.max_depth = max_depth;
+		v26.max_depth = max_depth;
+
+		if (C == 6) {	
+			run_visitor = std::ref(v6);
 		} else {
-			visitor<26> v;
-			v.max_depth = max_depth;
-			run_visitor = v;
+			run_visitor = std::ref(v26);
 		}
 
 		run_visitor(callback, voxels, seed);
