@@ -63,6 +63,10 @@ int main(int argc, char** argv) {
 	const bool with_mesh = vmap.count("mesh") != 0;
 
 	std::ifstream ifs(input_filename.c_str(), std::ios::binary);
+	if (!ifs.good()) {
+		std::cerr << "Unable to open file named " << input_filename << std::endl;
+		return 1;
+	}
 	ifs.seekg(0, ifs.end);
 	size_t size = ifs.tellg();
 	ifs.seekg(0, ifs.beg);
