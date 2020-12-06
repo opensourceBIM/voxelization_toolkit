@@ -14,14 +14,14 @@ TEST(Traversal, Outmost) {
 				if (((make_vec(4, 4, 4) - make_vec(i, j, k).as<int>()).abs() < 2).all()) {
 					continue;
 				}
-				storage->Set({ i, j, k });
+				storage->Set(make_vec(i, j, k ));
 			}
 		}
 	}
 
 	ASSERT_EQ(storage->count(), 5 * 5 * 2 + 5 * 3 * 2 + 3 * 3 * 2);
 	
-	storage->Set({ 4U,4U,4U });
+	storage->Set(make_vec<size_t>(4, 4, 4));
 
 	ASSERT_EQ(storage->count(), 5 * 5 * 2 + 5 * 3 * 2 + 3 * 3 * 2 + 1);
 
@@ -53,7 +53,7 @@ TEST(Traversal, MaxDepth) {
 
 	ASSERT_EQ(storage->count(), 5 * 5 * 2 + 5 * 3 * 2 + 3 * 3 * 2);
 
-	storage->Set({ 4U,4U,4U });
+	storage->Set(make_vec<size_t>(4, 4, 4));
 
 	ASSERT_EQ(storage->count(), 5 * 5 * 2 + 5 * 3 * 2 + 3 * 3 * 2 + 1);
 
@@ -78,7 +78,7 @@ TEST(Traversal, MaxDepth) {
 		count = 0;
 		v([&count](const tagged_index& v) {
 			count++;
-		}, storage, { 2U, 2U, 2U });
+		}, storage, make_vec<size_t>(2, 2, 2));
 
 		ASSERT_EQ(count, expected_count_for_depths[i]);
 	}

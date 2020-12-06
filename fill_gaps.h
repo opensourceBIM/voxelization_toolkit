@@ -75,7 +75,11 @@ public:
 		storage->bounds()[0].tie(i0, j0, k0);
 		storage->bounds()[1].tie(i1, j1, k1);
 
-		std::vector<vec_n<3, long>> opposites{ {1,0,0}, {0,1,0}, {0,0,1} };
+		std::vector<vec_n<3, long>> opposites{ 
+			make_vec<long>(1,0,0),
+			make_vec<long>(0,1,0),
+			make_vec<long>(0,0,1)
+		};
 
 		vec_n<3, size_t> ijk;
 		for (long i = i0; i <= (long)i1; ++i) {

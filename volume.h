@@ -41,7 +41,7 @@ public:
 			for (auto& c : cs) {
 				std::array< vec_n<3, size_t>, 2 > cext;
 				cvs->chunk_extents(c, cext);
-				if (storage_->ray_intersect_n(cext[0], { 0U,0U,1U }) % 2 == 1) {
+				if (storage_->ray_intersect_n(cext[0], make_vec<size_t>(0U,0U,1U)) % 2 == 1) {
 					constant_blocks_to_create.push_back(c);
 					filled_chunk(c) = true;
 				}

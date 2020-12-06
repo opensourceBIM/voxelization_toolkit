@@ -20,10 +20,10 @@ TEST(Postprocesses, FillGaps) {
 		}
 	}
 
-	ASSERT_TRUE(storage->Get({ 2U, 2U, 2U }));
-	ASSERT_FALSE(storage->Get({ 3U, 3U, 3U }));
+	ASSERT_TRUE(storage->Get(make_vec<size_t>( 2U, 2U, 2U )));
+	ASSERT_FALSE(storage->Get(make_vec<size_t>( 3U, 3U, 3U )));
 
 	auto storage2 = fill_gaps()(storage);
 
-	ASSERT_TRUE(storage2->Get({ 3U, 3U, 3U }));
+	ASSERT_TRUE(storage2->Get(make_vec<size_t>( 3U, 3U, 3U )));
 }

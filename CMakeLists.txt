@@ -50,7 +50,9 @@ if(UNIX)
     find_package(Threads)
     find_library(dl NAMES dl)
 
-    set(OCC_LIBRARIES -Wl,--start-group ${OCC_LIBRARIES} -Wl,--end-group)
+    if(NOT APPLE)
+        set(OCC_LIBRARIES -Wl,--start-group ${OCC_LIBRARIES} -Wl,--end-group)
+    endif()
     
     add_definitions(-Wno-deprecated-declarations)
 else()

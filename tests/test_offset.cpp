@@ -13,17 +13,17 @@ TEST(Postproc, Offset) {
 				if ((make_vec(i, j, k) == make_vec<size_t>(3U, 3U, 3U)).all()) {
 					continue;
 				}
-				storage->Set({i, j, k});
+				storage->Set(make_vec(i, j, k));
 			}
 		}
 	}
 
-	ASSERT_FALSE(storage->Get({1U, 1U, 1U}));
-	ASSERT_FALSE(storage->Get({3U, 3U, 3U}));
+	ASSERT_FALSE(storage->Get(make_vec<size_t>(1U, 1U, 1U)));
+	ASSERT_FALSE(storage->Get(make_vec<size_t>(3U, 3U, 3U)));
 
 	auto storage2 = offset<>()(storage);
 
-	ASSERT_TRUE(storage2->Get({1U, 1U, 1U}));
-	ASSERT_FALSE(storage2->Get({2U, 2U, 2U}));
-	ASSERT_TRUE(storage2->Get({3U, 3U, 3U}));
+	ASSERT_TRUE(storage2->Get(make_vec<size_t>(1U, 1U, 1U)));
+	ASSERT_FALSE(storage2->Get(make_vec<size_t>(2U, 2U, 2U)));
+	ASSERT_TRUE(storage2->Get(make_vec<size_t>(3U, 3U, 3U)));
 }

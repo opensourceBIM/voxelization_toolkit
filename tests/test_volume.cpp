@@ -28,8 +28,8 @@ TEST(DISABLED_Voxelizer, ApproxVolume) {
 	for (size_t i = 0; i < ncx; ++i) {
 		for (size_t j = 0; j < ncy; ++j) {
 			for (size_t k = 0; k < ncz; ++k) {
-				if (storage->get_chunk({ i, j, k }) != nullptr) {
-					std::cerr << vec_n<3, size_t>(i, j, k).format() << ": " << storage->get_chunk({ i, j, k })->count() << std::endl;
+				if (storage->get_chunk(make_vec(i, j, k)) != nullptr) {
+					std::cerr << vec_n<3, size_t>(i, j, k).format() << ": " << storage->get_chunk(make_vec(i, j, k))->count() << std::endl;
 				}
 			}
 		}

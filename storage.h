@@ -69,8 +69,8 @@ public:
 	abstract_voxel_storage() {
 		const size_t mi = std::numeric_limits<size_t>::min();
 		const size_t ma = std::numeric_limits<size_t>::max();
-		bounds_[0] = { ma, ma, ma };
-		bounds_[1] = { mi, mi, mi };
+		bounds_[0] = make_vec(ma, ma, ma);
+		bounds_[1] = make_vec(mi, mi, mi);
 	}
 
 	virtual ~abstract_voxel_storage() {}
@@ -93,7 +93,7 @@ public:
 	virtual size_t GetNbY() const = 0;
 	virtual size_t GetNbZ() const = 0;
 	vec_n<3, size_t> extents() const {
-		return { GetNbX(), GetNbY(), GetNbZ() };
+		return make_vec(GetNbX(), GetNbY(), GetNbZ());
 	}
 
 	virtual abstract_voxel_storage* inverted(void* location = nullptr) const = 0;
@@ -268,8 +268,8 @@ private:
 	void calculate_bounds_() {
 		const size_t mi = std::numeric_limits<size_t>::min();
 		const size_t ma = std::numeric_limits<size_t>::max();
-		bounds_[0] = { ma, ma, ma };
-		bounds_[1] = { mi, mi, mi };
+		bounds_[0] = make_vec(ma, ma, ma);
+		bounds_[1] = make_vec(mi, mi, mi);
 
 		BEGIN_LOOP(size_t(0), dimx_, 0U, dimy_, 0U, dimz_)
 			if (Get(ijk)) {
@@ -373,8 +373,8 @@ public:
 			}				
 		}
 		if (updated) {
-			bounds_[0].inplace_minimum({ x,y,z });
-			bounds_[1].inplace_maximum({ x,y,z });
+			bounds_[0].inplace_minimum(make_vec(x, y, z));
+			bounds_[1].inplace_maximum(make_vec(x, y, z));
 		}
 	}
 
@@ -1041,7 +1041,7 @@ protected:
 public:
 	size_t chunk_size() const { return chunk_size_; }
 
-	vec_n<3> num_chunks() const { return { nchunksx_, nchunksy_, nchunksz_ }; }
+	vec_n<3> num_chunks() const { return make_vec(nchunksx_, nchunksy_, nchunksz_); }
 
 	vec_n<3, long> grid_offset() const {
 		return grid_offset_;
