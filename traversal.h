@@ -363,8 +363,8 @@ public:
 	typename queue_type<CONNECTEDNESS>::type queue;
 	bool went_out_of_bounds;
 
-	visitor() : post_condition_(POST_CHECK_ALWAYS()) {}
-	explicit visitor(const PostT& p) : post_condition_(p) {}
+	visitor() : post_condition_(POST_CHECK_ALWAYS()), visited_(nullptr) {}
+	explicit visitor(const PostT& p) : post_condition_(p), visited_(nullptr) {}
 
 	template <typename Fn>
 	void operator()(Fn fn, regular_voxel_storage* storage, const vec_n<3, size_t>& seed) {
