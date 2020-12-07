@@ -66,11 +66,11 @@ else()
         if (EXISTS ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/oce/${WIN_ARCH}/lib)
             set(OCC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/oce/${WIN_ARCH}/lib)    
         else()
-            set(OCC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/opencascade-7.3.0/win32/lib)
+            set(OCC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/opencascade-7.3.0p3/win32/lib)
         endif()
                              
         set(OCC_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/oce/include/oce
-                             ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/opencascade-7.3.0/inc)
+                             ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/opencascade-7.3.0p3/inc)
     else()
         file(TO_CMAKE_PATH "${OCC_LIBRARY_DIR}" OCC_LIBRARY_DIR)
     endif()
