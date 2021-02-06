@@ -3,6 +3,7 @@
 
 #include "voxec.h"
 #include "progress.h"
+#include "json_logger.h"
 
 voxel_operation_map::map_t& voxel_operation_map::map() {
 	static voxel_operation_map::map_t m;
@@ -171,7 +172,12 @@ scope_map run(const std::vector<statement_type>& statements, double size, size_t
 		auto& st = *it;
 		const bool is_last = it == --statements.end();
 
-		std::cerr << "> " << st << std::endl;
+		auto statement_string = boost::lexical_cast<std::string>(st);
+
+		json_logger::message(json_logger::LOG_NOTICE, "executing {statement}", { 
+			{"statement", {{"text", statement_string}}}
+		});
+
 		voxel_operation_runner op(st);
 		op.application_progress_callback = apfn;
 		context[st.assignee()] = op.run(st, context);
@@ -196,13 +202,16 @@ scope_map run(const std::vector<statement_type>& statements, double size, size_t
 				auto szl = (long)dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->chunk_size();
 				auto left_world = ((voxels->bounds()[0].as<long>() + left * szl).as<double>() * sz);
 				auto right_world = ((voxels->bounds()[1].as<long>() + left * szl).as<double>() * sz);
-				std::cerr << "@" << n << " ; chunked voxels: "
-					<< left.format() << " - " << right.format() 
-					<< " ; count: " << voxels->count() 
-					<< " ; bounds: " << voxels->bounds()[0].format()
-						<< " - " << voxels->bounds()[1].format() << std::endl
-					<< " ; world: " << left_world.format()
-						<< " - " << right_world.format() << std::endl;
+				
+				json_logger::message(json_logger::LOG_NOTICE, "storing {value} in {variable}", {
+					{"variable", {{"name", st.assignee()}}},
+					{"value", {
+						{"count", (long) voxels->count()},
+						{"grid", left.format() + " - " + right.format()},
+						{"bounds", voxels->bounds()[0].format() + " - " + voxels->bounds()[1].format()},
+						{"world", left_world.format() + " - " + right_world.format()},
+					}},
+				});
 			}
 		}
 
@@ -217,7 +226,7 @@ scope_map run(const std::vector<statement_type>& statements, double size, size_t
 		print_visitor v;
 		context[statements.back().assignee()].apply_visitor(v);
 	} else {
-		std::cerr << "[Warning] No operations in input" << std::endl;
+		json_logger::message(json_logger::LOG_WARNING, "no operations in input", {});
 	}
 
 	return context;

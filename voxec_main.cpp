@@ -1,4 +1,5 @@
 #include "voxec.h"
+#include "json_logger.h"
 
 #include <boost/program_options.hpp>
 #include <boost/optional.hpp>
@@ -9,6 +10,8 @@
 namespace po = boost::program_options;
 
 int main(int argc, char** argv) {
+	// json_logger::register_output(json_logger::FMT_JSON, &std::cerr);
+	json_logger::register_output(json_logger::FMT_TEXT, &std::cerr);
 	
 	po::options_description opts("Command line options");
 	opts.add_options()
@@ -31,22 +34,22 @@ int main(int argc, char** argv) {
 		po::store(po::command_line_parser(argc, argv).
 			options(opts).positional(positional_options).run(), vmap);
 	} catch (const std::exception& e) {
-		std::cerr << "[Error] " << e.what() << "\n\n";
+		json_logger::message(json_logger::LOG_FATAL, "invalid command line {error}", {
+			{"error", {{"message", std::string(e.what())}}}
+		});
 		return 1;
 	}
 
 	if (!vmap.count("input-file")) {
-		std::cerr << "[Error] Input file not specified" << std::endl;
+		json_logger::message(json_logger::LOG_FATAL, "input file not specified");
 		return 1;
 	}
 
 	double d = 0.05;
 
 	if (!vmap.count("size")) {
-		std::cerr << "[Info] Using default size 0.05m" << std::endl;
-	}
-
-	if (vmap.count("size")) {
+		json_logger::message(json_logger::LOG_NOTICE, "using default size 0.05m");
+	} else {
 		d = vmap["size"].as<double>();
 	}
 
@@ -66,7 +69,9 @@ int main(int argc, char** argv) {
 
 	std::ifstream ifs(input_filename.c_str(), std::ios::binary);
 	if (!ifs.good()) {
-		std::cerr << "Unable to open file named " << input_filename << std::endl;
+		json_logger::message(json_logger::LOG_FATAL, "unable to open file {file}", {
+			{"file", {{"text", input_filename}}}
+		});
 		return 1;
 	}
 	ifs.seekg(0, ifs.end);
@@ -82,7 +87,9 @@ int main(int argc, char** argv) {
 	phrase_parse(first, last, parser, blank, tree);
 
 	if (std::distance(f, first) != size) {
-		std::cerr << "Parse errors parsing voxelfile at " << std::distance(f, first) << std::endl;
+		json_logger::message(json_logger::LOG_FATAL, "parse errors in voxelfile at {offset}", {
+			{"offset", {{"value", (long) std::distance(f, first)}}}
+		});
 		return 1;
 	}
 
@@ -90,8 +97,9 @@ int main(int argc, char** argv) {
 		run(tree, d, threads.get_value_or(1), chunk.get_value_or(128), with_mesh, quiet);
 		return 0;
 	} catch (const std::runtime_error& e) {
-		std::cerr << "Errors while running voxelfile:" << std::endl;
-		std::cerr << e.what() << std::endl;
+		json_logger::message(json_logger::LOG_FATAL, "encountered {error} while running voxelfile", {
+			{"error", {{"message", std::string(e.what())}}}
+		});
 		return 1;
 	}
 }

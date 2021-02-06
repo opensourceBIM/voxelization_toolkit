@@ -204,8 +204,8 @@ add_subdirectory(${CMAKE_BINARY_DIR}/googletest-src
                  EXCLUDE_FROM_ALL)
 endif()
 
-set(LIBVOXELIZER_HEADER_FILES progress_writer.h dim3.h sweep.h shift.h collapse.h edge_detect.h fill_gaps.h offset.h polyfill.h resample.h storage.h writer.h factory.h processor.h volume.h voxelizer.h traversal.h util.h)
-set(LIBVOXELIZER_SOURCE_FILES tribox3.cpp polyfill.cpp progress_writer.cpp storage.cpp factory.cpp)
+set(LIBVOXELIZER_HEADER_FILES progress_writer.h dim3.h sweep.h shift.h collapse.h edge_detect.h fill_gaps.h offset.h polyfill.h resample.h storage.h writer.h factory.h processor.h volume.h voxelizer.h traversal.h util.h json_logger.h)
+set(LIBVOXELIZER_SOURCE_FILES tribox3.cpp polyfill.cpp progress_writer.cpp storage.cpp factory.cpp json_logger.cpp)
 add_library(libvoxel STATIC ${LIBVOXELIZER_HEADER_FILES} ${LIBVOXELIZER_SOURCE_FILES})
 target_link_libraries(libvoxel ${IFC_LIBRARIES} ${ICU_LIBRARIES} ${Boost_LIBRARIES} "bcrypt.lib" ${OCC_LIBRARIES} ${LIB_RT} ${dl} ${CMAKE_THREAD_LIBS_INIT} ${WS2_LIBRARIES})
 
