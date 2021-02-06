@@ -2,6 +2,7 @@
 // @todo finish memory mapped chunked storage and make default
 
 #include "voxec.h"
+#include "progress.h"
 
 voxel_operation_map::map_t& voxel_operation_map::map() {
 	static voxel_operation_map::map_t m;
@@ -137,8 +138,18 @@ public:
 };
 
 
-scope_map run(const std::vector<statement_type>& statements, double size, size_t threads, size_t chunk_size, bool with_mesh) {
+scope_map run(const std::vector<statement_type>& statements, double size, size_t threads, size_t chunk_size, bool with_mesh, bool with_progress_on_cout) {
 	scope_map context;
+
+	std::unique_ptr<progress_bar> pb;
+	std::unique_ptr<application_progress> ap;
+	std::function<void(float)> pfn = [&pb](float f) { (*pb)(f); };
+	std::function<void(float)> apfn = [&ap](float f) { (*ap)(f); };
+	if (with_progress_on_cout) {
+		pb = std::make_unique<progress_bar>(std::cout, progress_bar::DOTS);
+		std::vector<float> estimates(statements.size(), 1.f);
+		ap = std::make_unique<application_progress>(estimates, pfn);
+	}
 
 	function_arg_value_type threads_ = (int)threads;
 	context["THREADS"] = threads_;
@@ -162,6 +173,7 @@ scope_map run(const std::vector<statement_type>& statements, double size, size_t
 
 		std::cerr << "> " << st << std::endl;
 		voxel_operation_runner op(st);
+		op.application_progress_callback = apfn;
 		context[st.assignee()] = op.run(st, context);
 
 		if (context[st.assignee()].which() == HAS_VOXELS) {
@@ -192,6 +204,10 @@ scope_map run(const std::vector<statement_type>& statements, double size, size_t
 					<< " ; world: " << left_world.format()
 						<< " - " << right_world.format() << std::endl;
 			}
+		}
+
+		if (ap) {
+			ap->finished();
 		}
 
 		n++;

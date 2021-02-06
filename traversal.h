@@ -463,13 +463,11 @@ public:
 				((abstract_chunked_voxel_storage*)output)->create_constant(pos.pos, 1U);
 			}
 			processed++;
-			if (progress_callback) {
-				(*progress_callback)(processed * 100 / (processed + v.queue.size()));
-			}
+			progress(static_cast<float>(processed) / (processed + v.queue.size()));
 		}, storage, seed);
-		if (progress_callback) {
-			(*progress_callback)(100);
-		}
+		
+		progress(1.);
+
 		return output;
 	}
 };
@@ -551,9 +549,8 @@ public:
 				processed += cs * cs * cs;
 			}
 			
-			if (progress_callback) {
-				(*progress_callback)(processed * 100 / (processed + v.queue.size()));
-			}
+			progress(static_cast<float>(processed) / (processed + v.queue.size()));
+
 		}, storage, seed);
 
 		if (start_outside && !v.went_out_of_bounds) {
@@ -578,9 +575,7 @@ public:
 			output = inverted;
 		}
 		
-		if (progress_callback) {
-			(*progress_callback)(100);
-		}
+		progress(1.);
 
 		return output;
 	}
@@ -610,7 +605,8 @@ public:
 	regular_voxel_storage * operator()(regular_voxel_storage* storage) {
 		traversal_voxel_filler filler;
 		filler.start_outside = true;
-		filler.progress_callback = boost::none;
+		// @todo why were these set to none?
+		// filler.progress_callback = boost::none;
 		return filler(storage);
 	}
 };
@@ -623,7 +619,7 @@ public:
 		traversal_voxel_filler filler;
 		filler.start_outside = true;
 		filler.invert = false;
-		filler.progress_callback = boost::none;
+		// filler.progress_callback = boost::none;
 		return filler(storage);
 	}
 };

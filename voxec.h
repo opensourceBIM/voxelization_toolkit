@@ -137,6 +137,8 @@ struct argument_spec {
 
 class voxel_operation {
 public:
+	boost::optional<std::function<void(float)>> application_progress_callback;
+
 	virtual const std::vector<argument_spec>& arg_names() const = 0;
 	virtual symbol_value invoke(const scope_map& scope) const = 0;
 	virtual bool catch_all() const {
@@ -807,7 +809,9 @@ public:
 	}
 	symbol_value invoke(const scope_map& scope) const {
 		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input");
-		return threaded_post_process<fill_gaps>(scope.get_value<int>("THREADS"))((regular_voxel_storage*) voxels);
+		threaded_post_process<fill_gaps> tpp(scope.get_value<int>("THREADS"));
+		tpp.set_progress_callback(application_progress_callback);
+		return tpp((regular_voxel_storage*) voxels);
 	}
 };
 
@@ -819,7 +823,9 @@ public:
 	}
 	symbol_value invoke(const scope_map& scope) const {
 		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input");
-		return threaded_post_process< offset<> >(scope.get_value<int>("THREADS"))((regular_voxel_storage*)voxels);
+		threaded_post_process< offset<> > tpp(scope.get_value<int>("THREADS"));
+		tpp.set_progress_callback(application_progress_callback);
+		return tpp((regular_voxel_storage*)voxels);
 	}
 };
 
@@ -869,7 +875,9 @@ public:
 	}
 	symbol_value invoke(const scope_map& scope) const {
 		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input");
-		return threaded_post_process<keep_outmost>(1)((regular_voxel_storage*)voxels);
+		threaded_post_process<keep_outmost> tpp(1);
+		tpp.set_progress_callback(application_progress_callback);
+		return tpp((regular_voxel_storage*)voxels);
 	}
 };
 
@@ -894,7 +902,9 @@ public:
 	}
 	symbol_value invoke(const scope_map& scope) const {
 		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input");
-		return threaded_post_process<traversal_voxel_filler_separate_components>(1)((regular_voxel_storage*)voxels);
+		threaded_post_process<traversal_voxel_filler_separate_components> tpp(1);
+		tpp.set_progress_callback(application_progress_callback);
+		return tpp((regular_voxel_storage*)voxels);
 	}
 };
 
@@ -909,7 +919,9 @@ public:
 		if (voxels->count() == 0) {
 			return voxels->empty_copy();
 		}
-		return threaded_post_process<traversal_voxel_filler_inverse>(1)((regular_voxel_storage*)voxels);
+		threaded_post_process<traversal_voxel_filler_inverse> tpp(1);
+		tpp.set_progress_callback(application_progress_callback);
+		return ((regular_voxel_storage*)voxels);
 	}
 };
 
@@ -921,7 +933,9 @@ public:
 	}
 	symbol_value invoke(const scope_map& scope) const {
 		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input");
-		return threaded_post_process<traversal_voxel_filler_inverted>(1)((regular_voxel_storage*)voxels);
+		threaded_post_process<traversal_voxel_filler_inverted> tpp(1);
+		tpp.set_progress_callback(application_progress_callback);
+		return tpp((regular_voxel_storage*)voxels);
 	}
 };
 
@@ -1312,12 +1326,14 @@ void operator()(const boost::blank&) const {
 class voxel_operation_runner {
 public:
 	const statement_type& statement_;
+	boost::optional<std::function<void(float)>> application_progress_callback;
 
 	voxel_operation_runner(const statement_type& statement) :
 		statement_(statement) {}
 
 	symbol_value run(const statement_type& st, scope_map& context) {
 		voxel_operation* op = voxel_operation_map::create(statement_.call().name());
+		op->application_progress_callback = application_progress_callback;
 
 		bool has_keyword = false;
 		std::map<std::string, function_arg_value_type> function_values;
@@ -1384,6 +1400,6 @@ public:
 	}
 };
 
-scope_map run(const std::vector<statement_type>& statements, double size, size_t threads = 0, size_t chunk_size = 128, bool with_mesh = false);
+scope_map run(const std::vector<statement_type>& statements, double size, size_t threads = 0, size_t chunk_size = 128, bool with_mesh = false, bool with_progress_on_cout = false);
 
 #endif

@@ -2,20 +2,46 @@
 #define EDGE_DETECT_H
 
 #include "storage.h"
-#include "progress.h"
+#include "progress_writer.h"
 
 #include <boost/optional.hpp>
 
 #include <thread>
 
+// A post process (ie. subtype of post_process) is a functor that takes a voxel storage
+// applies a procedure (such as edge detection, filling gaps, extrusion, ...) and returns
+// a new voxel storage with the operation applied.
 class post_process {
-public:
-	virtual regular_voxel_storage* operator()(regular_voxel_storage*) = 0;
-	boost::optional < std::function<void(int)> > progress_callback;
+protected:
+	boost::optional<std::function<void(int)>> progress_callback;
+	boost::optional<std::function<void(float)>> application_progress_callback;
 
+	void progress(float f) {
+		if (application_progress_callback) {
+			(*application_progress_callback)(f);
+		}
+		if (progress_callback) {
+			(*progress_callback)(static_cast<int>(f * 100.));
+		}
+	}
+
+public:
+	void set_progress_callback(boost::optional<std::function<void(int)>> cb) {
+		progress_callback = cb;
+	}
+
+	void set_progress_callback(boost::optional<std::function<void(float)>> cb) {
+		application_progress_callback = cb;
+	}
+
+	virtual regular_voxel_storage* operator()(regular_voxel_storage*) = 0;
 	virtual ~post_process() {}
 };
 
+// A threaded post process is a special kind of post process that can be parallelized
+// by taking applying the operation in parallel to multiple subregions of the voxel
+// storage. These are almost always local operations as opposed to the queue based
+// operations in traversal.h
 template <typename T>
 class threaded_post_process : public post_process {
 private:
@@ -32,6 +58,7 @@ public:
 		std::vector<regular_voxel_storage*> results(n_);
 		ts.reserve(n_);
 		auto progress = p.thread(n_);
+		progress.application_progress_callback = application_progress_callback;
 		
 		size_t x0 = 0;
 
@@ -40,9 +67,9 @@ public:
 
 		if (n_ == 1) {
 			T t;
-			t.progress_callback = std::function<void(int)>([&progress](int p) {
+			t.set_progress_callback(std::function<void(int)>([&progress](int p) {
 				progress(0, p);
-			});
+			}));
 			results[0] = t(storage);
 		} else {
 			// Create regions
@@ -63,9 +90,9 @@ public:
 			for (size_t i = 0; i < n_; ++i) {
 				ts.emplace_back(std::thread([this, i, &regions, &results, &progress]() {
 					T t;
-					t.progress_callback = std::function<void(int)>([&progress, i](int p) {
+					t.set_progress_callback(std::function<void(int)>([&progress, i](int p) {
 						progress(i, p);
-					});
+					}));
 					// @todo: on nix we sometimes get an empty result back. Is this due to the mutable bounds_ in abstract abstract_voxel_storage?
 					results[i] = t(regions[i]);
 				}));

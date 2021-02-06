@@ -12,6 +12,7 @@ int main(int argc, char** argv) {
 	
 	po::options_description opts("Command line options");
 	opts.add_options()
+		("quiet,q", "limit output on stdout to progress indication")
 		("threads,t", po::value<size_t>(), "number of parallel processing threads")
 		("size,d", po::value<double>(), "voxel size in meters")
 		("chunk,c", po::value<size_t>(), "chunk size in number of voxels")
@@ -61,6 +62,7 @@ int main(int argc, char** argv) {
 
 	const std::string input_filename = vmap["input-file"].as<std::string>();
 	const bool with_mesh = vmap.count("mesh") != 0;
+	const bool quiet = vmap.count("quiet") != 0;
 
 	std::ifstream ifs(input_filename.c_str(), std::ios::binary);
 	if (!ifs.good()) {
@@ -85,7 +87,7 @@ int main(int argc, char** argv) {
 	}
 
 	try {
-		run(tree, d, threads.get_value_or(1), chunk.get_value_or(128), with_mesh);
+		run(tree, d, threads.get_value_or(1), chunk.get_value_or(128), with_mesh, quiet);
 		return 0;
 	} catch (const std::runtime_error& e) {
 		std::cerr << "Errors while running voxelfile:" << std::endl;

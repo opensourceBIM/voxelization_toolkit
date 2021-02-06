@@ -5,7 +5,7 @@
 #include "factory.h"
 #include "storage.h"
 #include "writer.h"
-#include "progress.h"
+#include "progress_writer.h"
 #include "volume.h"
 
 #include <TopoDS_Shape.hxx>

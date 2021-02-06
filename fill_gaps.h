@@ -83,9 +83,8 @@ public:
 
 		vec_n<3, size_t> ijk;
 		for (long i = i0; i <= (long)i1; ++i) {
-			if (progress_callback) {
-				(*progress_callback)((i - i0) * 100 / (i1 - i0));
-			}
+			progress(static_cast<float>(i - i0) / (i1 - i0));
+
 			ijk.get(0) = i;
 			for (long j = j0; j <= (long)j1; ++j) {
 				ijk.get(1) = j;
@@ -117,9 +116,7 @@ public:
 			}
 		}
 
-		if (progress_callback) {
-			(*progress_callback)(100);
-		}
+		progress(1.);
 
 		return output_;
 	}
