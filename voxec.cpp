@@ -155,9 +155,13 @@ scope_map run(const std::vector<statement_type>& statements, double size, size_t
 	std::function<void(float)> apfn = [&ap](float f) { (*ap)(f); };
 	if (with_progress_on_cout) {
 		pb = std::make_unique<progress_bar>(std::cout, progress_bar::DOTS);
-		std::vector<float> estimates(statements.size(), 1.f);
-		ap = std::make_unique<application_progress>(estimates, pfn);
 	}
+	else {
+		pb = std::make_unique<progress_bar>(std::cout);
+	}
+
+	std::vector<float> estimates(statements.size(), 1.f);
+	ap = std::make_unique<application_progress>(estimates, pfn);
 
 	function_arg_value_type threads_ = (int)threads;
 	context["THREADS"] = threads_;
