@@ -6,6 +6,8 @@
 static std::mutex progress_mtx;
 
 void threaded_progress_writer::operator()(int n, int i)  {
+	if (silent_) return;
+
 	if (ps_[n] == i) {
 		return;
 	}

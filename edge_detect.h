@@ -20,12 +20,16 @@ protected:
 		if (application_progress_callback) {
 			(*application_progress_callback)(f);
 		}
-		if (progress_callback) {
-			(*progress_callback)(static_cast<int>(f * 100.));
+		if (!silent) {
+			if (progress_callback) {
+				(*progress_callback)(static_cast<int>(f * 100.));
+			}
 		}
 	}
 
 public:
+	bool silent = false;
+
 	void set_progress_callback(boost::optional<std::function<void(int)>> cb) {
 		progress_callback = cb;
 	}
@@ -52,7 +56,7 @@ public:
 	{}
 
 	regular_voxel_storage* operator()(regular_voxel_storage* storage) {
-		progress_writer p(typeid(T).name());
+		progress_writer p(typeid(T).name(), silent);
 		
 		std::vector<std::thread> ts;
 		std::vector<regular_voxel_storage*> results(n_);

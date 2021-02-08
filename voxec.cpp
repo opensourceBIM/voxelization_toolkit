@@ -105,37 +105,44 @@ std::ostream& operator<<(std::ostream& a, const statement_type& b) {
 	return a;
 }
 
-class print_visitor {
+class log_visitor {
+private:
+	json_logger::meta_value v_;
 public:
+	const json_logger::meta_value& value() const { return v_; }
+
 	typedef void result_type;
 
-	void operator()(const boost::blank&) const {
-		std::cerr << "(void:)" << std::endl;
+	void operator()(const boost::blank&) {
+		v_ = std::string("void");
 	}
 
-	void operator()(int v) const {
-		std::cerr << "(integer:)" << v << std::endl;
+	void operator()(int v) {
+		v_ = (long) v;
 	}
 
-	void operator()(double v) const {
-		std::cerr << "(real:)" << v << std::endl;
+	void operator()(double v) {
+		v_ = v;
 	}
 
-	void operator()(const std::string& v) const {
+	void operator()(const std::string& v) {
 		if (v.at(0) == '"') {
-			std::cerr << "(string:)" << v.substr(1, v.size() - 2) << std::endl;
+			v_ = v.substr(1, v.size() - 2);
+		}
+		else {
+			v_ = v;
 		}
 	}
 
-	void operator()(const function_arg_value_type& v) const {
+	void operator()(const function_arg_value_type& v) {
 		v.apply_visitor(*this);
 	}
 
-	void operator()(filtered_files_t const v) const {	}
+	void operator()(filtered_files_t const v) {	}
 
-	void operator()(geometry_collection_t* const v) const {	}
+	void operator()(geometry_collection_t* const v) { }
 
-	void operator()(abstract_voxel_storage* const v) const { }
+	void operator()(abstract_voxel_storage* const v) { }
 };
 
 
@@ -180,6 +187,7 @@ scope_map run(const std::vector<statement_type>& statements, double size, size_t
 
 		voxel_operation_runner op(st);
 		op.application_progress_callback = apfn;
+		op.silent = with_progress_on_cout;
 		context[st.assignee()] = op.run(st, context);
 
 		if (context[st.assignee()].which() == HAS_VOXELS) {
@@ -205,12 +213,7 @@ scope_map run(const std::vector<statement_type>& statements, double size, size_t
 				
 				json_logger::message(json_logger::LOG_NOTICE, "storing {value} in {variable}", {
 					{"variable", {{"name", st.assignee()}}},
-					{"value", {
-						{"count", (long) voxels->count()},
-						{"grid", left.format() + " - " + right.format()},
-						{"bounds", voxels->bounds()[0].format() + " - " + voxels->bounds()[1].format()},
-						{"world", left_world.format() + " - " + right_world.format()},
-					}},
+					{"value", dump_info(voxels)},
 				});
 			}
 		}
@@ -223,8 +226,12 @@ scope_map run(const std::vector<statement_type>& statements, double size, size_t
 	}
 
 	if (statements.size()) {
-		print_visitor v;
-		context[statements.back().assignee()].apply_visitor(v);
+		log_visitor v;
+		context[statements.back().assignee()].apply_visitor(std::ref(v));
+
+		json_logger::message(json_logger::LOG_NOTICE, "scripted finished with {variable}", {
+				{"variable", {{"value", v.value()}}},
+		});
 	} else {
 		json_logger::message(json_logger::LOG_WARNING, "no operations in input", {});
 	}

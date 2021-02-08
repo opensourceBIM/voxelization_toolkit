@@ -10,12 +10,12 @@
 namespace po = boost::program_options;
 
 int main(int argc, char** argv) {
-	// json_logger::register_output(json_logger::FMT_JSON, &std::cerr);
-	json_logger::register_output(json_logger::FMT_TEXT, &std::cerr);
+	std::unique_ptr<std::ofstream> log_file;
 	
 	po::options_description opts("Command line options");
 	opts.add_options()
 		("quiet,q", "limit output on stdout to progress indication")
+		("log-file", po::value<std::string>(), "filename to log json message")
 		("threads,t", po::value<size_t>(), "number of parallel processing threads")
 		("size,d", po::value<double>(), "voxel size in meters")
 		("chunk,c", po::value<size_t>(), "chunk size in number of voxels")
@@ -63,9 +63,19 @@ int main(int argc, char** argv) {
 		chunk = vmap["chunk"].as<size_t>();
 	}
 
+	if (vmap.count("log-file")) {
+		const std::string log_filename = vmap["log-file"].as<std::string>();
+		log_file = std::make_unique<std::ofstream>(log_filename.c_str());
+		json_logger::register_output(json_logger::FMT_TEXT, &*log_file);
+	}
+
 	const std::string input_filename = vmap["input-file"].as<std::string>();
 	const bool with_mesh = vmap.count("mesh") != 0;
 	const bool quiet = vmap.count("quiet") != 0;
+
+	if (!quiet) {
+		json_logger::register_output(json_logger::FMT_TEXT, &std::cerr);
+	}
 
 	std::ifstream ifs(input_filename.c_str(), std::ios::binary);
 	if (!ifs.good()) {

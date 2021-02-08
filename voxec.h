@@ -7,6 +7,7 @@
 #include "offset.h"
 #include "fill_gaps.h"
 #include "traversal.h"
+#include "json_logger.h"
 
 #ifdef WITH_IFC
 #include <ifcparse/IfcFile.h>
@@ -138,6 +139,7 @@ struct argument_spec {
 class voxel_operation {
 public:
 	boost::optional<std::function<void(float)>> application_progress_callback;
+	bool silent = false;
 
 	virtual const std::vector<argument_spec>& arg_names() const = 0;
 	virtual symbol_value invoke(const scope_map& scope) const = 0;
@@ -384,20 +386,22 @@ public:
 				}
 
 				if (old_progress != iterator.progress()) {
-					std::cerr << "\rparsing geometry " << iterator.progress();
 					old_progress = iterator.progress();
+					if (application_progress_callback) {
+						(*application_progress_callback)(old_progress / 100.f);
+					}
 				}
 
 				if (!iterator.next()) {
-					std::cerr << std::endl;
 					break;
 				}
 			}
 
-		}
+		}		
 
 		if (!at_least_one_succesful) {
-			throw std::runtime_error("Failed to generate geometry");
+			json_logger::message(json_logger::LOG_FATAL, "Failed to generate geometry");
+			abort();
 		}
 
 		std::random_shuffle(geometries->begin(), geometries->end());
@@ -415,7 +419,7 @@ namespace {
 		return voxels;
 	}
 
-	abstract_voxel_storage* voxelize(geometry_collection_t* surfaces, double vsize, int chunksize, const boost::optional<int>& threads) {
+	abstract_voxel_storage* voxelize(geometry_collection_t* surfaces, double vsize, int chunksize, const boost::optional<int>& threads, bool silent = false) {
 		double x1, y1, z1, x2, y2, z2;
 		int nx, ny, nz;
 
@@ -439,7 +443,7 @@ namespace {
 		nz += PADDING * 2;
 
 		if (threads) {
-			progress_writer progress("voxelize");
+			progress_writer progress("voxelize", silent);
 			threaded_processor p(x1, y1, z1, vsize, nx, ny, nz, chunksize, *threads, progress);
 			p.process(surfaces->begin(), surfaces->end(), SURFACE(), output(MERGED()));
 			return p.voxels();
@@ -471,7 +475,7 @@ public:
 			// Just some arbitrary empty region
 			return (abstract_voxel_storage*) new chunked_voxel_storage<bit_t>(make_vec<long>(0,0,0), vsize, cs, make_vec<size_t>(1U,1U,1U));
 		} else {
-			return voxelize(surfaces, vsize, cs, t);
+			return voxelize(surfaces, vsize, cs, t, silent);
 		}
 	}
 };
@@ -493,7 +497,7 @@ public:
 };
 
 namespace {
-	void dump_info(abstract_voxel_storage* voxels) {
+	json_logger::meta_data dump_info(abstract_voxel_storage* voxels) {
 		if (dynamic_cast<abstract_chunked_voxel_storage*>(voxels)) {
 			auto left = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->grid_offset();
 			auto nc = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->num_chunks();
@@ -502,14 +506,15 @@ namespace {
 			auto szl = (long)dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->chunk_size();
 			auto left_world = ((voxels->bounds()[0].as<long>() + left * szl).as<double>() * sz);
 			auto right_world = ((voxels->bounds()[1].as<long>() + left * szl).as<double>() * sz);
-			std::cerr << "voxels: "
-				<< left.format() << " - " << right.format()
-				<< " ; count: " << voxels->count()
-				<< " ; bounds: " << voxels->bounds()[0].format()
-				<< " - " << voxels->bounds()[1].format() << std::endl
-				<< " ; world: " << left_world.format()
-				<< " - " << right_world.format() << std::endl;
+
+			return {
+				{"count", (long)voxels->count()},
+				{"grid", left.format() + " - " + right.format()},
+				{"bounds", voxels->bounds()[0].format() + " - " + voxels->bounds()[1].format()},
+				{"world", left_world.format() + " - " + right_world.format()},
+			};
 		}
+		return {};
 	}
 	
 	template <typename Fn, typename Fn2>
@@ -811,6 +816,7 @@ public:
 		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input");
 		threaded_post_process<fill_gaps> tpp(scope.get_value<int>("THREADS"));
 		tpp.set_progress_callback(application_progress_callback);
+		tpp.silent = silent;
 		return tpp((regular_voxel_storage*) voxels);
 	}
 };
@@ -825,6 +831,7 @@ public:
 		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input");
 		threaded_post_process< offset<> > tpp(scope.get_value<int>("THREADS"));
 		tpp.set_progress_callback(application_progress_callback);
+		tpp.silent = silent;
 		return tpp((regular_voxel_storage*)voxels);
 	}
 };
@@ -853,7 +860,10 @@ public:
 #else
 		auto current = (regular_voxel_storage*) voxels->copy();
 		while (d) {
-			auto ofs = threaded_post_process< offset<1, 2> >(scope.get_value<int>("THREADS"))(current);
+			threaded_post_process< offset<1, 2> > tpp(scope.get_value<int>("THREADS"));
+			// @todo progress not propagated as it's within a loop
+			tpp.silent = silent;
+			auto ofs = tpp(current);
 			auto next = (regular_voxel_storage*) current->boolean_union(ofs);
 			delete ofs;
 			delete current;
@@ -877,6 +887,7 @@ public:
 		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input");
 		threaded_post_process<keep_outmost> tpp(1);
 		tpp.set_progress_callback(application_progress_callback);
+		tpp.silent = silent;
 		return tpp((regular_voxel_storage*)voxels);
 	}
 };
@@ -904,6 +915,7 @@ public:
 		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input");
 		threaded_post_process<traversal_voxel_filler_separate_components> tpp(1);
 		tpp.set_progress_callback(application_progress_callback);
+		tpp.silent = silent;
 		return tpp((regular_voxel_storage*)voxels);
 	}
 };
@@ -921,6 +933,7 @@ public:
 		}
 		threaded_post_process<traversal_voxel_filler_inverse> tpp(1);
 		tpp.set_progress_callback(application_progress_callback);
+		tpp.silent = silent;
 		return ((regular_voxel_storage*)voxels);
 	}
 };
@@ -935,6 +948,7 @@ public:
 		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input");
 		threaded_post_process<traversal_voxel_filler_inverted> tpp(1);
 		tpp.set_progress_callback(application_progress_callback);
+		tpp.silent = silent;
 		return tpp((regular_voxel_storage*)voxels);
 	}
 };
@@ -1327,6 +1341,7 @@ class voxel_operation_runner {
 public:
 	const statement_type& statement_;
 	boost::optional<std::function<void(float)>> application_progress_callback;
+	bool silent = false;
 
 	voxel_operation_runner(const statement_type& statement) :
 		statement_(statement) {}
@@ -1334,6 +1349,7 @@ public:
 	symbol_value run(const statement_type& st, scope_map& context) {
 		voxel_operation* op = voxel_operation_map::create(statement_.call().name());
 		op->application_progress_callback = application_progress_callback;
+		op->silent = silent;
 
 		bool has_keyword = false;
 		std::map<std::string, function_arg_value_type> function_values;

@@ -13,11 +13,12 @@ private:
 	std::vector<int> ps_;
 	std::string item_;
 	mutable bool ended_;
+	bool silent_;
 public:
 	boost::optional<std::function<void(float)>> application_progress_callback;
 
-	threaded_progress_writer(const std::string& item, int n)
-		: item_(item), ended_(false)
+	threaded_progress_writer(const std::string& item, int n, bool silent=false)
+		: item_(item), ended_(false), silent_(silent)
 	{
 		ps_.resize(n);
 	}
@@ -29,6 +30,7 @@ public:
 	void operator()(int n, int i);
 
 	void end() const {
+		if (silent_) return;
 		if (!ended_) {
 			std::cerr << std::endl;
 			ended_ = true;
@@ -46,8 +48,8 @@ public:
 
 	progress_writer() : silent_(true) {}
 
-	progress_writer(const std::string& item)
-		: item_(item), ended_(false), silent_(false) {}
+	progress_writer(const std::string& item, bool silent = false)
+		: item_(item), ended_(false), silent_(silent) {}
 
 	~progress_writer() {
 		end();
@@ -71,7 +73,7 @@ public:
 	}
 
 	threaded_progress_writer thread(int n) {
-		return threaded_progress_writer(item_, n);
+		return threaded_progress_writer(item_, n, silent_);
 	}
 };
 
