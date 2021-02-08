@@ -66,7 +66,7 @@ int main(int argc, char** argv) {
 	if (vmap.count("log-file")) {
 		const std::string log_filename = vmap["log-file"].as<std::string>();
 		log_file = std::make_unique<std::ofstream>(log_filename.c_str());
-		json_logger::register_output(json_logger::FMT_TEXT, &*log_file);
+		json_logger::register_output(json_logger::FMT_JSON, &*log_file);
 	}
 
 	const std::string input_filename = vmap["input-file"].as<std::string>();
