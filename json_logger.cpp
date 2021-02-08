@@ -14,7 +14,7 @@ namespace {
 	struct ptree_writer {
 		boost::property_tree::ptree& pt;
 		const std::string& k;
-		void operator()(int v) {
+		void operator()(long v) {
 			pt.put(k, v);
 		}
 		void operator()(double v) {
