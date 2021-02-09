@@ -240,6 +240,7 @@ public:
 		auto ifc_space = IfcSchema::Type::IfcSpace;
 		auto ifc_opening = IfcSchema::Type::IfcOpeningElement;
 		auto ifc_furnishing = IfcSchema::Type::IfcFurnishingElement;
+		// @todo what's this?
 		auto& ef_elements = ef_elements;
 #else
 		// From IfcOpenShell v0.6.0 onwards, there is support for multiple
@@ -277,8 +278,7 @@ public:
 
 		if (include) {
 			ef.include = *include;
-			ef.traverse = true;
-
+			
 			std::vector<std::string> entities_without_quotes;
 			std::transform(entities.begin(), entities.end(), std::back_inserter(entities_without_quotes), [](const std::string& v) {
 				return v.substr(1, v.size() - 2);
@@ -288,8 +288,14 @@ public:
 			std::transform(entities_without_quotes.begin(), entities_without_quotes.end(), std::inserter(ef_elements, ef_elements.begin()), [](const std::string& v) {
 				return IfcSchema::Type::FromString(boost::to_upper_copy(v));
 			});
+
+			ef.traverse = ef_elements != {IfcSchema::Type::IfcSpace};
 #else
 			ef_elements.insert(entities_without_quotes.begin(), entities_without_quotes.end());
+
+			// Normally we want decompositions to be included, so that a wall with IfcBuildingElement parts is processed including it's parts. For spaces we do not want that.
+			static const std::set<std::string> ONLY_SPACES{ { "IfcSpace" } };
+			ef.traverse = ef_elements != ONLY_SPACES;
 #endif
 
 			if (*include) {
@@ -412,6 +418,7 @@ public:
 #endif
 
 namespace {
+<<<<<<< HEAD
 	abstract_voxel_storage* voxelize(abstract_voxel_storage* voxels, geometry_collection_t* surfaces) {
 		progress_writer progress;
 		processor p(voxels, progress);
@@ -419,6 +426,7 @@ namespace {
 		return voxels;
 	}
 
+	template <typename V = bit_t>
 	abstract_voxel_storage* voxelize(geometry_collection_t* surfaces, double vsize, int chunksize, const boost::optional<int>& threads, bool silent = false) {
 		double x1, y1, z1, x2, y2, z2;
 		int nx, ny, nz;
@@ -442,18 +450,28 @@ namespace {
 		ny += PADDING * 2;
 		nz += PADDING * 2;
 
-		if (threads) {
-			progress_writer progress("voxelize", silent);
-			threaded_processor p(x1, y1, z1, vsize, nx, ny, nz, chunksize, *threads, progress);
-			p.process(surfaces->begin(), surfaces->end(), SURFACE(), output(MERGED()));
-			return p.voxels();
+		if (std::is_same<V, voxel_uint32_t>::value) {
+			chunked_voxel_storage<voxel_uint32_t>* storage = new chunked_voxel_storage<voxel_uint32_t>(x1, y1, z1, vsize, nx, ny, nz, 64);
+			progress_writer progress("voxelize");
+			processor pr(storage, progress);
+			pr.use_scanline() = false;
+			// @uint32 defaults to VOLUME_PRODUCT_ID
+			pr.process(surfaces->begin(), surfaces->end(), VOLUME_PRODUCT_ID(), output(MERGED()));
+			return storage;
 		} else {
-			progress_writer progress;
-			auto voxels = factory().chunk_size(chunksize).create(x1, y1, z1, vsize, nx, ny, nz);
-			// nb: the other constructor would tell the constructor to delete the created voxels
-			processor p(voxels, progress);
-			p.process(surfaces->begin(), surfaces->end(), SURFACE(), output(MERGED()));
-			return voxels;
+			if (threads) {
+				progress_writer progress("voxelize", silent);
+				threaded_processor p(x1, y1, z1, vsize, nx, ny, nz, chunksize, *threads, progress);
+				p.process(surfaces->begin(), surfaces->end(), SURFACE(), output(MERGED()));
+				return p.voxels();
+			} else {
+				progress_writer progress;
+				auto voxels = factory().chunk_size(chunksize).create(x1, y1, z1, vsize, nx, ny, nz);
+				// nb: the other constructor would tell the constructor to delete the created voxels
+				processor p(voxels, progress);
+				p.process(surfaces->begin(), surfaces->end(), SURFACE(), output(MERGED()));
+				return voxels;
+			}
 		}
 	}
 }
@@ -461,7 +479,7 @@ namespace {
 class op_voxelize : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "input", "surfaceset" }, {false, "VOXELSIZE", "real"} };
+		static std::vector<argument_spec> nm_ = { { true, "input", "surfaceset" }, {false, "VOXELSIZE", "real"}, {false, "type", "string"} };
 		return nm_;
 	}
 	symbol_value invoke(const scope_map& scope) const {
@@ -470,12 +488,21 @@ public:
 		double vsize = scope.get_value<double>("VOXELSIZE");
 		int cs = scope.get_value<int>("CHUNKSIZE");
 		int t = scope.get_value<int>("THREADS");
+		std::string ty = scope.get_value_or<std::string>("type", "bit");
 
 		if (surfaces->size() == 0) {
 			// Just some arbitrary empty region
-			return (abstract_voxel_storage*) new chunked_voxel_storage<bit_t>(make_vec<long>(0,0,0), vsize, cs, make_vec<size_t>(1U,1U,1U));
+			if (ty == "bit") {
+				return (abstract_voxel_storage*) new chunked_voxel_storage<bit_t>(make_vec<long>(0, 0, 0), vsize, cs, make_vec<size_t>(1U, 1U, 1U));
+			} else {
+				return (abstract_voxel_storage*) new chunked_voxel_storage<voxel_uint32_t>(make_vec<long>(0, 0, 0), vsize, cs, make_vec<size_t>(1U, 1U, 1U));
+			}
 		} else {
-			return voxelize(surfaces, vsize, cs, t, silent);
+			if (ty == "bit") {
+				return voxelize<bit_t>(surfaces, vsize, cs, t);
+			} else {
+				return voxelize<voxel_uint32_t>(surfaces, vsize, cs, t);
+			}
 		}
 	}
 };
@@ -539,7 +566,7 @@ namespace {
 				geometry_collection_t single = { { pair.first, C} };
 
 				auto vs = voxels->empty_copy();
-				voxelize(vs, &single);
+				voxelize<>(vs, &single);
 				auto x = vs->boolean_intersection(voxels);
 
 				// std::cout << "#" << pair.first << std::endl;
@@ -1230,7 +1257,11 @@ public:
 		auto voxels = scope.get_value<abstract_voxel_storage*>("input");
 		auto filename = scope.get_value<std::string>("filename");
 		std::ofstream ofs(filename.c_str());
-		((regular_voxel_storage*)voxels)->obj_export(ofs);
+		if (voxels->value_bits() == 1) {
+			((regular_voxel_storage*)voxels)->obj_export(ofs);
+		} else {
+			((regular_voxel_storage*)voxels)->obj_export(ofs, false, true);
+		}
 		symbol_value v;
 		return v;
 	}

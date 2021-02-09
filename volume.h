@@ -3,6 +3,7 @@
 
 #include "storage.h"
 
+#if 0
 class volume_filler {
 private:
 	regular_voxel_storage * storage_;
@@ -140,5 +141,6 @@ public:
 		}		
 	}
 };
+#endif
 
 #endif

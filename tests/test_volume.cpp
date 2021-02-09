@@ -19,8 +19,10 @@ TEST(DISABLED_Voxelizer, ApproxVolume) {
 		}
 	}
 
+	/*
 	volume_filler volume(storage);
 	volume.fill();
+	*/
 
 	size_t ncx, ncy, ncz;
 	storage->num_chunks().tie(ncx, ncy, ncz);
