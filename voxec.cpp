@@ -231,7 +231,7 @@ scope_map run(const std::vector<statement_type>& statements, double size, size_t
 
 	if (statements.size()) {
 		log_visitor v;
-		context[statements.back().assignee()].apply_visitor(std::ref(v));
+		context[statements.back().assignee()].apply_visitor(v);
 
 		json_logger::message(json_logger::LOG_NOTICE, "scripted finished with {variable}", {
 				{"variable", {{"value", v.value()}}},
