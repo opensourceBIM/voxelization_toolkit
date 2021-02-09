@@ -126,7 +126,7 @@ endif()
 if(IFC_SUPPORT)
 set(BOOST_COMPONENTS ${BOOST_COMPONENTS} filesystem)
 if(UNIX)
-    set(BOOST_ROOT       ${IFCOPENSHELL_INSTALL}/boost-1.59.0)
+    set(BOOST_ROOT       ${IFCOPENSHELL_INSTALL}/boost-1.71.0)
     
     set(IFC_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/src)
     set(IFC_LIBRARY_DIR  ${IFCOPENSHELL_INSTALL}/ifcopenshell/lib)
