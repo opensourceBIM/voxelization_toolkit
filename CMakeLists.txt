@@ -126,7 +126,7 @@ endif()
 if(IFC_SUPPORT)
 set(BOOST_COMPONENTS ${BOOST_COMPONENTS} filesystem)
 if(UNIX)
-    set(BOOST_ROOT       ${IFCOPENSHELL_INSTALL}/boost-1.59.0)
+    set(BOOST_ROOT       ${IFCOPENSHELL_INSTALL}/boost-1.71.0)
     
     set(IFC_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/src)
     set(IFC_LIBRARY_DIR  ${IFCOPENSHELL_INSTALL}/ifcopenshell/lib)
@@ -140,11 +140,11 @@ if(UNIX)
         string(REGEX REPLACE "([^;]+)" "${ICU_LIBRARY_DIR}/lib\\1.a" ICU_LIBRARIES "${ICU_LIBRARY_NAMES}")
     endif()
 else()
-    set(BOOST_ROOT       ${IFCOPENSHELL_ROOT}/deps/boost_1_67_0)
-    set(BOOST_LIBRARYDIR ${IFCOPENSHELL_ROOT}/deps/boost_1_67_0/stage/vs${MSVC_YEAR}-${WIN_ARCH}/lib)
+    set(BOOST_ROOT       ${IFCOPENSHELL_ROOT}/_deps/boost_1_74_0)
+    set(BOOST_LIBRARYDIR ${IFCOPENSHELL_ROOT}/_deps/boost_1_74_0/stage/vs${MSVC_YEAR}-${WIN_ARCH}/lib)
 	
     set(IFC_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/src)
-    set(IFC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/build-vs${MSVC_YEAR}-x86/${CMAKE_BUILD_TYPE})
+    set(IFC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/_build-vs${MSVC_YEAR}-Win32/${CMAKE_BUILD_TYPE})
     
     string(REGEX REPLACE "([^;]+)" "${IFC_LIBRARY_DIR}/\\1.lib" IFC_LIBRARIES "${IFC_LIBRARY_NAMES}")
 
