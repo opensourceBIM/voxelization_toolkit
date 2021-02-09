@@ -418,8 +418,7 @@ public:
 #endif
 
 namespace {
-<<<<<<< HEAD
-	abstract_voxel_storage* voxelize(abstract_voxel_storage* voxels, geometry_collection_t* surfaces) {
+	abstract_voxel_storage* voxelize_2(abstract_voxel_storage* voxels, geometry_collection_t* surfaces) {
 		progress_writer progress;
 		processor p(voxels, progress);
 		p.process(surfaces->begin(), surfaces->end(), SURFACE(), output(MERGED()));
@@ -566,7 +565,7 @@ namespace {
 				geometry_collection_t single = { { pair.first, C} };
 
 				auto vs = voxels->empty_copy();
-				voxelize<>(vs, &single);
+				voxelize_2(vs, &single);
 				auto x = vs->boolean_intersection(voxels);
 
 				// std::cout << "#" << pair.first << std::endl;
