@@ -26,8 +26,7 @@ using namespace Ifc2x3;
 
 #if defined(WITH_IFC) && !defined(IFCOPENSHELL_05)
 TEST(Voxelization, IfcSpaceIds) {
-	// const std::string input_filename = ".." DIRSEP "tests" DIRSEP "fixtures" DIRSEP "duplex.ifc";
-	const std::string input_filename = "William Lyon Mackenzie CI - 2020-01-19.ifc";
+	const std::string input_filename = ".." DIRSEP "tests" DIRSEP "fixtures" DIRSEP "duplex.ifc";
 
 	IfcParse::IfcFile ifc_file(input_filename);
 

@@ -73,13 +73,18 @@ void regular_voxel_storage::obj_export(std::ostream& fs, bool with_components, b
 void regular_voxel_storage::obj_export(obj_export_helper& obj, bool with_components, bool use_value) {
 	std::ostream& fs = *obj.stream;
 
-	fs << "vn  1  0  0\n";
-	fs << "vn -1  0  0\n";
-	fs << "vn  0  1  0\n";
-	fs << "vn  0 -1  0\n";
-	fs << "vn  0  0  1\n";
-	fs << "vn  0  0 -1\n";
-
+	// Take care to only emit normals once, even though it does not really affect file integrity
+	if (!obj.normals_emitted) {
+		fs << "vn  1  0  0\n";
+		fs << "vn -1  0  0\n";
+		fs << "vn  0  1  0\n";
+		fs << "vn  0 -1  0\n";
+		fs << "vn  0  0  1\n";
+		fs << "vn  0  0 -1\n";
+		obj.normals_emitted = true;
+	}
+	
+	
 	if (with_components && !use_value) {
 		size_t counter = 0;
 		connected_components(this, [&obj, &fs, &counter](regular_voxel_storage* component) {

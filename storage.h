@@ -192,6 +192,8 @@ public:
 struct obj_export_helper {
 	std::ostream* stream;
 	size_t vert_counter;
+	bool normals_emitted = false;
+	
 	obj_export_helper(std::ostream& fs, size_t n = 1)
 		: stream(&fs), vert_counter(n) {}
 };
