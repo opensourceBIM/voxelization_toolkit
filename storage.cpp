@@ -142,7 +142,7 @@ void regular_voxel_storage::obj_export(obj_export_helper& obj, bool with_compone
 					if (side) {
 						v[normal] += 1;
 					}
-					auto inserted = vertex_map.insert({ v, vertex_map.size() + 1 });
+					auto inserted = vertex_map.insert({ v, vertex_map.size() + nv });
 					if (inserted.second) {
 						fs << "v";
 						for (int i = 0; i < 3; ++i) {
@@ -197,6 +197,8 @@ void regular_voxel_storage::obj_export(obj_export_helper& obj, bool with_compone
 			fs << "\n";
 		}
 	}
+	
+	nv += vertex_map.size();
 }
 
 regular_voxel_storage* storage_for(std::array< vec_n<3, double>, 2 >& bounds, size_t max_extents, size_t padding, size_t chunk_size) {
