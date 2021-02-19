@@ -36,6 +36,8 @@ public:
 		Handle_Poly_Triangulation tri = BRep_Tool::Triangulation(face, loc);
 
 		if (tri.IsNull()) {
+			// @todo the reason we don't triangulate here is for multithreading (I think)
+			// this should be properly documented or changed.
 			return;
 			throw std::runtime_error("No triangulation!");
 		} else {
