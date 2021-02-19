@@ -115,7 +115,7 @@ set(IFC_LIBRARY_NAMES IfcGeom IfcParse)
 add_definitions("-DIFCOPENSHELL_05")
 else()
 set(IFC_LIBRARY_NAMES IfcGeom IfcGeom_ifc2x3 IfcGeom_ifc4 IfcGeom_ifc4x1
-                      IfcGeom_ifc4x2 IfcGeom_ifc4x3_rc1 IfcParse)
+                      IfcGeom_ifc4x2 IfcGeom_ifc4x3_rc1 IfcGeom_ifc4x3_rc2 IfcParse)
 endif()
 endif()
 
