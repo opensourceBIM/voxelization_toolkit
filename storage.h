@@ -36,34 +36,41 @@
 
 #define END_LOOP }}}}
 
-class bit_t {
-public:
+struct voxel_desc_t {
+	virtual size_t get_size_in_bits() const = 0;
+};
+
+struct bit_t : public voxel_desc_t {
 	typedef bool value_type;
 	typedef bool value_type_non_ref;
 	typedef uint8_t storage_type;
 	static const int min_value = 0;
 	static const int max_value = 1;
 	static const size_t size_in_bits = 1;
+
+	virtual size_t get_size_in_bits() const { return size_in_bits; }
 };
 
-class voxel_uint8_t {
-public:
+struct voxel_uint8_t : public voxel_desc_t {
 	typedef const uint8_t& value_type;
 	typedef uint8_t value_type_non_ref;
 	typedef uint8_t storage_type;
 	static const int min_value = 0;
 	static const int max_value = 255;
 	static const size_t size_in_bits = 8;
+
+	virtual size_t get_size_in_bits() const { return size_in_bits; }
 };
 
-class voxel_uint32_t {
-public:
+struct voxel_uint32_t : public voxel_desc_t {
 	typedef const uint32_t& value_type;
 	typedef uint32_t value_type_non_ref;
 	typedef uint32_t storage_type;
 	static const int min_value = 0;
 	static const int max_value = std::numeric_limits<uint32_t>::max();
 	static const size_t size_in_bits = 32;
+
+	virtual size_t get_size_in_bits() const { return size_in_bits; }
 };
 
 enum file_part {
@@ -101,6 +108,7 @@ public:
 	virtual void Get(const vec_n<3, size_t>& pos, void*) const = 0;
 	virtual bool Get(const vec_n<3, size_t>& pos) const = 0;
 	virtual void Set(const vec_n<3, size_t>& pos) = 0;
+	virtual void Set(const vec_n<3, size_t>& pos, void*) = 0;
 
 	virtual bool GetVoxelX(double& x, size_t& i) = 0;
 	virtual bool GetVoxelY(double& y, size_t& j) = 0;
@@ -130,6 +138,7 @@ public:
 	
 	virtual abstract_voxel_storage* make_explicit(void* location = nullptr) const = 0;
 	virtual abstract_voxel_storage* empty_copy() const = 0;
+	virtual abstract_voxel_storage* empty_copy_as(voxel_desc_t& fmt) const = 0;
 	virtual abstract_voxel_storage* copy(void* location = nullptr) const = 0;
 
 	virtual size_t ray_intersect_n(const vec_n<3, size_t>& pos, const vec_n<3, size_t>& dir) {
@@ -389,6 +398,11 @@ public:
 		return nullptr;
 	}
 
+	abstract_voxel_storage* empty_copy_as(voxel_desc_t& fmt) const {
+		// @todo is this safe?
+		return nullptr;
+	}
+
 	abstract_voxel_storage* make_explicit(void* location = nullptr) const {
 		// @todo other code depends on this returning nullptr, but perhaps
 		// that code should call is_explicit() instead?
@@ -408,6 +422,10 @@ public:
 
 	void Set(const vec_n<3, size_t>& xyz) {
 		Set(xyz, 1);
+	}
+
+	void Set(const vec_n<3, size_t>& pos, void* ptr) {
+		Set(pos, *(typename T::value_type_non_ref*) ptr);
 	}
 
 	void Set(const vec_n<3, size_t>& xyz, const typename T::value_type_non_ref& v) {
@@ -603,6 +621,11 @@ public:
 		return nullptr;
 	}
 
+	abstract_voxel_storage* empty_copy_as(voxel_desc_t& fmt) const {
+		// @todo is this safe?
+		return nullptr;
+	}
+
 	abstract_voxel_storage* inverted(void* location = nullptr) const {
 		throw std::runtime_error("Not implemented");
 	}
@@ -633,6 +656,10 @@ public:
 	}
 
 	void Set(const vec_n<3, size_t>&) {
+		throw std::runtime_error("Invalid");
+	}
+
+	void Set(const vec_n<3, size_t>&, void*) {
 		throw std::runtime_error("Invalid");
 	}
 
@@ -754,6 +781,11 @@ public:
 		return nullptr;
 	}
 
+	abstract_voxel_storage* empty_copy_as(voxel_desc_t& fmt) const {
+		// @todo is this safe?
+		return nullptr;
+	}
+
 	bool is_constant() { return true; }
 
 	size_t value() const {
@@ -761,6 +793,10 @@ public:
 	}
 
 	void Set(const vec_n<3, size_t>&) {
+		throw std::runtime_error("Invalid");
+	}
+
+	void Set(const vec_n<3, size_t>&, void*) {
 		throw std::runtime_error("Invalid");
 	}
 
@@ -1224,6 +1260,18 @@ public:
 		c->Set(xyz - cxyz * chunk_size_);
 	}
 
+	void Set(const vec_n<3, size_t>& xyz, void* v) {
+		vec_n<3, size_t> cxyz = xyz / chunk_size_;
+		auto c = get_or_create_chunk(cxyz);
+		if (!c->is_explicit()) {
+			auto c2 = c->make_explicit(next_slot());
+			delete c;
+			c = c2;
+			set_chunk(cxyz, c2);
+		}
+		c->Set(xyz - cxyz * chunk_size_, v);
+	}
+
 	abstract_voxel_storage* boolean_union(const abstract_voxel_storage* other_) {
 		const abstract_chunked_voxel_storage* other = (const abstract_chunked_voxel_storage*) other_;
 		return boolean_operation(other, OP_UNION);
@@ -1513,6 +1561,10 @@ public:
 		return new memory_mapped_chunked_voxel_storage(grid_offset_, d_, chunk_size_, nc, factory::mmap_filename());
 	}
 
+	abstract_voxel_storage* empty_copy_as(voxel_desc_t& fmt) const {
+		throw std::runtime_error("not implemented");
+	}
+
 	abstract_voxel_storage* copy(void* location = nullptr) const {
 		auto nc = num_chunks();
 		memory_mapped_chunked_voxel_storage* c = new memory_mapped_chunked_voxel_storage(grid_offset_, d_, chunk_size_, nc, factory::mmap_filename());
@@ -1601,6 +1653,18 @@ public:
 	abstract_voxel_storage* empty_copy() const {
 		auto nc = num_chunks();
 		return new chunked_voxel_storage(grid_offset_, d_, chunk_size_, nc);
+	}
+
+	abstract_voxel_storage* empty_copy_as(voxel_desc_t& fmt) const {
+		auto nc = num_chunks();
+		// @todo some sort of factory or visitor is needed here:
+		if (fmt.get_size_in_bits() == 1) {
+			return new chunked_voxel_storage<bit_t>(grid_offset_, d_, chunk_size_, nc);
+		} else if (fmt.get_size_in_bits() == 8) {
+			return new chunked_voxel_storage<voxel_uint8_t>(grid_offset_, d_, chunk_size_, nc);
+		} else if (fmt.get_size_in_bits() == 32) {
+			return new chunked_voxel_storage<voxel_uint32_t>(grid_offset_, d_, chunk_size_, nc);
+		}
 	}
 
 	abstract_voxel_storage* copy(void* location = nullptr) const {
@@ -1876,6 +1940,10 @@ public:
 		throw std::runtime_error("not implemented");
 	}
 
+	virtual void Set(const vec_n<3, size_t>&, void*) {
+		throw std::runtime_error("not implemented");
+	}
+
 	abstract_voxel_storage* boolean_union(const abstract_voxel_storage* other) {
 		throw std::runtime_error("not implemented");
 	}
@@ -1904,8 +1972,11 @@ public:
 		throw std::runtime_error("not implemented");
 	}
 
+	// @todo are these correctly implemented?
 	virtual abstract_voxel_storage* empty_copy() const { return base_->empty_copy(); }
 	virtual abstract_voxel_storage* copy(void* location = nullptr) const { return base_->copy(); }
+
+	virtual abstract_voxel_storage* empty_copy_as(voxel_desc_t& fmt) const { throw std::runtime_error("Not implemented"); }
 
 	virtual long long unsigned int count() const {
 		unsigned long long n = 0;
