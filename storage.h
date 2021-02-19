@@ -138,7 +138,7 @@ public:
 	
 	virtual abstract_voxel_storage* make_explicit(void* location = nullptr) const = 0;
 	virtual abstract_voxel_storage* empty_copy() const = 0;
-	virtual abstract_voxel_storage* empty_copy_as(voxel_desc_t& fmt) const = 0;
+	virtual abstract_voxel_storage* empty_copy_as(voxel_desc_t* fmt) const = 0;
 	virtual abstract_voxel_storage* copy(void* location = nullptr) const = 0;
 
 	virtual size_t ray_intersect_n(const vec_n<3, size_t>& pos, const vec_n<3, size_t>& dir) {
@@ -398,7 +398,7 @@ public:
 		return nullptr;
 	}
 
-	abstract_voxel_storage* empty_copy_as(voxel_desc_t& fmt) const {
+	abstract_voxel_storage* empty_copy_as(voxel_desc_t* fmt) const {
 		// @todo is this safe?
 		return nullptr;
 	}
@@ -621,7 +621,7 @@ public:
 		return nullptr;
 	}
 
-	abstract_voxel_storage* empty_copy_as(voxel_desc_t& fmt) const {
+	abstract_voxel_storage* empty_copy_as(voxel_desc_t* fmt) const {
 		// @todo is this safe?
 		return nullptr;
 	}
@@ -781,7 +781,7 @@ public:
 		return nullptr;
 	}
 
-	abstract_voxel_storage* empty_copy_as(voxel_desc_t& fmt) const {
+	abstract_voxel_storage* empty_copy_as(voxel_desc_t* fmt) const {
 		// @todo is this safe?
 		return nullptr;
 	}
@@ -1561,7 +1561,7 @@ public:
 		return new memory_mapped_chunked_voxel_storage(grid_offset_, d_, chunk_size_, nc, factory::mmap_filename());
 	}
 
-	abstract_voxel_storage* empty_copy_as(voxel_desc_t& fmt) const {
+	abstract_voxel_storage* empty_copy_as(voxel_desc_t* fmt) const {
 		throw std::runtime_error("not implemented");
 	}
 
@@ -1655,15 +1655,17 @@ public:
 		return new chunked_voxel_storage(grid_offset_, d_, chunk_size_, nc);
 	}
 
-	abstract_voxel_storage* empty_copy_as(voxel_desc_t& fmt) const {
+	abstract_voxel_storage* empty_copy_as(voxel_desc_t* fmt) const {
 		auto nc = num_chunks();
 		// @todo some sort of factory or visitor is needed here:
-		if (fmt.get_size_in_bits() == 1) {
+		if (fmt->get_size_in_bits() == 1) {
 			return new chunked_voxel_storage<bit_t>(grid_offset_, d_, chunk_size_, nc);
-		} else if (fmt.get_size_in_bits() == 8) {
+		} else if (fmt->get_size_in_bits() == 8) {
 			return new chunked_voxel_storage<voxel_uint8_t>(grid_offset_, d_, chunk_size_, nc);
-		} else if (fmt.get_size_in_bits() == 32) {
+		} else if (fmt->get_size_in_bits() == 32) {
 			return new chunked_voxel_storage<voxel_uint32_t>(grid_offset_, d_, chunk_size_, nc);
+		} else {
+			throw std::runtime_error("Not implemented");
 		}
 	}
 
@@ -1976,7 +1978,7 @@ public:
 	virtual abstract_voxel_storage* empty_copy() const { return base_->empty_copy(); }
 	virtual abstract_voxel_storage* copy(void* location = nullptr) const { return base_->copy(); }
 
-	virtual abstract_voxel_storage* empty_copy_as(voxel_desc_t& fmt) const { throw std::runtime_error("Not implemented"); }
+	virtual abstract_voxel_storage* empty_copy_as(voxel_desc_t* fmt) const { throw std::runtime_error("Not implemented"); }
 
 	virtual long long unsigned int count() const {
 		unsigned long long n = 0;

@@ -68,7 +68,9 @@ public:
 			throw std::runtime_error("Only collapse over negative Z is implemented");
 		}
 
-		regular_voxel_storage* collapsed = (regular_voxel_storage*)storage->empty_copy_as(voxel_uint32_t{});
+		// @todo maybe create some static instances of these types, or in a map?
+		voxel_uint32_t vut;
+		regular_voxel_storage* collapsed = (regular_voxel_storage*)storage->empty_copy_as(&vut);
 		auto bounds = storage->bounds();
 
 		size_t i0, j0, k0, i1, j1, k1;
