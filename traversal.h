@@ -480,11 +480,20 @@ namespace {
 			auto seed = query_leftmost()(storage_copy);
 			
 			regular_voxel_storage* output = (regular_voxel_storage*)storage_copy->empty_copy();
+
+			// largest possible type at the moment
+			uint32_t val;
 			
 			visitor<> v;
-			v([output](const tagged_index& pos) {
+			v([output, storage_copy, &val](const tagged_index& pos) {
 				if (pos.which == tagged_index::VOXEL) {
-					output->Set(pos.pos);
+					// @todo set value in case of non-bit
+					if (output->value_bits() == 1) {
+						output->Set(pos.pos);
+					} else {
+						storage_copy->Get(pos.pos, &val);
+						output->Set(pos.pos, &val);
+					}
 				} else {
 					((abstract_chunked_voxel_storage*)output)->create_constant(pos.pos, 1U);
 				}
@@ -497,6 +506,7 @@ namespace {
 			// NB: deleted
 			delete output;
 		}
+		// @todo shouldn't storage_copy get deleted?
 	}
 }
 
