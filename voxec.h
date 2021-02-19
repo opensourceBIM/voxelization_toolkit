@@ -536,6 +536,27 @@ public:
 	}
 };
 
+class op_keep_components : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "min_size", "integer" } };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input");
+		auto result = voxels->empty_copy();
+		size_t min_size = (size_t) scope.get_value<int>("min_size");
+
+		connected_components((regular_voxel_storage*)voxels, [&result, &min_size](regular_voxel_storage* c) {
+			if (c->count() >= min_size) {
+				result->boolean_union_inplace(c);
+			}
+		});
+
+		return result;
+	}
+};
+
 namespace {
 	json_logger::meta_data dump_info(abstract_voxel_storage* voxels) {
 		if (dynamic_cast<abstract_chunked_voxel_storage*>(voxels)) {
@@ -1079,6 +1100,7 @@ public:
 class op_shift: public op_geom<shift> {};
 class op_sweep : public op_geom<sweep> {};
 class op_collapse : public op_geom<collapse> {};
+class op_collapse_count : public op_geom<collapse_count> {};
 
 class op_traverse : public voxel_operation {
 public:

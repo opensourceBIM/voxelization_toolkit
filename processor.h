@@ -209,6 +209,7 @@ public:
 
 				int n = voxels_->value_bits();
 				if (volume.value == PRODUCT_ID) {
+					// @todo this still needs to be generalized
 					if (n != 32) {
 						throw std::runtime_error("Unable to assign product ids to this voxel value type");
 					}
