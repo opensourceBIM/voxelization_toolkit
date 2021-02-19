@@ -198,11 +198,6 @@ public:
 	const vec_n<3, size_t>& operator*() const { return current_; }
 };
 
-template <>
-struct std::iterator_traits<set_voxel_iterator> {
-	typedef std::forward_iterator_tag iterator_category;
-};
-
 struct obj_export_helper {
 	std::ostream* stream;
 	size_t vert_counter;
@@ -2035,6 +2030,13 @@ namespace {
 			throw std::runtime_error("Not implemented");
 		}
 	}
+}
+
+namespace std {
+	template <>
+	struct iterator_traits<set_voxel_iterator> {
+		typedef forward_iterator_tag iterator_category;
+	};
 }
 
 #endif
