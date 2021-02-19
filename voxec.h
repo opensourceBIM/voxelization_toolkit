@@ -1286,17 +1286,18 @@ public:
 class op_mesh : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "filename", "string"} };
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "filename", "string"}, {false, "use_value", "integer"} };
 		return nm_;
 	}
 	symbol_value invoke(const scope_map& scope) const {
 		auto voxels = scope.get_value<abstract_voxel_storage*>("input");
+		auto use_value = scope.get_value_or<int>("use_value", -1);
 		auto filename = scope.get_value<std::string>("filename");
 		std::ofstream ofs(filename.c_str());
 		if (voxels->value_bits() == 1) {
 			((regular_voxel_storage*)voxels)->obj_export(ofs);
 		} else {
-			((regular_voxel_storage*)voxels)->obj_export(ofs, false, true);
+			((regular_voxel_storage*)voxels)->obj_export(ofs, use_value != 1, use_value == 1);
 		}
 		symbol_value v;
 		return v;
