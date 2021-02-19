@@ -573,6 +573,7 @@ namespace {
 				{"grid", left.format() + " - " + right.format()},
 				{"bounds", voxels->bounds()[0].format() + " - " + voxels->bounds()[1].format()},
 				{"world", left_world.format() + " - " + right_world.format()},
+				{"bits", (long)voxels->value_bits()}
 			};
 		}
 		return {};
