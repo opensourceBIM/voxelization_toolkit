@@ -20,6 +20,9 @@ public:
 			throw std::runtime_error("Only orthogonal sweeps supported");
 		}
 
+		uint32_t v = 1;
+		const bool use_count = storage->value_bits() == 32;
+
 		regular_voxel_storage* swepts = (regular_voxel_storage*) storage->copy();
 		auto bounds = storage->bounds();
 
@@ -30,8 +33,11 @@ public:
 
 		BEGIN_LOOP_I2(bounds[0], bounds[1])
 			if (storage->Get(ijk)) {
+				if (use_count) {
+					storage->Get(ijk, &v);
+				}
 				auto ijk2 = ijk.as<long>();
-				for (int i = 0; i < std::abs(d[D]); ++i) {
+				for (int i = 1; i < std::abs(d[D]) * v; ++i) {
 					if (pos) {
 						ijk2.get(D)++;
 					} else {
@@ -40,7 +46,7 @@ public:
 					if ((ijk2 >= zero).all() && (ijk2 < extents).all()) {
 						swepts->Set(ijk2.as<size_t>());
 					}
-				}				
+				}
 			}
 		END_LOOP;
 
