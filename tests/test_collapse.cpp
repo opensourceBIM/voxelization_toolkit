@@ -20,7 +20,8 @@ TEST(SweepAndCollapse, Same) {
 	ASSERT_TRUE(result->Get(loc));
 
 	auto result2 = cc(swept, 0, 0, -1);
-	size_t value;
+	ASSERT_EQ(result2->value_bits(), 32);
+	size_t value = 0;
 	result2->Get(loc, &value);
 	ASSERT_EQ(value, 5);
 	// @nb dz=1 because the extrusion depth is now stored in the voxel value

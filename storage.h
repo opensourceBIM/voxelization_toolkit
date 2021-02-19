@@ -469,6 +469,7 @@ public:
 		} else if (T::size_in_bits < 8U)  {
 			size_t z8 = z / (8U / T::size_in_bits);
 			uint8_t r = z % (8U / T::size_in_bits);
+			// @todo why this integral_constant, isn't size_in_bits always < 8U
 			return RefOrBoolImpl(std::integral_constant<bool, T::size_in_bits < 8U>{}, data_[x + y * dimx_ + z8 * dimx_ * dimy_], r);
 		}
 	}
