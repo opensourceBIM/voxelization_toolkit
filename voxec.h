@@ -426,7 +426,7 @@ namespace {
 	}
 
 	template <typename V = bit_t>
-	abstract_voxel_storage* voxelize(geometry_collection_t* surfaces, double vsize, int chunksize, const boost::optional<int>& threads, bool silent = false) {
+	abstract_voxel_storage* voxelize(geometry_collection_t* surfaces, double vsize, int chunksize, const boost::optional<int>& threads, bool use_volume, bool silent = false) {
 		double x1, y1, z1, x2, y2, z2;
 		int nx, ny, nz;
 
@@ -449,26 +449,33 @@ namespace {
 		ny += PADDING * 2;
 		nz += PADDING * 2;
 
+		std::unique_ptr<fill_volume_t> method;
+		if (use_volume) {
+			method = std::make_unique<VOLUME>();
+		} else {
+			method = std::make_unique<SURFACE>();
+		}
+
 		if (std::is_same<V, voxel_uint32_t>::value) {
 			chunked_voxel_storage<voxel_uint32_t>* storage = new chunked_voxel_storage<voxel_uint32_t>(x1, y1, z1, vsize, nx, ny, nz, 64);
 			progress_writer progress("voxelize");
 			processor pr(storage, progress);
 			pr.use_scanline() = false;
-			// @uint32 defaults to VOLUME_PRODUCT_ID
+			// @todo, uint32 defaults to VOLUME_PRODUCT_ID, make this explicit
 			pr.process(surfaces->begin(), surfaces->end(), VOLUME_PRODUCT_ID(), output(MERGED()));
 			return storage;
 		} else {
 			if (threads) {
 				progress_writer progress("voxelize", silent);
 				threaded_processor p(x1, y1, z1, vsize, nx, ny, nz, chunksize, *threads, progress);
-				p.process(surfaces->begin(), surfaces->end(), SURFACE(), output(MERGED()));
+				p.process(surfaces->begin(), surfaces->end(), *method, output(MERGED()));
 				return p.voxels();
 			} else {
 				progress_writer progress;
 				auto voxels = factory().chunk_size(chunksize).create(x1, y1, z1, vsize, nx, ny, nz);
 				// nb: the other constructor would tell the constructor to delete the created voxels
 				processor p(voxels, progress);
-				p.process(surfaces->begin(), surfaces->end(), SURFACE(), output(MERGED()));
+				p.process(surfaces->begin(), surfaces->end(), *method, output(MERGED()));
 				return voxels;
 			}
 		}
@@ -478,7 +485,7 @@ namespace {
 class op_voxelize : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "input", "surfaceset" }, {false, "VOXELSIZE", "real"}, {false, "type", "string"} };
+		static std::vector<argument_spec> nm_ = { { true, "input", "surfaceset" }, {false, "VOXELSIZE", "real"}, {false, "type", "string"}, {false, "method", "string"} };
 		return nm_;
 	}
 	symbol_value invoke(const scope_map& scope) const {
@@ -488,6 +495,13 @@ public:
 		int cs = scope.get_value<int>("CHUNKSIZE");
 		int t = scope.get_value<int>("THREADS");
 		std::string ty = scope.get_value_or<std::string>("type", "bit");
+		std::string method = scope.get_value_or<std::string>("method", "surface");
+
+		if (method != "surface" && method != "volume") {
+			throw std::runtime_error("Unsupported method " + method);
+		}
+
+		bool use_volume = method == "volume";
 
 		if (surfaces->size() == 0) {
 			// Just some arbitrary empty region
@@ -498,9 +512,9 @@ public:
 			}
 		} else {
 			if (ty == "bit") {
-				return voxelize<bit_t>(surfaces, vsize, cs, t);
+				return voxelize<bit_t>(surfaces, vsize, cs, t, use_volume, silent);
 			} else {
-				return voxelize<voxel_uint32_t>(surfaces, vsize, cs, t);
+				return voxelize<voxel_uint32_t>(surfaces, vsize, cs, t, use_volume, silent);
 			}
 		}
 	}
