@@ -39,6 +39,8 @@ voxel_operation_map::map_t& voxel_operation_map::map() {
 		m.insert(std::make_pair(std::string("keep_components"), &instantiate<op_keep_components>));
 		m.insert(std::make_pair(std::string("dump_surfaces"), &instantiate<op_dump_surfaces>));
 		m.insert(std::make_pair(std::string("json_stats"), &instantiate<op_json_stats>));
+		m.insert(std::make_pair(std::string("greater_than"), &instantiate<op_greater>));
+		m.insert(std::make_pair(std::string("less_than"), &instantiate<op_less>));
 #ifdef WITH_IFC
 		m.insert(std::make_pair(std::string("export_ifc"), &instantiate<op_export_ifc>));
 		m.insert(std::make_pair(std::string("export_json"), &instantiate<op_export_elements>));

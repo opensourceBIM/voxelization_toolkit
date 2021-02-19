@@ -1103,6 +1103,34 @@ class op_sweep : public op_geom<sweep> {};
 class op_collapse : public op_geom<collapse> {};
 class op_collapse_count : public op_geom<collapse_count> {};
 
+template <typename Pred>
+class op_compare : public voxel_operation {
+	const std::vector<argument_spec>& arg_names() const {
+		// @todo this needs to be expanded to other types for rhs eventually
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "rhs", "integer"} };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		auto* voxels = (regular_voxel_storage*) scope.get_value<abstract_voxel_storage*>("input");
+		auto rhs = (uint32_t)scope.get_value<int>("rhs");
+
+		auto result = voxels->empty_copy();
+		uint32_t val;
+
+		for (auto& pos : *voxels) {
+			voxels->Get(pos, &val);
+			if (Pred()(val, rhs)) {
+				result->Set(pos, &val);
+			}
+		}
+
+		return result;
+	}
+};
+
+class op_greater : public op_compare<std::greater<size_t>> {};
+class op_less : public op_compare<std::less<size_t>> {};
+
 class op_traverse : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
