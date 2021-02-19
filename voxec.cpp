@@ -34,6 +34,7 @@ voxel_operation_map::map_t& voxel_operation_map::map() {
 		m.insert(std::make_pair(std::string("constant_like"), &instantiate<op_constant_like>));
 		m.insert(std::make_pair(std::string("resample"), &instantiate<op_resample>));
 		m.insert(std::make_pair(std::string("collapse"), &instantiate<op_collapse>));
+		m.insert(std::make_pair(std::string("collapse_count"), &instantiate<op_collapse_count>));
 		m.insert(std::make_pair(std::string("print_components"), &instantiate<op_print_components>));
 		m.insert(std::make_pair(std::string("dump_surfaces"), &instantiate<op_dump_surfaces>));
 		m.insert(std::make_pair(std::string("json_stats"), &instantiate<op_json_stats>));
