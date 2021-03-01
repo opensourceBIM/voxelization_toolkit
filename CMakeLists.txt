@@ -140,11 +140,11 @@ if(UNIX)
         string(REGEX REPLACE "([^;]+)" "${ICU_LIBRARY_DIR}/lib\\1.a" ICU_LIBRARIES "${ICU_LIBRARY_NAMES}")
     endif()
 else()
-    set(BOOST_ROOT       ${IFCOPENSHELL_ROOT}/_deps/boost_1_74_0)
-    set(BOOST_LIBRARYDIR ${IFCOPENSHELL_ROOT}/_deps/boost_1_74_0/stage/vs${MSVC_YEAR}-${WIN_ARCH}/lib)
+    set(BOOST_ROOT       ${IFCOPENSHELL_ROOT}/deps/boost_1_67_0)
+    set(BOOST_LIBRARYDIR ${IFCOPENSHELL_ROOT}/deps/boost_1_67_0/stage/vs${MSVC_YEAR}-${WIN_ARCH}/lib)
 	
     set(IFC_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/src)
-    set(IFC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/_build-vs${MSVC_YEAR}-Win32/${CMAKE_BUILD_TYPE})
+    set(IFC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/build-vs${MSVC_YEAR}-x86/${CMAKE_BUILD_TYPE})
     
     string(REGEX REPLACE "([^;]+)" "${IFC_LIBRARY_DIR}/\\1.lib" IFC_LIBRARIES "${IFC_LIBRARY_NAMES}")
 
@@ -162,7 +162,7 @@ find_package(Boost REQUIRED COMPONENTS ${BOOST_COMPONENTS})
 message(STATUS "Boost include files found in ${Boost_INCLUDE_DIRS}")
 message(STATUS "Boost libraries found in ${Boost_LIBRARY_DIRS}")
 
-include_directories(${IFC_INCLUDE_DIR} ${OCC_INCLUDE_DIR} ${Boost_INCLUDE_DIRS})
+include_directories(${IFC_INCLUDE_DIR} ${OCC_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/eigen)
 link_directories(${Boost_LIBRARY_DIRS})
 
 include_directories(${INCLUDE_DIRECTORIES} ${OCC_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${IFC_INCLUDE_DIR})
