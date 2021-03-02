@@ -41,7 +41,7 @@ TEST(NormalEstimation, OCC) {
 	Bnd_Box B;
 	BRepBndLib::AddClose(face, B);
 	
-	double d = 0.05;
+	double d = 0.01;
 	double x0, y0, z0, x1, y1, z1;
 	B.Get(x0, y0, z0, x1, y1, z1);
 	
@@ -63,61 +63,60 @@ TEST(NormalEstimation, OCC) {
 
 	std::cout << "center " << (*it).format() << std::endl;
 
-	for (int i = 1; i <= 10; i += 2) {
+	int i = 2;
 
-		visitor<26> vis;
-		vis.max_depth = 0.1 * i / d;
+	visitor<26> vis;
+	vis.max_depth = 0.1 * i / d;
 
-		std::cout << "md " << (0.1 * i) << std::endl;
+	std::cout << "md " << (0.1 * i) << std::endl;
 
-		std::vector<float> coords;
+	std::vector<float> coords;
 
-		auto selection = storage->empty_copy();
+	auto selection = storage->empty_copy();
 
-		vis([&coords, &selection](const tagged_index& pos) {
-			if (pos.which == tagged_index::VOXEL) {
-				coords.push_back(pos.pos.get(0));
-				coords.push_back(pos.pos.get(1));
-				coords.push_back(pos.pos.get(2));
-				selection->Set(pos.pos);
-			}
-			else {
-				throw std::runtime_error("Unexpected");
-			}
-		}, storage, *it);
-
-		/*{
-			std::ofstream ofs("m2.obj");
-			((chunked_voxel_storage<bit_t>*)selection)->obj_export(ofs);
+	vis([&coords, &selection](const tagged_index& pos) {
+		if (pos.which == tagged_index::VOXEL) {
+			coords.push_back(pos.pos.get(0));
+			coords.push_back(pos.pos.get(1));
+			coords.push_back(pos.pos.get(2));
+			selection->Set(pos.pos);
 		}
-
-		storage->boolean_subtraction_inplace(selection);
-
-		{
-			std::ofstream ofs("m1.obj");
-			storage->obj_export(ofs);
-		}*/
-
-		std::cout << "neighbours " << (coords.size() / 3) << std::endl;
-
-		Eigen::MatrixXf points = Eigen::Map<Eigen::MatrixXf>(coords.data(), 3, coords.size() / 3).transpose();
-
-		Eigen::MatrixXf centered = points.rowwise() - points.colwise().mean();
-		Eigen::MatrixXf cov = centered.adjoint() * centered;
-		Eigen::SelfAdjointEigenSolver<Eigen::MatrixXf> eig(cov);
-
-		auto estimated = eig.eigenvectors().col(0);
-
-		std::cout << estimated << std::endl;
-
-		auto angle = std::acos(estimated.dot(norm));
-		if (angle > M_PI / 2) {
-			angle = M_PI - angle;
+		else {
+			throw std::runtime_error("Unexpected");
 		}
-		auto angle_degrees = angle / M_PI * 180.;
+	}, storage, *it);
 
-		std::cout << "angle " << angle_degrees << "d" << std::endl;
-
-		ASSERT_LT(angle_degrees, 90.);
+	/*{
+		std::ofstream ofs("m2.obj");
+		((chunked_voxel_storage<bit_t>*)selection)->obj_export(ofs);
 	}
+
+	storage->boolean_subtraction_inplace(selection);
+
+	{
+		std::ofstream ofs("m1.obj");
+		storage->obj_export(ofs);
+	}*/
+
+	std::cout << "neighbours " << (coords.size() / 3) << std::endl;
+
+	Eigen::MatrixXf points = Eigen::Map<Eigen::MatrixXf>(coords.data(), 3, coords.size() / 3).transpose();
+
+	Eigen::MatrixXf centered = points.rowwise() - points.colwise().mean();
+	Eigen::MatrixXf cov = centered.adjoint() * centered;
+	Eigen::SelfAdjointEigenSolver<Eigen::MatrixXf> eig(cov);
+
+	auto estimated = eig.eigenvectors().col(0);
+
+	std::cout << estimated << std::endl;
+
+	auto angle = std::acos(estimated.dot(norm));
+	if (angle > M_PI / 2) {
+		angle = M_PI - angle;
+	}
+	auto angle_degrees = angle / M_PI * 180.;
+
+	std::cout << "angle " << angle_degrees << "d" << std::endl;
+
+	ASSERT_LT(angle_degrees, 1.);
 }

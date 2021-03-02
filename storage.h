@@ -2037,6 +2037,7 @@ namespace std {
 	template <>
 	struct iterator_traits<set_voxel_iterator> {
 		typedef forward_iterator_tag iterator_category;
+		typedef std::ptrdiff_t difference_type;
 	};
 }
 
