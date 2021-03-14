@@ -247,3 +247,11 @@ scope_map run(const std::vector<statement_type>& statements, double size, size_t
 
 	return context;
 }
+
+size_t padding_ = 32;
+size_t get_padding() {
+	return padding_;
+}
+void set_padding(size_t v) {
+	padding_ = v;
+}
