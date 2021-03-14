@@ -18,6 +18,7 @@ int main(int argc, char** argv) {
 		("log-file", po::value<std::string>(), "filename to log json message")
 		("threads,t", po::value<size_t>(), "number of parallel processing threads")
 		("size,d", po::value<double>(), "voxel size in meters")
+		("padding,p", po::value<size_t>(), "padding around geometry bounding box (default=32)")
 		("chunk,c", po::value<size_t>(), "chunk size in number of voxels")
 		("mmap,m", "use memory-mapped files instead of pure RAM")
 		("mesh", "emit obj mesh for the last instruction")
@@ -51,6 +52,10 @@ int main(int argc, char** argv) {
 		json_logger::message(json_logger::LOG_NOTICE, "using default size 0.05m");
 	} else {
 		d = vmap["size"].as<double>();
+	}
+
+	if (vmap.count("padding")) {
+		set_padding(vmap["padding"].as<size_t>());
 	}
 
 	boost::optional<size_t> threads, chunk;

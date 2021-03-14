@@ -56,6 +56,9 @@ struct filtered_files_t {};
 #define DIRSEP "/"
 #endif
 
+size_t get_padding();
+void set_padding(size_t);
+
 typedef boost::variant<boost::blank, filtered_files_t, geometry_collection_t*, abstract_voxel_storage*, function_arg_value_type> symbol_value;
 
 class voxel_operation;
@@ -435,19 +438,17 @@ namespace {
 			BRepBndLib::Add(p.second, global_bounds);
 		}
 
-		const size_t PADDING = 32U;
-
 		global_bounds.Get(x1, y1, z1, x2, y2, z2);
 		nx = (int)ceil((x2 - x1) / vsize);
 		ny = (int)ceil((y2 - y1) / vsize);
 		nz = (int)ceil((z2 - z1) / vsize);
 
-		x1 -= vsize * PADDING;
-		y1 -= vsize * PADDING;
-		z1 -= vsize * PADDING;
-		nx += PADDING * 2;
-		ny += PADDING * 2;
-		nz += PADDING * 2;
+		x1 -= vsize * get_padding();
+		y1 -= vsize * get_padding();
+		z1 -= vsize * get_padding();
+		nx += get_padding() * 2;
+		ny += get_padding() * 2;
+		nz += get_padding() * 2;
 
 		std::unique_ptr<fill_volume_t> method;
 		if (use_volume) {
