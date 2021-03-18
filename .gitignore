@@ -31,3 +31,5 @@
 *.out
 *.app
 build/
+
+test

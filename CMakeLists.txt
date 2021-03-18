@@ -111,6 +111,19 @@ endif()
 
 set(BOOST_COMPONENTS regex program_options iostreams system)
 
+
+SET(HDF5_INCLUDE_DIR ${IFCOPENSHELL_ROOT}/_deps-vs2017-x64-installed/HDF5-1.8.22-win64/include)
+SET(HDF5_LIBRARY_DIR ${IFCOPENSHELL_ROOT}/_deps-vs2017-x64-installed/HDF5-1.8.22-win64/lib)
+
+
+SET(HDF5_LIBRARIES 
+		"${HDF5_LIBRARY_DIR}/libhdf5_cpp.lib"
+		"${HDF5_LIBRARY_DIR}/libhdf5.lib"
+		"${HDF5_LIBRARY_DIR}/libzlib.lib"
+		"${HDF5_LIBRARY_DIR}/libsz.lib"
+		"${HDF5_LIBRARY_DIR}/libaec.lib")
+
+
 if (IFC_SUPPORT)
 # Find IfcOpenShell version, v0.6.0 does not have the IfcSchema namespace anymore
 file(READ "${IFCOPENSHELL_ROOT}/src/ifcparse/IfcParse.h" header)
@@ -170,10 +183,10 @@ find_package(Boost REQUIRED COMPONENTS ${BOOST_COMPONENTS})
 message(STATUS "Boost include files found in ${Boost_INCLUDE_DIRS}")
 message(STATUS "Boost libraries found in ${Boost_LIBRARY_DIRS}")
 
-include_directories(${IFC_INCLUDE_DIR} ${OCC_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/eigen)
+include_directories(${IFC_INCLUDE_DIR} ${OCC_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${HDF5_INCLUDE_DIR} ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/eigen)
 link_directories(${Boost_LIBRARY_DIRS})
 
-include_directories(${INCLUDE_DIRECTORIES} ${OCC_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${IFC_INCLUDE_DIR})
+include_directories(${INCLUDE_DIRECTORIES} ${OCC_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${HDF5_INCLUDE_DIR} ${IFC_INCLUDE_DIR})
 if (NOT MSVC)
 include(CheckCXXCompilerFlag)
 CHECK_CXX_COMPILER_FLAG("-std=c++14" COMPILER_SUPPORTS_CXX11)
@@ -221,7 +234,7 @@ ENDIF()
 set(LIBVOXELIZER_HEADER_FILES progress_writer.h dim3.h sweep.h shift.h collapse.h edge_detect.h fill_gaps.h offset.h polyfill.h resample.h storage.h writer.h factory.h processor.h volume.h voxelizer.h traversal.h util.h json_logger.h)
 set(LIBVOXELIZER_SOURCE_FILES tribox3.cpp polyfill.cpp progress_writer.cpp storage.cpp factory.cpp json_logger.cpp)
 add_library(libvoxel STATIC ${LIBVOXELIZER_HEADER_FILES} ${LIBVOXELIZER_SOURCE_FILES})
-target_link_libraries(libvoxel ${IFC_LIBRARIES} ${ICU_LIBRARIES} ${Boost_LIBRARIES} ${BCRYPT_LIBRARIES} ${OCC_LIBRARIES} ${LIB_RT} ${dl} ${CMAKE_THREAD_LIBS_INIT} ${WS2_LIBRARIES})
+target_link_libraries(libvoxel ${IFC_LIBRARIES} ${ICU_LIBRARIES} ${Boost_LIBRARIES} ${BCRYPT_LIBRARIES} ${OCC_LIBRARIES} ${LIB_RT} ${dl} ${CMAKE_THREAD_LIBS_INIT} ${WS2_LIBRARIES} ${HDF5_LIBRARIES})
 
 set(LIBVOXEC_HEADER_FILES voxelfile.h voxec.h)
 set(LIBVOXEC_SOURCE_FILES voxec.cpp)
