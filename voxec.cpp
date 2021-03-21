@@ -36,6 +36,7 @@ voxel_operation_map::map_t& voxel_operation_map::map() {
 		m.insert(std::make_pair(std::string("collapse"), &instantiate<op_collapse>));
 		m.insert(std::make_pair(std::string("collapse_count"), &instantiate<op_collapse_count>));
 		m.insert(std::make_pair(std::string("print_components"), &instantiate<op_print_components>));
+		m.insert(std::make_pair(std::string("describe_components"), &instantiate<op_describe_components>));
 		m.insert(std::make_pair(std::string("keep_components"), &instantiate<op_keep_components>));
 		m.insert(std::make_pair(std::string("dump_surfaces"), &instantiate<op_dump_surfaces>));
 		m.insert(std::make_pair(std::string("json_stats"), &instantiate<op_json_stats>));
@@ -47,6 +48,8 @@ voxel_operation_map::map_t& voxel_operation_map::map() {
 		m.insert(std::make_pair(std::string("filter_attributes"), &instantiate<op_create_attr_filter>));
 		m.insert(std::make_pair(std::string("filter_properties"), &instantiate<op_create_prop_filter>));
 #endif
+		m.insert(std::make_pair(std::string("zeros"), &instantiate<op_zeros>));
+		m.insert(std::make_pair(std::string("plane"), &instantiate<op_plane>));
 		m.insert(std::make_pair(std::string("mesh"), &instantiate<op_mesh>));
 		initialized = true;
 	}

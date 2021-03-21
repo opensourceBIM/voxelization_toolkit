@@ -39,6 +39,11 @@ struct filtered_files_t {};
 #include <BRepBndLib.hxx>
 #include <BRep_Builder.hxx>
 #include <BRepTools.hxx>
+#include <ProjLib.hxx>
+#include <TopExp_Explorer.hxx>
+#include <BRepPrimAPI_MakeBox.hxx>
+#include <BRepBuilderAPI_MakeFace.hxx>
+#include <BRepAlgoAPI_Common.hxx>
 
 #include <set>
 #include <map>
@@ -154,6 +159,29 @@ public:
 	}
 	virtual ~voxel_operation() {}
 };
+
+namespace {
+	json_logger::meta_data dump_info(abstract_voxel_storage* voxels) {
+		if (dynamic_cast<abstract_chunked_voxel_storage*>(voxels)) {
+			auto left = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->grid_offset();
+			auto nc = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->num_chunks();
+			auto right = (left + nc.as<long>()) - (decltype(left)::element_type)1;
+			auto sz = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->voxel_size();
+			auto szl = (long)dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->chunk_size();
+			auto left_world = ((voxels->bounds()[0].as<long>() + left * szl).as<double>() * sz);
+			auto right_world = ((voxels->bounds()[1].as<long>() + left * szl).as<double>() * sz);
+
+			return {
+				{"count", (long)voxels->count()},
+				{"grid", left.format() + " - " + right.format()},
+				{"bounds", voxels->bounds()[0].format() + " - " + voxels->bounds()[1].format()},
+				{"world", left_world.format() + " - " + right_world.format()},
+				{"bits", (long)voxels->value_bits()}
+			};
+		}
+		return {};
+	}
+}
 
 #ifdef WITH_IFC
 class op_parse_ifc_file : public voxel_operation {
@@ -537,6 +565,32 @@ public:
 	}
 };
 
+class op_describe_components : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "output_path", "string" }, { true, "input", "voxels" } };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		const std::string output_path = scope.get_value<std::string>("output_path");
+		std::ofstream ofs(output_path.c_str());
+		ofs << "[";
+		bool first = true;
+		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input");
+		connected_components((regular_voxel_storage*)voxels, [&ofs, &first](regular_voxel_storage* c) {
+			if (!first) {
+				ofs << ",";
+			}
+			auto info = dump_info(c);
+			ofs << json_logger::to_json_string(info);
+			first = false;
+		});
+		ofs << "]";
+		symbol_value v;
+		return v;
+	}
+};
+
 class op_keep_components : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
@@ -559,27 +613,6 @@ public:
 };
 
 namespace {
-	json_logger::meta_data dump_info(abstract_voxel_storage* voxels) {
-		if (dynamic_cast<abstract_chunked_voxel_storage*>(voxels)) {
-			auto left = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->grid_offset();
-			auto nc = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->num_chunks();
-			auto right = (left + nc.as<long>()) - (decltype(left)::element_type)1;
-			auto sz = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->voxel_size();
-			auto szl = (long)dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->chunk_size();
-			auto left_world = ((voxels->bounds()[0].as<long>() + left * szl).as<double>() * sz);
-			auto right_world = ((voxels->bounds()[1].as<long>() + left * szl).as<double>() * sz);
-
-			return {
-				{"count", (long)voxels->count()},
-				{"grid", left.format() + " - " + right.format()},
-				{"bounds", voxels->bounds()[0].format() + " - " + voxels->bounds()[1].format()},
-				{"world", left_world.format() + " - " + right_world.format()},
-				{"bits", (long)voxels->value_bits()}
-			};
-		}
-		return {};
-	}
-	
 	template <typename Fn, typename Fn2>
 	void revoxelize_and_check_overlap(abstract_voxel_storage* voxels, const geometry_collection_t& surfaces, Fn fn, Fn2 fn2) {
 		BRep_Builder B;
@@ -896,6 +929,101 @@ public:
 		tpp.set_progress_callback(application_progress_callback);
 		tpp.silent = silent;
 		return tpp((regular_voxel_storage*)voxels);
+	}
+};
+
+class op_zeros : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" } };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input");
+		// @todo also implement empty_copy_as() here.
+		return voxels->empty_copy();
+	}
+};
+
+class op_plane : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, {true, "a", "real"}, {true, "b", "real"}, {true, "c", "real"}, {true, "d", "real"} };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		abstract_voxel_storage* v = scope.get_value<abstract_voxel_storage*>("input");
+		
+		auto voxels = dynamic_cast<abstract_chunked_voxel_storage*>(v);
+		if (voxels == nullptr) {
+			throw std::runtime_error("expected chunked storage");
+		}
+
+		auto result = voxels->empty_copy();
+
+		if (voxels->count() == 0) {
+			return result;
+		}
+		
+		gp_Pln pln(
+			scope.get_value<double>("a"),
+			scope.get_value<double>("b"),
+			scope.get_value<double>("c"),
+			scope.get_value<double>("d")
+		);
+		
+		auto left = voxels->grid_offset();
+		auto sz = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->voxel_size();
+		auto szl = (long)dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->chunk_size();
+		auto left_world = ((voxels->bounds()[0].as<long>() + left * szl).as<double>() * sz);
+		auto right_world = ((voxels->bounds()[1].as<long>() + left * szl).as<double>() * sz);
+
+		BRepPrimAPI_MakeBox mb(gp_Pnt(
+			left_world.get<0>(),
+			left_world.get<1>(),
+			left_world.get<2>()
+		), gp_Pnt(
+			right_world.get<0>(),
+			right_world.get<1>(),
+			right_world.get<2>()
+		));
+
+		auto box = mb.Solid();
+		static double inf = std::numeric_limits<double>::infinity();
+		std::array<std::array<double, 2>, 2> uv_min_max = {{ {{+inf, +inf}}, {{-inf,-inf}} }};
+
+		TopExp_Explorer exp(box, TopAbs_VERTEX);
+		for (; exp.More(); exp.Next()) {
+			auto p = BRep_Tool::Pnt(TopoDS::Vertex(exp.Current()));
+			auto p2d = ProjLib::Project(pln, p);
+			for (int i = 0; i < 2; ++i) {
+				auto v = p2d.ChangeCoord().ChangeCoord(i + 1);
+				auto& min_v = uv_min_max[0][i];
+				auto& max_v = uv_min_max[1][i];
+				if (v < min_v) min_v = v;
+				if (v > max_v) max_v = v;
+			}
+		}
+
+		auto face = BRepBuilderAPI_MakeFace(pln,
+			uv_min_max[0][0], uv_min_max[1][0],
+			uv_min_max[0][1], uv_min_max[1][1]
+		);
+
+		auto face_inside = BRepAlgoAPI_Common(face, box).Shape();
+		TopoDS_Compound C;
+		if (face_inside.ShapeType() == TopAbs_COMPOUND) {
+			C = TopoDS::Compound(face_inside);
+		} else {
+			BRep_Builder B;
+			B.MakeCompound(C);
+			B.Add(C, face_inside);
+		}
+
+		BRepMesh_IncrementalMesh(C, 0.001);
+		
+		geometry_collection_t* single = new geometry_collection_t{ { 0, C} };
+		return single;
 	}
 };
 
@@ -1315,7 +1443,7 @@ public:
 class op_mesh : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "filename", "string"}, {false, "use_value", "integer"} };
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "filename", "string"}, {false, "use_value", "integer"}, {false, "with_components", "integer"} };
 		return nm_;
 	}
 	symbol_value invoke(const scope_map& scope) const {
@@ -1324,7 +1452,8 @@ public:
 		auto filename = scope.get_value<std::string>("filename");
 		std::ofstream ofs(filename.c_str());
 		if (voxels->value_bits() == 1) {
-			((regular_voxel_storage*)voxels)->obj_export(ofs);
+			auto with_components = scope.get_value_or<int>("with_components", -1);
+			((regular_voxel_storage*)voxels)->obj_export(ofs, with_components != 0);
 		} else {
 			((regular_voxel_storage*)voxels)->obj_export(ofs, use_value != 1, use_value == 1);
 		}
