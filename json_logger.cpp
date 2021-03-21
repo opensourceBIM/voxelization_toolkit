@@ -41,6 +41,17 @@ namespace {
 	}
 }
 
+std::string json_logger::to_json_string(const meta_data& m) {
+	boost::property_tree::ptree pt;
+	for (auto& p : m) {
+		ptree_writer vis{ pt, p.first };
+		boost::apply_visitor(vis, p.second);
+	}
+	std::ostringstream oss;
+	boost::property_tree::write_json(oss, pt, false);
+	return oss.str();
+}
+
 void json_logger::message(severity s, const std::string & message, const std::map<std::string, meta_data>& meta)
 {
 	static const std::array<const std::string, 6> severity_strings = { "", "debug", "notice", "warning", "error", "fatal" };
