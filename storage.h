@@ -1116,7 +1116,10 @@ protected:
 					continue;
 				}
 			} else if (mode == OP_SUBTRACTION) {
-				if (Sa == CK_EMPTY || Sb == CK_FULL) {
+				if (Sa == CK_EMPTY) {
+					continue;
+				} else if (Sb == CK_FULL) {
+					set_chunk(n, ijk, nullptr);
 					continue;
 				} else if (Sb == CK_EMPTY) {
 					if (!inplace) {
@@ -1126,6 +1129,7 @@ protected:
 				}
 			} else if (mode == OP_INTERSECTION) {
 				if (Sa == CK_EMPTY || Sb == CK_EMPTY) {
+					// @todo this does not appear correct. When B is empty A needs to be *cleared* when not empty and in-place.
 					continue;
 				} else if (Sb == CK_FULL) {
 					if (!inplace) {
