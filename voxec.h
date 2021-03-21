@@ -44,6 +44,7 @@ struct filtered_files_t {};
 #include <BRepPrimAPI_MakeBox.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepAlgoAPI_Common.hxx>
+#include <BRepMesh_IncrementalMesh.hxx>
 
 #include <set>
 #include <map>
