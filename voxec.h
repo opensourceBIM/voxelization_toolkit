@@ -592,6 +592,67 @@ public:
 	}
 };
 
+class op_describe_group_by : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "output_path", "string" }, { true, "input", "voxels" }, { true, "groups", "voxels" } };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		const std::string output_path = scope.get_value<std::string>("output_path");
+		std::ofstream ofs(output_path.c_str());
+		ofs << "[";
+		bool first = true;
+		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input");
+		
+		auto groups = (regular_voxel_storage*) scope.get_value<abstract_voxel_storage*>("groups");
+
+		if (groups->value_bits() != 32) {
+			throw std::runtime_error("Expected a uint stored dataset for groups");
+		}
+
+		uint32_t v;
+		std::set<uint32_t> vs;
+		for (auto& ijk : *groups) {
+			groups->Get(ijk, &v);
+			vs.insert(v);
+		}
+
+		static bit_t desc_bits;
+
+		for (auto& id : vs) {
+			if (!first) {
+				ofs << ",";
+			}
+
+			// A {0,1} dataset of `groups`==`id`
+			auto where_id = groups->empty_copy_as(&desc_bits);
+			for (auto& ijk : *groups) {
+				groups->Get(ijk, &v);
+				if (v == id) {
+					where_id->Set(ijk);
+				}
+			}
+
+			auto c = voxels->boolean_intersection(where_id);
+
+			auto info = dump_info(c);
+			info["id"] = static_cast<long>(id);
+			ofs << json_logger::to_json_string(info);
+
+			delete c;
+			delete where_id;
+
+			first = false;
+		}
+
+		ofs << "]";
+
+		symbol_value v_null;
+		return v_null;
+	}
+};
+
 class op_keep_components : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
