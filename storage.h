@@ -541,9 +541,20 @@ public:
 	}
 
 	void boolean_intersection_inplace(const abstract_voxel_storage* other_) {
-		const continuous_voxel_storage<T>* other = (const continuous_voxel_storage<T>*) other_;
-		for (size_t i = 0; i < size(); ++i) {
-			data_[i] &= other->data_[i];
+		if (this->value_bits() == other_->value_bits()) {
+			const continuous_voxel_storage<T>* other = (const continuous_voxel_storage<T>*) other_;
+			for (size_t i = 0; i < size(); ++i) {
+				data_[i] &= other->data_[i];
+			}
+		} else if (this->value_bits() == 32 && other_->value_bits() == 1) {
+			uint32_t zero = 0;
+			BEGIN_LOOP(size_t(0), dimx_, 0U, dimy_, 0U, dimz_)
+				if (!other_->Get(ijk)) {
+					Set(ijk, &zero);
+				}
+			END_LOOP;
+		} else {
+			throw std::runtime_error("Not implemented");
 		}
 		calculate_count_();
 		calculate_bounds_();
@@ -1111,7 +1122,8 @@ protected:
 						set_chunk(n, ijk, a->copy(n->next_slot()));
 					}
 					continue;
-				} else if (Sa == CK_EMPTY) {
+				} else if (Sa == CK_EMPTY && n->value_bits() == b->value_bits()) {
+					// When copying from b we need to check whether datatypes match
 					set_chunk(n, ijk, b->copy(n->next_slot()));
 					continue;
 				}
@@ -1128,15 +1140,17 @@ protected:
 					continue;
 				}
 			} else if (mode == OP_INTERSECTION) {
-				if (Sa == CK_EMPTY || Sb == CK_EMPTY) {
-					// @todo this does not appear correct. When B is empty A needs to be *cleared* when not empty and in-place.
+				if (Sa == CK_EMPTY) {
+					continue;
+				} else if (Sb == CK_EMPTY) {
+					set_chunk(n, ijk, nullptr);
 					continue;
 				} else if (Sb == CK_FULL) {
 					if (!inplace) {
 						set_chunk(n, ijk, a->copy(n->next_slot()));
 					}
 					continue;
-				} else if (Sa == CK_FULL) {
+				} else if (Sa == CK_FULL && n->value_bits() == b->value_bits()) {
 					set_chunk(n, ijk, b->copy(n->next_slot()));
 					continue;
 				}
@@ -1148,7 +1162,12 @@ protected:
 				release(get_chunk(this, ijk));
 			}
 
-			abstract_voxel_storage* a_explicit = a->is_explicit() ? (inplace ? a : a->copy(n->next_slot())) : a->make_explicit(n->next_slot());
+			abstract_voxel_storage* a_explicit;
+			if (a == nullptr) {
+				a_explicit = a = n->get_or_create_chunk(ijk.as<size_t>());
+			} else {
+				a_explicit = a->is_explicit() ? (inplace ? a : a->copy(n->next_slot())) : a->make_explicit(n->next_slot());
+			}
 			// b is temporary, so not assigned next_slot
 			abstract_voxel_storage* b_temp = b->is_explicit() ? nullptr : b->make_explicit();
 			abstract_voxel_storage* b_forced_explicit = b_temp ? b_temp : b;
