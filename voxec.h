@@ -487,7 +487,7 @@ namespace {
 		}
 
 		if (std::is_same<V, voxel_uint32_t>::value) {
-			chunked_voxel_storage<voxel_uint32_t>* storage = new chunked_voxel_storage<voxel_uint32_t>(x1, y1, z1, vsize, nx, ny, nz, 64);
+			chunked_voxel_storage<voxel_uint32_t>* storage = new chunked_voxel_storage<voxel_uint32_t>(x1, y1, z1, vsize, nx, ny, nz, chunksize);
 			progress_writer progress("voxelize");
 			processor pr(storage, progress);
 			pr.use_scanline() = false;
