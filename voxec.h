@@ -164,6 +164,7 @@ public:
 namespace {
 	json_logger::meta_data dump_info(abstract_voxel_storage* voxels) {
 		if (dynamic_cast<abstract_chunked_voxel_storage*>(voxels)) {
+			auto csize = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->chunk_size();
 			auto left = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->grid_offset();
 			auto nc = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->num_chunks();
 			auto right = (left + nc.as<long>()) - (decltype(left)::element_type)1;
@@ -177,7 +178,8 @@ namespace {
 				{"grid", left.format() + " - " + right.format()},
 				{"bounds", voxels->bounds()[0].format() + " - " + voxels->bounds()[1].format()},
 				{"world", left_world.format() + " - " + right_world.format()},
-				{"bits", (long)voxels->value_bits()}
+				{"bits", (long)voxels->value_bits()},
+				{"chunk_size", (long) csize}
 			};
 		}
 		return {};
