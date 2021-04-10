@@ -1391,13 +1391,26 @@ public:
 class op_constant_like : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "value", "integer" } };
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "value", "integer" }, { false, "type", "string"} };
 		return nm_;
 	}
 	symbol_value invoke(const scope_map& scope) const {
 		regular_voxel_storage* voxels = (regular_voxel_storage*)scope.get_value<abstract_voxel_storage*>("input");
 		int value = scope.get_value<int>("value");
-		abstract_chunked_voxel_storage* output = (abstract_chunked_voxel_storage*)voxels->empty_copy();
+
+		abstract_chunked_voxel_storage* output;
+
+		if (scope.has("type")) {
+			if (scope.get_value<std::string>("type") == "uint") {
+				voxel_uint32_t fmt;
+				output = (abstract_chunked_voxel_storage*)voxels->empty_copy_as(&fmt);
+			} else {
+				throw std::runtime_error("not implemented");
+			}			
+		} else {
+			output = (abstract_chunked_voxel_storage*)voxels->empty_copy();
+		}
+
 		if (value == 1) {
 			auto i = make_vec<size_t>(0U, 0U, 0U);
 			auto j = output->num_chunks();
