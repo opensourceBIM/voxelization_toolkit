@@ -1276,7 +1276,7 @@ template <typename T>
 class op_geom : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "dx", "integer|real" },{ true, "dy", "integer|real" },{ true, "dz", "integer|real" } };
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "dx", "integer|real" },{ true, "dy", "integer|real" },{ true, "dz", "integer|real" }, { false, "until", "voxels" } };
 		return nm_;
 	}
 	symbol_value invoke(const scope_map& scope) const {
@@ -1286,7 +1286,13 @@ public:
 		int dy = scope.get_length("dy");
 		int dz = scope.get_length("dz");
 
+		abstract_voxel_storage* until = nullptr;
+		try {
+			until = scope.get_value<abstract_voxel_storage*>("until");
+		} catch (scope_map::not_in_scope&) { }
+
 		T s;
+		s.until = until;
 		return s(voxels, dx, dy, dz);
 	}
 };
