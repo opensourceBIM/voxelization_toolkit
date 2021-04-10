@@ -14,14 +14,30 @@ public:
 
 		auto dxyz = make_vec<long>(dx, dy, dz);
 
-		BEGIN_LOOP_I2(bounds[0], bounds[1])
-			if (storage->Get(ijk)) {
-				auto ijk2 = ijk.as<long>() + dxyz;
-				if ((ijk2 >= zero).all() && (ijk2 < extents).all()) {
-					shifted->Set(ijk2.as<size_t>());
+		bool use_value = storage->value_bits() == 32;
+
+		if (use_value) {
+			uint32_t v;
+			BEGIN_LOOP_I2(bounds[0], bounds[1])
+				storage->Get(ijk, &v);
+				if (v) {
+					auto ijk2 = ijk.as<long>() + dxyz;
+					if ((ijk2 >= zero).all() && (ijk2 < extents).all()) {
+						shifted->Set(ijk2.as<size_t>(), &v);
+					}
 				}
-			}
-		END_LOOP;
+			END_LOOP;
+
+		} else {
+			BEGIN_LOOP_I2(bounds[0], bounds[1])
+				if (storage->Get(ijk)) {
+					auto ijk2 = ijk.as<long>() + dxyz;
+					if ((ijk2 >= zero).all() && (ijk2 < extents).all()) {
+						shifted->Set(ijk2.as<size_t>());
+					}
+				}
+			END_LOOP;
+		}
 
 		return shifted;
 	}
