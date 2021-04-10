@@ -607,11 +607,6 @@ namespace {
 
 		static bit_t desc_bits;
 
-		std::cout << "voxels " << voxels->count() << std::endl;
-
-		std::ofstream ofs0("debug-0.obj");
-		((regular_voxel_storage*)voxels)->obj_export(ofs0, false, false);
-
 		for (auto& id : vs) {
 			// A {0,1} dataset of `groups`==`id`
 			auto where_id = groups->empty_copy_as(&desc_bits);
@@ -623,14 +618,6 @@ namespace {
 			}
 
 			auto c = voxels->boolean_intersection(where_id);
-
-			std::cout << id << " " << where_id->count() << " " << c->count() << std::endl;
-
-			std::ofstream ofs1("debug-1-" + boost::lexical_cast<std::string>(id) + ".obj");
-			std::ofstream ofs2("debug-2-" + boost::lexical_cast<std::string>(id) + ".obj");
-
-			((regular_voxel_storage*)where_id)->obj_export(ofs1, false, false);
-			((regular_voxel_storage*)c)->obj_export(ofs2, false, false);
 
 			delete where_id;			
 
