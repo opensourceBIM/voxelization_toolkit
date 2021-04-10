@@ -5,6 +5,8 @@
 
 class sweep {
 public:
+	abstract_voxel_storage* until = nullptr;
+
 	regular_voxel_storage* operator()(abstract_voxel_storage* storage, int dx, int dy, int dz) {
 		int d[3] = { dx, dy, dz };
 		int nonzero = 0;
@@ -37,15 +39,29 @@ public:
 					storage->Get(ijk, &v);
 				}
 				auto ijk2 = ijk.as<long>();
-				for (int i = 1; i < std::abs(d[D]) * v; ++i) {
+				int i = 1;
+				while (until || (i < std::abs(d[D]) * v)) {
+
 					if (pos) {
 						ijk2.get(D)++;
-					} else {
+					}
+					else {
 						ijk2.get(D)--;
 					}
+
+					if (until) {
+						if (until->Get(ijk2.as<size_t>())) {
+							break;
+						}
+					}
+
 					if ((ijk2 >= zero).all() && (ijk2 < extents).all()) {
 						swepts->Set(ijk2.as<size_t>());
+					} else {
+						break;
 					}
+
+					++i;
 				}
 			}
 		END_LOOP;

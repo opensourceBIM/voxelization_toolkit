@@ -5,6 +5,8 @@
 
 class shift {
 public:
+	abstract_voxel_storage* until = nullptr;
+
 	regular_voxel_storage* operator()(abstract_voxel_storage* storage, int dx, int dy, int dz) {
 		regular_voxel_storage* shifted = (regular_voxel_storage*)storage->empty_copy();
 		auto bounds = storage->bounds();
