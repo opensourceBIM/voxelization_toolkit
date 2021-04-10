@@ -594,6 +594,51 @@ public:
 	}
 };
 
+namespace {
+	template <typename Fn>
+	void group_by(regular_voxel_storage* groups, abstract_voxel_storage* voxels, Fn fn) {
+
+		uint32_t v;
+		std::set<uint32_t> vs;
+		for (auto& ijk : *groups) {
+			groups->Get(ijk, &v);
+			vs.insert(v);
+		}
+
+		static bit_t desc_bits;
+
+		std::cout << "voxels " << voxels->count() << std::endl;
+
+		std::ofstream ofs0("debug-0.obj");
+		((regular_voxel_storage*)voxels)->obj_export(ofs0, false, false);
+
+		for (auto& id : vs) {
+			// A {0,1} dataset of `groups`==`id`
+			auto where_id = groups->empty_copy_as(&desc_bits);
+			for (auto& ijk : *groups) {
+				groups->Get(ijk, &v);
+				if (v == id) {
+					where_id->Set(ijk);
+				}
+			}
+
+			auto c = voxels->boolean_intersection(where_id);
+
+			std::cout << id << " " << where_id->count() << " " << c->count() << std::endl;
+
+			std::ofstream ofs1("debug-1-" + boost::lexical_cast<std::string>(id) + ".obj");
+			std::ofstream ofs2("debug-2-" + boost::lexical_cast<std::string>(id) + ".obj");
+
+			((regular_voxel_storage*)where_id)->obj_export(ofs1, false, false);
+			((regular_voxel_storage*)c)->obj_export(ofs2, false, false);
+
+			delete where_id;			
+
+			fn(id, c);
+		}
+	}
+}
+
 class op_describe_group_by : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
@@ -613,40 +658,18 @@ public:
 			throw std::runtime_error("Expected a uint stored dataset for groups");
 		}
 
-		uint32_t v;
-		std::set<uint32_t> vs;
-		for (auto& ijk : *groups) {
-			groups->Get(ijk, &v);
-			vs.insert(v);
-		}
-
-		static bit_t desc_bits;
-
-		for (auto& id : vs) {
+		group_by(groups, voxels, [&ofs, &first](uint32_t id, abstract_voxel_storage* c) {
 			if (!first) {
 				ofs << ",";
 			}
-
-			// A {0,1} dataset of `groups`==`id`
-			auto where_id = groups->empty_copy_as(&desc_bits);
-			for (auto& ijk : *groups) {
-				groups->Get(ijk, &v);
-				if (v == id) {
-					where_id->Set(ijk);
-				}
-			}
-
-			auto c = voxels->boolean_intersection(where_id);
-
 			auto info = dump_info(c);
 			info["id"] = static_cast<long>(id);
 			ofs << json_logger::to_json_string(info);
 
 			delete c;
-			delete where_id;
 
 			first = false;
-		}
+		});
 
 		ofs << "]";
 
@@ -1526,19 +1549,32 @@ public:
 class op_mesh : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "filename", "string"}, {false, "use_value", "integer"}, {false, "with_components", "integer"} };
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "filename", "string"}, {false, "use_value", "integer"}, {false, "with_components", "integer"}, { false, "groups", "voxels" } };
 		return nm_;
 	}
 	symbol_value invoke(const scope_map& scope) const {
 		auto voxels = scope.get_value<abstract_voxel_storage*>("input");
 		auto use_value = scope.get_value_or<int>("use_value", -1);
 		auto filename = scope.get_value<std::string>("filename");
+
+		auto groups = (regular_voxel_storage*) scope.get_value_or<abstract_voxel_storage*>("groups", nullptr);
+
 		std::ofstream ofs(filename.c_str());
-		if (voxels->value_bits() == 1) {
-			auto with_components = scope.get_value_or<int>("with_components", -1);
-			((regular_voxel_storage*)voxels)->obj_export(ofs, with_components != 0);
+
+		if (groups) {
+			obj_export_helper helper(ofs);
+			group_by(groups, voxels, [&helper, &ofs](uint32_t id, abstract_voxel_storage* c) {
+				ofs << "g id-" << id << "\n";
+				((regular_voxel_storage*)c)->obj_export(helper, false, false);
+			});
 		} else {
-			((regular_voxel_storage*)voxels)->obj_export(ofs, use_value != 1, use_value == 1);
+
+			if (voxels->value_bits() == 1) {
+				auto with_components = scope.get_value_or<int>("with_components", -1);
+				((regular_voxel_storage*)voxels)->obj_export(ofs, with_components != 0);
+			} else {
+				((regular_voxel_storage*)voxels)->obj_export(ofs, use_value != 1, use_value == 1);
+			}
 		}
 		symbol_value v;
 		return v;
