@@ -350,6 +350,7 @@ private:
 			chunk_neighbours_queue_add_(pos.first, pos.second, c);
 			set_visited_chunk_(c);
 		} else if (post_condition_(pos.second)) {
+			depth = pos.first;
 			fn(tagged_index{ tagged_index::VOXEL, pos.second });
 
 			neighbours_queue_add_(pos);
@@ -358,6 +359,8 @@ private:
 	}
 
 public:
+	double depth = std::numeric_limits<double>::quiet_NaN();
+
 	// @todo max_depth doesn't work correctly with implicit voxel storage
 	boost::optional<double> max_depth;
 	typename queue_type<CONNECTEDNESS>::type queue;
