@@ -1343,22 +1343,12 @@ class op_less : public op_compare<std::less<size_t>> {};
 class op_traverse : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "seed", "voxels" }, { false, "depth", "integer|real" }, { false, "connectedness", "integer" } };
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "seed", "voxels" }, { false, "depth", "integer|real" }, { false, "connectedness", "integer" }, {false, "type", "string"} };
 		return nm_;
 	}
 	symbol_value invoke(const scope_map& scope) const {
 		regular_voxel_storage* voxels = (regular_voxel_storage*) scope.get_value<abstract_voxel_storage*>("input");
 		regular_voxel_storage* seed = (regular_voxel_storage*) scope.get_value<abstract_voxel_storage*>("seed");
-
-		regular_voxel_storage* output = (regular_voxel_storage*)voxels->empty_copy();
-
-		auto callback = [this, output](const tagged_index& pos) {
-			if (pos.which == tagged_index::VOXEL) {
-				output->Set(pos.pos);
-			} else {
-				((abstract_chunked_voxel_storage*)output)->create_constant(pos.pos, 1U);
-			}
-		};
 
 		boost::optional<double> max_depth;
 		try {
@@ -1367,8 +1357,7 @@ public:
 			// traversal with unconstrained depth
 		}
 
-		// Type erasure to get a runtime argument into a template arg.
-		std::function<void(decltype(callback), decltype(voxels), decltype(seed))> run_visitor;
+		bool use_value = scope.has("type") && scope.get_value<std::string>("type") == "uint";
 
 		int C = 6;
 		try {
@@ -1380,11 +1369,39 @@ public:
 		if (C != 6 && C != 26) {
 			throw std::runtime_error("Connectedness should be 6 or 26");
 		}
+
+		if (use_value && C != 26) {
+			throw std::runtime_error("Connectedness should be 26 when using value");
+		}
+
+		regular_voxel_storage* output;
+		if (use_value) {
+			voxel_uint32_t fmt;
+			output = (regular_voxel_storage*)voxels->empty_copy_as(&fmt);
+		} else {
+			output = (regular_voxel_storage*)voxels->empty_copy();
+		}
 		
 		visitor<6> v6;
 		visitor<26> v26;
 		v6.max_depth = max_depth;
 		v26.max_depth = max_depth;
+
+		uint32_t val;
+
+		auto callback = [this, output, &v26, &val, &use_value](const tagged_index& pos) {
+			if (use_value) {
+				val = v26.depth * 10. + 1;
+				output->Set(pos.pos, &val);
+			} else if (pos.which == tagged_index::VOXEL) {
+				output->Set(pos.pos);
+			} else {
+				((abstract_chunked_voxel_storage*)output)->create_constant(pos.pos, 1U);
+			}
+		};
+
+		// Type erasure to get a runtime argument into a template arg.
+		std::function<void(decltype(callback), decltype(voxels), decltype(seed))> run_visitor;
 
 		if (C == 6) {	
 			run_visitor = std::ref(v6);
@@ -1413,6 +1430,9 @@ public:
 		if (scope.has("type")) {
 			if (scope.get_value<std::string>("type") == "uint") {
 				voxel_uint32_t fmt;
+				output = (abstract_chunked_voxel_storage*)voxels->empty_copy_as(&fmt);
+			} else if (scope.get_value<std::string>("type") == "bit") {
+				bit_t fmt;
 				output = (abstract_chunked_voxel_storage*)voxels->empty_copy_as(&fmt);
 			} else {
 				throw std::runtime_error("not implemented");
