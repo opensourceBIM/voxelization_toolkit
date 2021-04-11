@@ -1588,6 +1588,52 @@ public:
 	}
 };
 
+class op_export_csv : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "filename", "string"} };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		auto voxels = (regular_voxel_storage*) scope.get_value<abstract_voxel_storage*>("input");
+		auto filename = scope.get_value<std::string>("filename");
+		std::ofstream ofs(filename.c_str());
+
+		bool use_value = voxels->value_bits() == 32;
+
+		auto sz = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->voxel_size();
+		auto szl = (long)dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->chunk_size();
+		auto left = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->grid_offset();
+
+		uint32_t v;
+
+		for (auto ijk : *voxels) {
+			if (use_value) {
+				voxels->Get(ijk, &v);
+				if (v == 0) {
+					// @todo why is this needed?
+					continue;
+				}
+			}
+
+			auto xyz = (ijk.as<long>() + left * szl).as<double>() * sz;
+			
+			ofs << xyz.get<0>() << ","
+				<< xyz.get<1>() << ","
+				<< xyz.get<2>();
+			
+			if (use_value) {
+				ofs << "," << v;
+			}
+
+			ofs << "\n";
+		}
+
+		symbol_value v_null;
+		return v_null;
+	}
+};
+
 template <typename T>
 T* instantiate() {
 	return new T();
