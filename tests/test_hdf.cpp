@@ -8,14 +8,31 @@
 
 TEST(HdfFileName, HDF) {
 
+	auto storage = new chunked_voxel_storage<bit_t>(0., 0., 0., 0.1, 200, 150, 10, 32);
+
+
+	BRepBuilderAPI_MakePolygon mp(gp_Pnt(1, 1, 0), gp_Pnt(16, 1, 0), gp_Pnt(16, 9.8, 0), gp_Pnt(1, 9.8, 0), true);
+	BRepBuilderAPI_MakeFace mf(mp.Wire());
+	TopoDS_Face face = mf.Face();
+
+	auto vox = voxelizer(face, storage);
+	vox.Convert();
+
+	/*HDF WRITER*/
+	hdf_writer writer;
+	writer.SetVoxels(storage);
+	writer.Write("test_hdf_writer.vox");
+	/*HDF WRITER*/
+
+
 	const H5std_string  FILE_NAME("SDS.h5");
 	const H5std_string  DATASET_NAME("IntArray");
-	const int   NX = 5;                    
+	const int   NX = 5;
 	const int   NY = 6;
 	const int   RANK = 2;
 
 	int i, j;
-	int data[NX][NY];          
+	int data[NX][NY];
 	for (j = 0; j < NX; j++)
 	{
 		for (i = 0; i < NY; i++)
@@ -23,7 +40,7 @@ TEST(HdfFileName, HDF) {
 	}
 
 	H5::H5File file(FILE_NAME, H5F_ACC_TRUNC);
-	hsize_t     dimsf[2];              
+	hsize_t     dimsf[2];
 	dimsf[0] = NX;
 	dimsf[1] = NY;
 	H5::DataSpace dataspace(RANK, dimsf);

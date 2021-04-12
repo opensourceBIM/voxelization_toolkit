@@ -2,13 +2,27 @@
 #define WRITER_H
 
 #include "storage.h"
+#include "H5Cpp.h"
 
 #include <string>
 #include <fstream>
 
-class voxel_writer {
-private:
+
+class abstract_writer {
+
+public:
 	abstract_voxel_storage* voxels_;
+	void SetVoxels(abstract_voxel_storage* voxels) {
+		voxels_ = voxels;
+	}
+
+	virtual void Write(const std::string& fnc) = 0;
+
+
+};
+
+class voxel_writer :public abstract_writer {
+private:
 
 	std::ofstream& assert_good_(const std::string& fn, std::ofstream& fs) {
 		if (!fs.good()) {
@@ -16,12 +30,7 @@ private:
 		}
 		return fs;
 	}
-
 public:
-	void SetVoxels(abstract_voxel_storage* voxels) {
-		voxels_ = voxels;
-	}
-
 	void Write(const std::string& fnc) {
 		{
 			std::string fn = fnc + std::string(".index");
@@ -45,5 +54,33 @@ public:
 		}
 	}
 };
+
+
+
+class hdf_writer :public abstract_writer {
+
+public:
+	void Write(const std::string& fnc) {
+
+		chunked_voxel_storage<bit_t>* storage = (chunked_voxel_storage<bit_t>*)voxels_;
+
+		for (int i = 0; i < storage->num_chunks().get(1); i++) {
+
+			auto c = storage->get_chunk(make_vec<size_t>(i, 1, 0));
+
+			if (c && c->is_explicit()) {
+				continuous_voxel_storage<bit_t>* convox = (continuous_voxel_storage<bit_t>*)voxels_;
+				bit_t::storage_type* data = convox->data();
+				
+				
+			}
+		}
+	}
+
+
+};
+
+
+
 
 #endif
