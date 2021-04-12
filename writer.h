@@ -64,16 +64,29 @@ public:
 
 		chunked_voxel_storage<bit_t>* storage = (chunked_voxel_storage<bit_t>*)voxels_;
 
-		for (int i = 0; i < storage->num_chunks().get(1); i++) {
-
-			auto c = storage->get_chunk(make_vec<size_t>(i, 1, 0));
+		for (int i = 0; i < storage->num_chunks().get(0); i++) {
+			auto c = storage->get_chunk(make_vec<size_t>(i, 1, 0));			
 
 			if (c && c->is_explicit()) {
-				continuous_voxel_storage<bit_t>* convox = (continuous_voxel_storage<bit_t>*)voxels_;
-				bit_t::storage_type* data = convox->data();
-				
-				
+				continuous_voxel_storage<bit_t>* convox = (continuous_voxel_storage<bit_t>*)c;
+				auto d = convox->data();
+				//std::cout << c->value_bits(); 
+				for (int j = 0; j < convox->size(); j++) {
+					auto vd = convox->data()[j];
+					std::bitset<8> b(convox->data()[j]); 
+					std::cout << (int)convox->data()[j]<<std::endl;
+				}
+
+				if (c && c->is_constant() ){
+					std::cout << "Constant handling to implement."<<std::endl; 
+			
+				}
+				else {
+					std::cout << "Plane handling to implement."<<std::endl;
+
+				}
 			}
+
 		}
 	}
 
