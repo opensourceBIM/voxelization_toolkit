@@ -5,18 +5,20 @@
 
 #include <BRepBuilderAPI_MakePolygon.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
+#include <BRepPrimAPI_MakeBox.hxx>
 
 TEST(HdfFileName, HDF) {
 
-	auto storage = new chunked_voxel_storage<bit_t>(0., 0., 0., 0.1, 200, 150, 10, 32);
+	auto storage = new chunked_voxel_storage<bit_t>(0., 0., 0., 0.1, 1000, 1000, 100, 32);
 
+	for (int i = 0; i < 10; ++i) {
+		for (int j = 0; j < 10; ++j) {
+			BRepPrimAPI_MakeBox mb(gp_Pnt(10 * i, 10 * j, 0.), 8., 8., 8.);
 
-	BRepBuilderAPI_MakePolygon mp(gp_Pnt(1, 1, 0), gp_Pnt(16, 1, 0), gp_Pnt(16, 9.8, 0), gp_Pnt(1, 9.8, 0), true);
-	BRepBuilderAPI_MakeFace mf(mp.Wire());
-	TopoDS_Face face = mf.Face();
-
-	auto vox = voxelizer(face, storage);
-	vox.Convert();
+			auto vox = voxelizer(mb.Solid(), storage);
+			vox.Convert();
+		}
+	}
 
 	/*HDF WRITER*/
 	hdf_writer writer;
