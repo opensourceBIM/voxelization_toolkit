@@ -508,13 +508,27 @@ namespace {
 		}
 
 		if (std::is_same<V, voxel_uint32_t>::value) {
-			chunked_voxel_storage<voxel_uint32_t>* storage = new chunked_voxel_storage<voxel_uint32_t>(x1, y1, z1, vsize, nx, ny, nz, chunksize);
-			progress_writer progress("voxelize");
-			processor pr(storage, progress);
-			pr.use_scanline() = false;
+			
 			// @todo, uint32 defaults to VOLUME_PRODUCT_ID, make this explicit
-			pr.process(surfaces->begin(), surfaces->end(), VOLUME_PRODUCT_ID(), output(MERGED()));
-			return storage;
+			// @why
+			// pr.use_scanline() = false;
+
+			chunked_voxel_storage<voxel_uint32_t>* storage = new chunked_voxel_storage<voxel_uint32_t>(x1, y1, z1, vsize, nx, ny, nz, chunksize);
+
+			if (threads) {
+				progress_writer progress("voxelize", silent);
+				threaded_processor p(storage, *threads, progress);
+				p.process(surfaces->begin(), surfaces->end(), VOLUME_PRODUCT_ID(), output(MERGED()));
+				// @todo what actually happens to storage?
+				delete storage;
+				return p.voxels();
+			} else {
+				progress_writer progress("voxelize");
+				processor pr(storage, progress);
+				pr.process(surfaces->begin(), surfaces->end(), VOLUME_PRODUCT_ID(), output(MERGED()));
+				return storage;
+			}			
+
 		} else {
 			if (threads) {
 				progress_writer progress("voxelize", silent);
