@@ -627,9 +627,24 @@ public:
 	}
 };
 
+#include <boost/asio/thread_pool.hpp>
+#include <boost/asio/post.hpp>
+#include <thread>
+#include <mutex>
+
 namespace {
+	template <typename T>
+	class mt_list : public std::list<T> {
+		std::mutex m;
+	public:
+		void push_back(const T& t) {
+			std::lock_guard<std::mutex> lock{ m };
+			std::list<T>::push_back(t);
+		}
+	};
+
 	template <typename Fn>
-	void group_by(regular_voxel_storage* groups, abstract_voxel_storage* voxels, Fn fn) {
+	void group_by(regular_voxel_storage* groups, abstract_voxel_storage* voxels, Fn fn, int threads=1) {
 
 		uint32_t v;
 		std::set<uint32_t> vs;
@@ -638,23 +653,47 @@ namespace {
 			vs.insert(v);
 		}
 
-		static bit_t desc_bits;
+		bit_t desc_bits;
 
-		for (auto& id : vs) {
+		mt_list<std::pair<uint32_t, abstract_voxel_storage*>> results;
+		boost::asio::thread_pool pool(threads); // 4 threads
+		
+		auto process = [&fn, &groups, &desc_bits, &voxels, &results, &threads](uint32_t id) {
+			uint32_t vv;
 			// A {0,1} dataset of `groups`==`id`
 			auto where_id = groups->empty_copy_as(&desc_bits);
 			for (auto& ijk : *groups) {
-				groups->Get(ijk, &v);
-				if (v == id) {
+				groups->Get(ijk, &vv);
+				if (vv == id) {
 					where_id->Set(ijk);
 				}
 			}
 
 			auto c = voxels->boolean_intersection(where_id);
 
-			delete where_id;			
+			delete where_id;
 
-			fn(id, c);
+			if (threads <= 1) {
+				fn(id, c);
+			} else {
+				results.push_back({ id, c });
+			}
+		};
+
+		for (auto& id : vs) {
+			if (threads > 1) {
+				boost::asio::post(pool, std::bind(process, id));
+			} else {
+				process(id);
+			}
+		}
+
+		if (threads > 1) {
+			
+			pool.join();
+			for (auto& r : results) {
+				fn(r.first, r.second);
+			}
 		}
 	}
 }
@@ -689,7 +728,7 @@ public:
 			delete c;
 
 			first = false;
-		});
+		}, scope.get_value_or<int>("THREADS", 1));
 
 		ofs << "]";
 
@@ -1606,7 +1645,7 @@ public:
 			group_by(groups, voxels, [&helper, &ofs](uint32_t id, abstract_voxel_storage* c) {
 				ofs << "g id-" << id << "\n";
 				((regular_voxel_storage*)c)->obj_export(helper, false, false);
-			});
+			}, scope.get_value_or<int>("THREADS", 1));
 		} else {
 
 			if (voxels->value_bits() == 1) {
