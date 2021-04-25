@@ -1634,6 +1634,7 @@ public:
 	symbol_value invoke(const scope_map& scope) const {
 		auto voxels = scope.get_value<abstract_voxel_storage*>("input");
 		auto use_value = scope.get_value_or<int>("use_value", -1);
+		auto with_components = scope.get_value_or<int>("with_components", -1);
 		auto filename = scope.get_value<std::string>("filename");
 
 		auto groups = (regular_voxel_storage*) scope.get_value_or<abstract_voxel_storage*>("groups", nullptr);
@@ -1649,10 +1650,9 @@ public:
 		} else {
 
 			if (voxels->value_bits() == 1) {
-				auto with_components = scope.get_value_or<int>("with_components", -1);
 				((regular_voxel_storage*)voxels)->obj_export(ofs, with_components != 0);
 			} else {
-				((regular_voxel_storage*)voxels)->obj_export(ofs, use_value != 1, use_value == 1);
+				((regular_voxel_storage*)voxels)->obj_export(ofs, with_components != 0 && use_value != 1, use_value == 1);
 			}
 		}
 		symbol_value v;
