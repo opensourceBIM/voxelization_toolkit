@@ -268,6 +268,14 @@ public:
 
 		IfcGeom::entity_filter ef;
 
+		boost::optional<size_t> threads;
+		if (scope.has("THREADS")) {
+			int t = scope.get_value<int>("THREADS");
+			if (t > 1) {
+				threads = (size_t)t;
+			}
+		}
+
 #ifdef IFCOPENSHELL_05
 		auto ifc_roof = IfcSchema::Type::IfcRoof;
 		auto ifc_slab = IfcSchema::Type::IfcSlab;
@@ -360,12 +368,23 @@ public:
 
 		for (auto ifc_file : ifc_files.files) {
 
-			IfcGeom::Iterator<double> iterator(settings_surface, ifc_file, filters_surface);
+			std::unique_ptr<IfcGeom::Iterator<double>> iterator;
+
+#ifdef IFCOPENSHELL_05
+			iterator.reset(IfcGeom::Iterator<double>(settings_surface, ifc_file, filters_surface));
+#else
+			if (threads) {
+				iterator.reset(new IfcGeom::Iterator<double>(settings_surface, ifc_file, filters_surface, *threads));
+			} else {
+				iterator.reset(new IfcGeom::Iterator<double>(settings_surface, ifc_file, filters_surface));
+			}
+#endif
+			
 			
 			// For debugging geometry creation from IfcOpenShell
 			// Logger::SetOutput(&std::cout, &std::cout);
 
-			if (!iterator.initialize()) {
+			if (!iterator->initialize()) {
 				continue;
 			}
 
@@ -374,7 +393,7 @@ public:
 			int old_progress = -1;
 
 			for (;;) {
-				elem_t* elem = (elem_t*)iterator.get();
+				elem_t* elem = (elem_t*)iterator->get();
 				bool process = true;
 
 				if (boost::to_lower_copy(elem->name()).find("nulpunt") != std::string::npos) {
@@ -425,14 +444,14 @@ public:
 					geometries->push_back(std::make_pair(elem->id(), compound));
 				}
 
-				if (old_progress != iterator.progress()) {
-					old_progress = iterator.progress();
+				if (old_progress != iterator->progress()) {
+					old_progress = iterator->progress();
 					if (application_progress_callback) {
 						(*application_progress_callback)(old_progress / 100.f);
 					}
 				}
 
-				if (!iterator.next()) {
+				if (!iterator->next()) {
 					break;
 				}
 			}
