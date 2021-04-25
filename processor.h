@@ -290,9 +290,10 @@ public:
 		auto progress = p_.thread(num_threads_);
 		size_t x0 = 0;
 		bool first = true;
-		for (size_t i = 0; i < num_threads_; ++i, first = false) {
+		for (size_t i = 0; i < num_threads_; ++i) {
 			size_t x1 = (size_t)floor((i + 1) * d);
 			if (x1 == x0) continue;
+			first = false;
 			if (i == num_threads_ - 1) {
 				x1 = N;
 			}
