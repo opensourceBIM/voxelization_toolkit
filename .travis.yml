@@ -1,3 +1,4 @@
+dist: focal
 language: cpp
 sudo: required
 compiler:
