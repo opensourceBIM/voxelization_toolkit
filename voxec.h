@@ -1524,6 +1524,36 @@ public:
 	}
 };
 
+class op_copy : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { false, "type", "string"} };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		regular_voxel_storage* voxels = (regular_voxel_storage*)scope.get_value<abstract_voxel_storage*>("input");
+
+		abstract_chunked_voxel_storage* output;
+
+		if (scope.has("type")) {
+			if (scope.get_value<std::string>("type") == "uint") {
+				voxel_uint32_t fmt;
+				output = (abstract_chunked_voxel_storage*)voxels->copy_as(&fmt);
+			} else if (scope.get_value<std::string>("type") == "bit") {
+				bit_t fmt;
+				output = (abstract_chunked_voxel_storage*)voxels->copy_as(&fmt);
+			} else {
+				throw std::runtime_error("not implemented");
+			}
+		} else {
+			output = (abstract_chunked_voxel_storage*)voxels->copy();
+		}
+
+		return output;
+	}
+};
+
+
 #ifdef WITH_IFC
 
 namespace {
