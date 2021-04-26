@@ -31,6 +31,7 @@ private:
 		}
 		return fs;
 	}
+
 public:
 	void Write(const std::string& fnc) {
 		{
@@ -62,64 +63,127 @@ class hdf_writer :public abstract_writer {
 
 public:
 	void Write(const std::string& fnc) {
-		const int      RANK = 2;
+
+		chunked_voxel_storage<bit_t>* storage = (chunked_voxel_storage<bit_t>*)voxels_;
+
+		int continuous_count = 0; 
+		int planar_count = 0; 
+		int constant_count = 0; 
+
+		for (int i = 0; i < storage->num_chunks().get(0); i++) {
+			auto chunk = storage->get_chunk(make_vec<size_t>(i, 0, 0));
+
+			if (chunk && chunk->is_explicit()) {
+				continuous_count++;
+
+			}
+			else {
+				if (chunk && chunk->is_constant()) {
+					constant_count++;
+				}
+
+				else {
+					planar_count++;
+				}
+			}
+		}
+
+		//std::cout << continuous_count << std::endl;
+		//std::cout << planar_count << std::endl;
+		//std::cout << constant_count << std::endl; 
+		
+		int chunk_stream = storage->chunk_size() * storage->voxel_size(); 
+
 		const H5std_string FILE_NAME(fnc);
-		const H5std_string DATASET_NAME("Continuous");
-
-		H5::H5File file(FILE_NAME, H5F_ACC_TRUNC);
-
+		const H5std_string DATASET_NAME("continuous_chunks");
+		const int      NX = 10;
+		const int      NY = 5;
+		const int      RANK = 2;
 		hsize_t      dims[2] = { 3, 3 };  // dataset dimensions at creation
 		hsize_t      maxdims[2] = { H5S_UNLIMITED, H5S_UNLIMITED };
 		H5::DataSpace mspace1(RANK, dims, maxdims);
+	
+		H5::H5File file(FILE_NAME, H5F_ACC_TRUNC);
 
 		H5::DSetCreatPropList cparms;
 		hsize_t      chunk_dims[2] = { 2, 5 };
 		cparms.setChunk(RANK, chunk_dims);
-
+	
+		int fill_val = 0;
+		cparms.setFillValue(H5::PredType::NATIVE_INT, &fill_val);
+	
 		H5::DataSet dataset = file.createDataSet(DATASET_NAME, H5::PredType::NATIVE_INT, mspace1, cparms);
+	
+		hsize_t      size[2];
+		size[0] = continuous_count;
+		size[1] = 32 * 32 * 32;
+		dataset.extend(size);
+	
+		H5::DataSpace fspace1 = dataset.getSpace();
+		hsize_t     offset[2];
+		offset[0] = 1;
+		offset[1] = 0;
+		hsize_t      dims1[2] = { 3, 3 };            /* data1 dimensions */
+		fspace1.selectHyperslab(H5S_SELECT_SET, dims1, offset);
 
-		chunked_voxel_storage<bit_t>* storage = (chunked_voxel_storage<bit_t>*)voxels_;
+		H5::DataSpace fspace2 = dataset.getSpace();
+		offset[0] = 1;
+		offset[1] = 0;
+		hsize_t   dims2[2] = { 1, 32*32*32 };
+
+		fspace2.selectHyperslab(H5S_SELECT_SET, dims2, offset);
+
+		H5::DataSpace mspace2(RANK, dims2);
+
+		int cont_count = 0;
 
 		for (int i = 0; i < storage->num_chunks().get(0); i++) {
+
+			std::vector<int> bits_container;
 			auto c = storage->get_chunk(make_vec<size_t>(i, 0, 0));
 
 			if (c && c->is_explicit()) {
+
+				offset[0] = cont_count;
+				cont_count++;
+				offset[1] = 0;
+				fspace2.selectHyperslab(H5S_SELECT_SET, dims2, offset);
+
 				continuous_voxel_storage<bit_t>* convox = (continuous_voxel_storage<bit_t>*)c;
 				auto d = convox->data();
+				//std::cout << convox->size();
 
 				for (int j = 0; j < convox->size(); j++) {
 					auto vd = convox->data()[j];
+					// consider using boost::dynamic_bitset
 					std::bitset<8> b(convox->data()[j]);
-
-					/*std::cout << b<<std::endl;*/
-
-				/*	for (int k = 0; k < 8; k++) {
-						std::cout << b[k];
-
-					}*/
-
-					std::cout << (int)convox->data()[j] << std::endl;
+			
 					for (int k = 0; k < 8; k++) {
-						int bitmask = 1 << k;
-						int masked = vd & bitmask;
-						int voxbit = masked >> vd;
-						std::cout << voxbit;
+						bits_container.push_back(b[k]);
+					
 					}
-
 				}
 
-				if (c && c->is_constant()) {
-					std::cout << "Constant handling to implement." << std::endl;
 
-				}
-				else {
-					std::cout << "Plane handling to implement." << std::endl;
+				dataset.write(bits_container.data(), H5::PredType::NATIVE_INT, mspace2, fspace2);
+			}
 
-				}
+			if (c && c->is_constant()) {
+				std::cout << "Constant handling to implement." << std::endl;
+
+			}
+			else {
+				std::cout << "Plane handling to implement." << std::endl;
+
+			}
+
+
 			}
 		}
-	std:cout << std::endl;
-	}
+
+
+	
+	
 
 
 };
