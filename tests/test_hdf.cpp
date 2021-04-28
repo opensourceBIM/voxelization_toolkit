@@ -23,9 +23,21 @@ TEST(HdfFileName, HDF) {
 	auto vox = voxelizer(x, storage2);
 	vox.Convert();
 
+
+	auto storage = new chunked_voxel_storage<bit_t>(0., 0., 0., 0.1, 200, 150, 10, 32);
+
+	{
+		BRepBuilderAPI_MakePolygon mp(gp_Pnt(1, 1, 0), gp_Pnt(16, 1, 0), gp_Pnt(16, 9.8, 0), gp_Pnt(1, 9.8, 0), true);
+		BRepBuilderAPI_MakeFace mf(mp.Wire());
+		TopoDS_Face face = mf.Face();
+
+		auto vox = voxelizer(face, storage);
+		vox.Convert();
+	}
+
 	hdf_writer writer; 
 	writer.SetVoxels(storage2);
-	writer.Write("voxels.h5");
+	writer.Write("voxels2.h5");
 
 	std::ofstream fs("voxobj.obj");
 	obj_export_helper oeh{ fs };
