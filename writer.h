@@ -66,12 +66,19 @@ public:
 
 		chunked_voxel_storage<bit_t>* storage = (chunked_voxel_storage<bit_t>*)voxels_;
 
+		std::cout<<storage->num_chunks().get(0)<<std::endl;
+		std::cout << storage->num_chunks().get(1) << std::endl;
+		std::cout << storage->num_chunks().get(2) << std::endl;
+
+		std::cout << storage->chunk_size() << std::endl; 
+
 		int continuous_count = 0;
 		int planar_count = 0;
 		int constant_count = 0;
 
 		int col_n = 0;
 
+		
 		for (int i = 0; i < storage->num_chunks().get(0); i++) {
 			auto chunk = storage->get_chunk(make_vec<size_t>(i, 0, 0));
 			
@@ -95,30 +102,38 @@ public:
 			}
 		}
 
-
 		int chunk_stream = storage->chunk_size() * storage->voxel_size();
 
 		std::vector<int> bits_container;
 
 		const H5std_string FILE_NAME(fnc);
 		const H5std_string DATASET_NAME("continuous_chunks");
-		const int      NX = continuous_count;
-		const int      NY = col_n; 
-		const int      RANK = 2;
+		
+		const int      NC = continuous_count;
+		const int      NX = storage->num_chunks().get(0);
+		const int      NY = storage->num_chunks().get(1);
+		const int	   NZ = storage->num_chunks().get(2);
+
+		const int      RANK = 4;
 		H5::H5File file(FILE_NAME, H5F_ACC_TRUNC);
 
-		hsize_t     dimsf[2];
-		dimsf[0] = NX;
-		dimsf[1] = NY;
+		hsize_t     dimsf[4];
+		dimsf[0] = NC;
+		dimsf[1] = NX;
+		dimsf[2] = NY;
+		dimsf[3] = NZ;
+
 		H5::DataSpace dataspace(RANK, dimsf);
 		H5::IntType datatype(H5::PredType::NATIVE_INT);
 		datatype.setOrder(H5T_ORDER_LE);
 		H5::DataSet dataset = file.createDataSet(DATASET_NAME, datatype, dataspace);
 
 		int column_number = col_n;
-		hsize_t     offset[2];
+		hsize_t     offset[4];
 		offset[0] = 0;
 		offset[1] = 0;
+		offset[2] = 0;
+		offset[3] = 0;
 
 		hsize_t     slab_dimsf[2] = { 1, col_n  };
 		dataspace.selectHyperslab(H5S_SELECT_SET, slab_dimsf, offset);
@@ -134,21 +149,21 @@ public:
 
 			if (c && c->is_explicit()) {
 
-				offset[0] = cont_count;
+				/*offset[0] = cont_count;
 				cont_count++;
 				offset[1] = 0;
-				dataspace.selectHyperslab(H5S_SELECT_SET, slab_dimsf, offset);
+				dataspace.selectHyperslab(H5S_SELECT_SET, slab_dimsf, offset);*/
 
 				continuous_voxel_storage<bit_t>* convox = (continuous_voxel_storage<bit_t>*)c;
 				auto d = convox->data();
 			
-				for (int j = 0; j < convox->size(); j++) {
-					auto vd = convox->data()[j];
+				for (int v = 0; v < convox->size(); v++) {
+					auto vd = convox->data()[v];
 					// consider using boost::dynamic_bitset
-					std::bitset<8> b(convox->data()[j]);
+					std::bitset<8> b(convox->data()[v]);
 			
-					for (int k = 0; k < 8; k++) {
-						bits_container.push_back(b[k]);
+					for (int l = 0;  l< 8; l++) {
+						bits_container.push_back(b[l]);
 					
 					}
 				}
