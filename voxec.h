@@ -601,6 +601,33 @@ public:
 	}
 };
 
+class op_print_values : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" } };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		auto voxels = (regular_voxel_storage*) scope.get_value<abstract_voxel_storage*>("input");
+		uint32_t v;
+		std::set<uint32_t> vs;
+		for (auto& ijk : *voxels) {
+			voxels->Get(ijk, &v);
+			vs.insert(v);
+		}
+		bool first = true;
+		for (auto& x : vs) {
+			if (!first) {
+				std::cout << " ";
+			}
+			first = false;
+			std::cout << x;
+		}
+		symbol_value vv;
+		return vv;
+	}
+};
+
 class op_describe_components : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
