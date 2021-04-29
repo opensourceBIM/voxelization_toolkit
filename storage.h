@@ -1150,7 +1150,7 @@ protected:
 			// std::cout << "boolean operatoin of chunk " << ijk.format() << " " << css[Sa] << " " << css[Sb] << std::endl;  
 
 			if (mode == OP_UNION) {
-				if ((Sa == CK_FULL || Sb == CK_FULL) && get_chunk(n, ijk) == nullptr && b->value_bits() == 1) {
+				if (Sb == CK_FULL && get_chunk(n, ijk) == nullptr && b->value_bits() == 1) {
 					n->create_constant((ijk - left).as<size_t>(), 1U);
 					continue;
 				} else if (Sb == CK_EMPTY) {
@@ -1158,7 +1158,7 @@ protected:
 						set_chunk(n, ijk, a->copy(n->next_slot()));
 					}
 					continue;
-				} else if (Sa == CK_EMPTY && n->value_bits() == b->value_bits()) {
+				} else if ((Sa == CK_EMPTY || Sb == CK_FULL) && n->value_bits() == b->value_bits()) {
 					// When copying from b we need to check whether datatypes match
 					set_chunk(n, ijk, b->copy(n->next_slot()));
 					continue;
