@@ -9,6 +9,27 @@
 #include <fstream>
 
 
+#define BEGIN_LOOP(i0, i1, j0, j1, k0, k1) {\
+	vec_n<3, typename std::remove_reference<decltype(i0)>::type> ijk;\
+	for (ijk.get(0) = i0; ijk.get(0) < i1; ++ijk.get(0)) {\
+		for (ijk.get(1) = j0; ijk.get(1) < j1; ++ijk.get(1)) {\
+			for (ijk.get(2) = k0; ijk.get(2) < k1; ++ijk.get(2)) {
+
+#define BEGIN_LOOP_I(i0, i1, j0, j1, k0, k1) {\
+	vec_n<3, typename std::remove_reference<decltype(i0)>::type> ijk;\
+	for (ijk.get(0) = i0; ijk.get(0) <= i1; ++ijk.get(0)) {\
+		for (ijk.get(1) = j0; ijk.get(1) <= j1; ++ijk.get(1)) {\
+			for (ijk.get(2) = k0; ijk.get(2) <= k1; ++ijk.get(2)) {
+
+#define BEGIN_LOOP2(v0, v1) BEGIN_LOOP(v0.template get<0>(), v1.template get<0>(), v0.template get<1>(), v1.template get<1>(), v0.template get<2>(), v1.template get<2>())
+
+#define BEGIN_LOOP_I2(v0, v1) BEGIN_LOOP_I(v0.template get<0>(), v1.template get<0>(), v0.template get<1>(), v1.template get<1>(), v0.template get<2>(), v1.template get<2>())
+
+#define BEGIN_LOOP_ZERO_2(v1) BEGIN_LOOP2(make_vec<decltype(v1)::element_type>((decltype(v1)::element_type)0, (decltype(v1)::element_type)0, (decltype(v1)::element_type)0), v1)
+
+#define END_LOOP }}}}
+
+
 class abstract_writer {
 
 public:
@@ -58,7 +79,6 @@ public:
 };
 
 
-
 class hdf_writer :public abstract_writer {
 
 public:
@@ -66,28 +86,21 @@ public:
 
 		chunked_voxel_storage<bit_t>* storage = (chunked_voxel_storage<bit_t>*)voxels_;
 
-		std::cout<<storage->num_chunks().get(0)<<std::endl;
-		std::cout << storage->num_chunks().get(1) << std::endl;
-		std::cout << storage->num_chunks().get(2) << std::endl;
-
-		std::cout << storage->chunk_size() << std::endl; 
-
 		int continuous_count = 0;
 		int planar_count = 0;
 		int constant_count = 0;
 
 		int col_n = 0;
 
-		
 		for (int i = 0; i < storage->num_chunks().get(0); i++) {
 			auto chunk = storage->get_chunk(make_vec<size_t>(i, 0, 0));
-			
+
 			if (chunk && chunk->is_explicit()) {
 				if (col_n == 0) {
 					continuous_voxel_storage<bit_t>* casted = (continuous_voxel_storage<bit_t>*)chunk;
 					col_n = casted->size() * casted->value_bits() * 8;
 				}
-			
+
 				continuous_count++;
 
 			}
@@ -102,17 +115,14 @@ public:
 			}
 		}
 
-		int chunk_stream = storage->chunk_size() * storage->voxel_size();
-
-		std::vector<int> bits_container;
 
 		const H5std_string FILE_NAME(fnc);
 		const H5std_string DATASET_NAME("continuous_chunks");
-		
+
 		const int      NC = continuous_count;
-		const int      NX = storage->num_chunks().get(0);
-		const int      NY = storage->num_chunks().get(1);
-		const int	   NZ = storage->num_chunks().get(2);
+		const int      NX = storage->chunk_size();
+		const int      NY = storage->chunk_size();
+		const int	   NZ = storage->chunk_size();
 
 		const int      RANK = 4;
 		H5::H5File file(FILE_NAME, H5F_ACC_TRUNC);
@@ -128,65 +138,46 @@ public:
 		datatype.setOrder(H5T_ORDER_LE);
 		H5::DataSet dataset = file.createDataSet(DATASET_NAME, datatype, dataspace);
 
-		int column_number = col_n;
-		hsize_t     offset[4];
-		offset[0] = 0;
-		offset[1] = 0;
-		offset[2] = 0;
-		offset[3] = 0;
-
-		hsize_t     slab_dimsf[2] = { 1, col_n  };
-		dataspace.selectHyperslab(H5S_SELECT_SET, slab_dimsf, offset);
-		H5::DataSpace mspace2(RANK, slab_dimsf);
-
-
 		int cont_count = 0;
 
+		std::vector<int> bits_container;
+
 		for (int i = 0; i < storage->num_chunks().get(0); i++) {
+			for (int j = 0; j < storage->num_chunks().get(1); j++) {
+				for (int k = 0; k < storage->num_chunks().get(2); k++) {
+					auto c = storage->get_chunk(make_vec<size_t>(i, j, k));
+					if (c && c->is_explicit()) {
 
-			std::vector<int> bits_container;
-			auto c = storage->get_chunk(make_vec<size_t>(i, 0, 0));
+						continuous_voxel_storage<bit_t>* convox = (continuous_voxel_storage<bit_t>*)c;
+						size_t i0, j0, k0, i1, j1, k1;
+						i0 = 0;
+						j0 = 0;
+						k0 = 0;
+						convox->extents().tie(i1, j1, k1);
 
-			if (c && c->is_explicit()) {
+						BEGIN_LOOP_ZERO_2(make_vec<size_t>(i1, j1, k1))
+							bits_container.push_back(convox->Get(ijk));
+						END_LOOP;
+					}
 
-				/*offset[0] = cont_count;
-				cont_count++;
-				offset[1] = 0;
-				dataspace.selectHyperslab(H5S_SELECT_SET, slab_dimsf, offset);*/
+					if (c && c->is_constant()) {
+						std::cout << "Constant handling to implement." << std::endl;
+					}
+					else {
+						std::cout << "Plane handling to implement." << std::endl;
 
-				continuous_voxel_storage<bit_t>* convox = (continuous_voxel_storage<bit_t>*)c;
-				auto d = convox->data();
-			
-				for (int v = 0; v < convox->size(); v++) {
-					auto vd = convox->data()[v];
-					// consider using boost::dynamic_bitset
-					std::bitset<8> b(convox->data()[v]);
-			
-					for (int l = 0;  l< 8; l++) {
-						bits_container.push_back(b[l]);
-					
 					}
 				}
-
-				dataset.write(bits_container.data(), H5::PredType::NATIVE_INT, mspace2, dataspace);
-			}
-
-			if (c && c->is_constant()) {
-				std::cout << "Constant handling to implement." << std::endl;
-
-			}
-			else {
-				std::cout << "Plane handling to implement." << std::endl;
-
-			}
-
-
 			}
 		}
 
+		dataset.write(bits_container.data(), H5::PredType::NATIVE_INT);
 
-	};
-	
+	}
+
+
+};
+
 
 
 
