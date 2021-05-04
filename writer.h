@@ -160,12 +160,14 @@ public:
 						END_LOOP;
 					}
 
-					if (c && c->is_constant()) {
+					if (c && c->is_constant() || c==nullptr ){
 						std::cout << "Constant handling to implement." << std::endl;
 					}
 					else {
 						std::cout << "Plane handling to implement." << std::endl;
-
+						planar_voxel_storage<bit_t>* planvox = (planar_voxel_storage<bit_t>*)c;
+						continuous_voxel_storage<bit_t>* continuoused = planvox->make_explicit();
+						
 					}
 				}
 			}
