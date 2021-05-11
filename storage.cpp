@@ -108,7 +108,8 @@ void regular_voxel_storage::obj_export(obj_export_helper& obj, bool with_compone
 	std::map< std::array<long long, 2>, std::vector< std::pair<std::array<size_t, 3>, size_t> > > triangles;
 
 	const double d = voxel_size();
-	for (auto it = begin(); it != end(); ++it) {
+	auto end_ = end();
+	for (auto it = begin(); it != end_; ++it) {
 		it.value(V1);
 		for (size_t f = 0; f < 6; ++f) {
 			vec_n<3, long> n;
