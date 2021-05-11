@@ -88,6 +88,10 @@ public:
 		using std::runtime_error::runtime_error;
 	};
 
+	class value_error : public std::runtime_error {
+		using std::runtime_error::runtime_error;
+	};
+
 	template <typename T>
 	const T& get_value_or(const std::string& symbol, const T& default_value) const {
 		auto it = find(symbol);
@@ -101,15 +105,19 @@ public:
 	const T& get_value(const std::string& symbol) const {
 		auto it = find(symbol);
 		if (it == end()) {
-			throw not_in_scope("Not in scope " + symbol);
+			throw not_in_scope("Undefined variable " + symbol);
 		}
-		return get_value_<T>(it->second);
+		try {
+			return get_value_<T>(it->second);
+		} catch (boost::bad_get&) {
+			throw value_error(std::string("Expected ") + typeid(T).name() + " got type index " + std::to_string(it->second.which()));
+		}
 	}
 
 	const int get_length(const std::string& symbol) const {
 		auto it = find(symbol);
 		if (it == end()) {
-			throw not_in_scope("Not in scope " + symbol);
+			throw not_in_scope("Undefined variable " + symbol);
 		}
 		try {
 			return get_value_<int>(it->second);
@@ -1943,6 +1951,6 @@ public:
 	}
 };
 
-scope_map run(const std::vector<statement_type>& statements, double size, size_t threads = 0, size_t chunk_size = 128, bool with_mesh = false, bool with_progress_on_cout = false);
+scope_map run(const std::vector<statement_or_function_def>& statements, double size, size_t threads = 0, size_t chunk_size = 128, bool with_mesh = false, bool with_progress_on_cout = false);
 
 #endif
