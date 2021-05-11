@@ -29,7 +29,8 @@ TEST(Voxelfile, Parser) {
 	auto f = first;
 
 	voxelfile_parser<decltype(first)> parser;
-	std::vector<statement_type> tree;
+	
+	std::vector<statement_or_function_def> tree;
 	phrase_parse(first, last, parser, blank, tree);
 
 	ASSERT_EQ(std::distance(f, first), size);

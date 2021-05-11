@@ -113,7 +113,11 @@ std::ostream& operator<<(std::ostream& a, const function_call_type& b) {
 }
 
 std::ostream& operator<<(std::ostream& a, const statement_type& b) {
-	a << boost::fusion::at_c<0>(b) << " = " << boost::fusion::at_c<1>(b);
+	std::string assignee = boost::fusion::at_c<0>(b);
+	if (assignee.size()) {
+		a << assignee << " = ";
+	}
+	a << boost::fusion::at_c<1>(b);
 	return a;
 }
 
@@ -157,33 +161,72 @@ public:
 	void operator()(abstract_voxel_storage* const v) { }
 };
 
+template <typename T, typename U, typename Ts, typename Us>
+class assigner {
+	Ts& ts_;
+	Us& us_;
 
-scope_map run(const std::vector<statement_type>& statements, double size, size_t threads, size_t chunk_size, bool with_mesh, bool with_progress_on_cout) {
-	scope_map context;
+public:
+	assigner(Ts& ts, Us& us)
+		: ts_(ts)
+		, us_(us)
+	{}
 
-	std::unique_ptr<progress_bar> pb;
-	std::unique_ptr<application_progress> ap;
-	std::function<void(float)> pfn = [&pb](float f) { (*pb)(f); };
-	std::function<void(float)> apfn = [&ap](float f) { (*ap)(f); };
-	if (with_progress_on_cout) {
-		pb = std::make_unique<progress_bar>(std::cout, progress_bar::DOTS);
+	void operator()(const T& t) {
+		ts_.push_back(t);
 	}
-	else {
-		pb = std::make_unique<progress_bar>(std::cout);
+
+	void operator()(const U& u) {
+		// @nb overwritten on purpose
+		us_[u.name()] = u;
+	}
+};
+
+void map_arguments(const std::vector<std::string> parameters, scope_map& context, const std::vector<function_arg_type>& args) {
+
+	// @todo revisit the similarities with voxel_operation_runner
+
+	bool has_keyword = false;
+	std::map<std::string, function_arg_value_type> function_values;
+	size_t position = 0;
+
+	for (auto& arg : args) {
+		if (has_keyword && !arg.has_keyword()) {
+			throw std::runtime_error("Keyword argument supplied after positional argument");
+		}
+		has_keyword = arg.has_keyword();
+		if (has_keyword) {
+			if (function_values.find(*arg.keyword()) != function_values.end()) {
+				throw std::runtime_error("Value for " + *arg.keyword() + "supplied multiple times");
+			}
+			function_values[*arg.keyword()] = arg.value();
+		}
+		else {
+			if (position >= parameters.size()) {
+				throw std::runtime_error("Too many positional arguments");
+			}
+			function_values[parameters[position]] = arg.value();
+		}
+		position++;
 	}
 
-	std::vector<float> estimates(statements.size(), 1.f);
-	ap = std::make_unique<application_progress>(estimates, pfn);
+	for (auto& pname : parameters) {
+		if (function_values.find(pname) == function_values.end()) {
+			throw std::runtime_error("No value supplied for " + pname);
+		}
 
-	function_arg_value_type threads_ = (int)threads;
-	context["THREADS"] = threads_;
+		symbol_value_assignment_visitor v(&context[pname], "*", context);
+		function_values[pname].apply_visitor(v);
+	}
 
-	function_arg_value_type chunk_size_ = (int)chunk_size;
-	context["CHUNKSIZE"] = chunk_size_;
+	for (auto& arg : args) {
+		if (arg.has_keyword() && context.find(*arg.keyword()) == context.end()) {
+			throw std::runtime_error("Keyword argument " + *arg.keyword() + " unused");
+		}
+	}
+}
 
-	function_arg_value_type vsize_ = size;
-	context["VOXELSIZE"] = vsize_;
-
+void execute_statements(scope_map& context, const std::map<std::string, function_def_type>& functions, const std::vector<statement_type>& statements, bool silent, std::unique_ptr<application_progress>& ap, std::function<void(float)> apfn, std::string prefix="") {
 	size_t n = 0;
 
 	long HAS_VOXELS = boost::mpl::distance<
@@ -193,44 +236,63 @@ scope_map run(const std::vector<statement_type>& statements, double size, size_t
 
 	for (auto it = statements.begin(); it != statements.end(); ++it) {
 		auto& st = *it;
-		const bool is_last = it == --statements.end();
+		// const bool is_last = it == --statements.end();
 
 		auto statement_string = boost::lexical_cast<std::string>(st);
 
-		json_logger::message(json_logger::LOG_NOTICE, "executing {statement}", { 
+		json_logger::message(json_logger::LOG_NOTICE, "executing {statement}", {
 			{"statement", {{"text", statement_string}}}
-		});
+			});
 
-		voxel_operation_runner op(st);
-		op.application_progress_callback = apfn;
-		op.silent = with_progress_on_cout;
-		context[st.assignee()] = op.run(st, context);
+		auto fnit = functions.find(st.call().name());
+		if (fnit != functions.end()) {
+			auto context_copy = context;
+			map_arguments(
+				fnit->second.args(),
+				context_copy,
+				st.call().args()
+			);
+			std::unique_ptr<application_progress> ap_unused;
+			execute_statements(
+				context_copy,
+				functions,
+				fnit->second.statements(),
+				silent,
+				ap_unused,
+				[](float) {},
+				boost::lexical_cast<std::string>(n) + "."
+			);
+			if (context_copy.find(fnit->second.result_identifier()) == context_copy.end()) {
+				throw scope_map::not_in_scope("Undefined variable " + fnit->second.result_identifier());
+			}
+			context[st.assignee()] = context_copy[fnit->second.result_identifier()];
+		} else {
+			voxel_operation_runner op(st);
+			op.application_progress_callback = apfn;
+			op.silent = silent;
+			context[st.assignee()] = op.run(st, context);
+		}	
 
 		if (context[st.assignee()].which() == HAS_VOXELS) {
 			auto voxels = boost::get<abstract_voxel_storage*>(context[st.assignee()]);
 			voxel_writer w;
 			w.SetVoxels(voxels);
-			w.Write(boost::lexical_cast<std::string>(n) + ".vox");
+			w.Write(prefix + boost::lexical_cast<std::string>(n) + ".vox");
 
+			/*
+			// @nb automatic meshing of last operand output no longer supported
 			if (with_mesh && is_last) {
 				std::string ofn = boost::lexical_cast<std::string>(n) + ".obj";
 				std::ofstream ofs(ofn.c_str());
 				((regular_voxel_storage*)voxels)->obj_export(ofs);
 			}
+			*/
 
 			if (dynamic_cast<abstract_chunked_voxel_storage*>(voxels)) {
-				auto left = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->grid_offset();
-				auto nc = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->num_chunks();
-				auto right = (left + nc.as<long>()) - (decltype(left)::element_type)1;
-				auto sz = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->voxel_size();
-				auto szl = (long)dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->chunk_size();
-				auto left_world = ((voxels->bounds()[0].as<long>() + left * szl).as<double>() * sz);
-				auto right_world = ((voxels->bounds()[1].as<long>() + left * szl).as<double>() * sz);
-				
 				json_logger::message(json_logger::LOG_NOTICE, "storing {value} in {variable}", {
 					{"variable", {{"name", st.assignee()}}},
 					{"value", dump_info(voxels)},
-				});
+					});
 			}
 		}
 
@@ -245,12 +307,61 @@ scope_map run(const std::vector<statement_type>& statements, double size, size_t
 		log_visitor v;
 		context[statements.back().assignee()].apply_visitor(v);
 
-		json_logger::message(json_logger::LOG_NOTICE, "scripted finished with {variable}", {
+		std::string msg = prefix.empty()
+			? std::string("script finished with {variable}")
+			: std::string("function finished with {variable}");
+
+		json_logger::message(json_logger::LOG_NOTICE, msg, {
 				{"variable", {{"value", v.value()}}},
-		});
-	} else {
+			});
+	}
+	else {
 		json_logger::message(json_logger::LOG_WARNING, "no operations in input", {});
 	}
+}
+
+scope_map run(const std::vector<statement_or_function_def>& statements_and_functions, double size, size_t threads, size_t chunk_size, bool with_mesh, bool with_progress_on_cout) {
+	scope_map context;
+
+	std::unique_ptr<progress_bar> pb;
+	std::unique_ptr<application_progress> ap;
+	std::function<void(float)> pfn = [&pb](float f) { (*pb)(f); };
+	std::function<void(float)> apfn = [&ap](float f) { (*ap)(f); };
+	if (with_progress_on_cout) {
+		pb = std::make_unique<progress_bar>(std::cout, progress_bar::DOTS);
+	}
+	else {
+		pb = std::make_unique<progress_bar>(std::cout);
+	}
+
+	// split into statements and function calls
+	std::vector<statement_type> statements;
+	std::map<std::string, function_def_type> functions;
+
+	assigner<
+		statement_type,
+		function_def_type,
+		decltype(statements),
+		decltype(functions)> vis(
+			statements,
+			functions
+		);
+
+	std::for_each(statements_and_functions.begin(), statements_and_functions.end(), boost::apply_visitor(vis));
+
+	std::vector<float> estimates(statements.size(), 1.f);
+	ap = std::make_unique<application_progress>(estimates, pfn);
+
+	function_arg_value_type threads_ = (int)threads;
+	context["THREADS"] = threads_;
+
+	function_arg_value_type chunk_size_ = (int)chunk_size;
+	context["CHUNKSIZE"] = chunk_size_;
+
+	function_arg_value_type vsize_ = size;
+	context["VOXELSIZE"] = vsize_;
+
+	execute_statements(context, functions, statements, with_progress_on_cout, ap, apfn);
 
 	return context;
 }
