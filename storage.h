@@ -140,6 +140,7 @@ public:
 	virtual abstract_voxel_storage* empty_copy() const = 0;
 	virtual abstract_voxel_storage* empty_copy_as(voxel_desc_t* fmt) const = 0;
 	virtual abstract_voxel_storage* copy(void* location = nullptr) const = 0;
+	virtual abstract_voxel_storage* copy_as(voxel_desc_t* fmt, void* location = nullptr) const = 0;
 
 	virtual size_t ray_intersect_n(const vec_n<3, size_t>& pos, const vec_n<3, size_t>& dir) {
 		// @todo implement more efficiently for subtypes
@@ -393,6 +394,20 @@ public:
 		return c;
 	}
 
+	abstract_voxel_storage* copy_as(voxel_desc_t* fmt, void* location = nullptr) const {
+		if (fmt->get_size_in_bits() == 1) {
+			continuous_voxel_storage<bit_t>* c = new continuous_voxel_storage<bit_t>(ox_, oy_, oz_, d_, dimx_, dimy_, dimz_, location);
+			BEGIN_LOOP(size_t(0), dimx_, 0U, dimy_, 0U, dimz_)
+				if (Get(ijk)) {
+					c->Set(ijk);
+				}
+			END_LOOP;
+			return c;
+		} else {
+			throw std::runtime_error("Not implemented");
+		}
+	}
+
 	abstract_voxel_storage* empty_copy() const {
 		// @todo is this safe?
 		return nullptr;
@@ -541,9 +556,20 @@ public:
 	}
 
 	void boolean_intersection_inplace(const abstract_voxel_storage* other_) {
-		const continuous_voxel_storage<T>* other = (const continuous_voxel_storage<T>*) other_;
-		for (size_t i = 0; i < size(); ++i) {
-			data_[i] &= other->data_[i];
+		if (this->value_bits() == other_->value_bits()) {
+			const continuous_voxel_storage<T>* other = (const continuous_voxel_storage<T>*) other_;
+			for (size_t i = 0; i < size(); ++i) {
+				data_[i] &= other->data_[i];
+			}
+		} else if (this->value_bits() == 32 && other_->value_bits() == 1) {
+			uint32_t zero = 0;
+			BEGIN_LOOP(size_t(0), dimx_, 0U, dimy_, 0U, dimz_)
+				if (!other_->Get(ijk)) {
+					Set(ijk, &zero);
+				}
+			END_LOOP;
+		} else {
+			throw std::runtime_error("Not implemented");
 		}
 		calculate_count_();
 		calculate_bounds_();
@@ -615,6 +641,19 @@ public:
 			c->add(*it);
 		}
 		return c;
+	}
+
+	abstract_voxel_storage* copy_as(voxel_desc_t* fmt, void* location = nullptr) const {
+		if (fmt->get_size_in_bits() == 1) {
+			planar_voxel_storage* c = new planar_voxel_storage<bit_t>(ox_, oy_, oz_, d_, dimx_, dimy_, dimz_, axis_, *offsets_.begin());
+			for (auto it = offsets_.begin(); it != offsets_.end(); ++it) {
+				c->add(*it);
+			}
+			return c;
+		}
+		else {
+			throw std::runtime_error("Not implemented");
+		}
 	}
 
 	abstract_voxel_storage* empty_copy() const {
@@ -775,6 +814,14 @@ public:
 
 	abstract_voxel_storage* copy(void* location = nullptr) const {
 		return new constant_voxel_storage(ox_, oy_, oz_, d_, dimx_, dimy_, dimz_, value_);
+	}
+
+	abstract_voxel_storage* copy_as(voxel_desc_t* fmt, void* location = nullptr) const {
+		if (fmt->get_size_in_bits() == 1) {
+			return new constant_voxel_storage(ox_, oy_, oz_, d_, dimx_, dimy_, dimz_, value_ > 1 ? 1 : value_);
+		} else {
+			throw std::runtime_error("Not implemented");
+		}
 	}
 
 	abstract_voxel_storage* empty_copy() const {
@@ -1103,7 +1150,7 @@ protected:
 			// std::cout << "boolean operatoin of chunk " << ijk.format() << " " << css[Sa] << " " << css[Sb] << std::endl;  
 
 			if (mode == OP_UNION) {
-				if ((Sa == CK_FULL || Sb == CK_FULL) && get_chunk(n, ijk) == nullptr) {
+				if (Sb == CK_FULL && get_chunk(n, ijk) == nullptr && b->value_bits() == 1) {
 					n->create_constant((ijk - left).as<size_t>(), 1U);
 					continue;
 				} else if (Sb == CK_EMPTY) {
@@ -1111,12 +1158,16 @@ protected:
 						set_chunk(n, ijk, a->copy(n->next_slot()));
 					}
 					continue;
-				} else if (Sa == CK_EMPTY) {
+				} else if ((Sa == CK_EMPTY || Sb == CK_FULL) && n->value_bits() == b->value_bits()) {
+					// When copying from b we need to check whether datatypes match
 					set_chunk(n, ijk, b->copy(n->next_slot()));
 					continue;
 				}
 			} else if (mode == OP_SUBTRACTION) {
-				if (Sa == CK_EMPTY || Sb == CK_FULL) {
+				if (Sa == CK_EMPTY) {
+					continue;
+				} else if (Sb == CK_FULL) {
+					set_chunk(n, ijk, nullptr);
 					continue;
 				} else if (Sb == CK_EMPTY) {
 					if (!inplace) {
@@ -1125,14 +1176,17 @@ protected:
 					continue;
 				}
 			} else if (mode == OP_INTERSECTION) {
-				if (Sa == CK_EMPTY || Sb == CK_EMPTY) {
+				if (Sa == CK_EMPTY) {
+					continue;
+				} else if (Sb == CK_EMPTY) {
+					set_chunk(n, ijk, nullptr);
 					continue;
 				} else if (Sb == CK_FULL) {
 					if (!inplace) {
 						set_chunk(n, ijk, a->copy(n->next_slot()));
 					}
 					continue;
-				} else if (Sa == CK_FULL) {
+				} else if (Sa == CK_FULL && n->value_bits() == b->value_bits()) {
 					set_chunk(n, ijk, b->copy(n->next_slot()));
 					continue;
 				}
@@ -1144,7 +1198,12 @@ protected:
 				release(get_chunk(this, ijk));
 			}
 
-			abstract_voxel_storage* a_explicit = a->is_explicit() ? (inplace ? a : a->copy(n->next_slot())) : a->make_explicit(n->next_slot());
+			abstract_voxel_storage* a_explicit;
+			if (a == nullptr) {
+				a_explicit = a = n->get_or_create_chunk(ijk.as<size_t>());
+			} else {
+				a_explicit = a->is_explicit() ? (inplace ? a : a->copy(n->next_slot())) : a->make_explicit(n->next_slot());
+			}
 			// b is temporary, so not assigned next_slot
 			abstract_voxel_storage* b_temp = b->is_explicit() ? nullptr : b->make_explicit();
 			abstract_voxel_storage* b_forced_explicit = b_temp ? b_temp : b;
@@ -1579,6 +1638,19 @@ public:
 		return c;
 	}
 
+	abstract_voxel_storage* copy_as(voxel_desc_t* fmt, void* location = nullptr) const {
+		auto nc = num_chunks();
+		memory_mapped_chunked_voxel_storage* c = new memory_mapped_chunked_voxel_storage(grid_offset_, d_, chunk_size_, nc, factory::mmap_filename());
+
+		BEGIN_LOOP(size_t(0), nchunksx_, 0U, nchunksy_, 0U, nchunksz_)
+			if (get_chunk(ijk) != nullptr) {
+				c->set_chunk(ijk, get_chunk(ijk)->copy(c->next_slot()));
+			}
+		END_LOOP;
+
+		return c;
+	}
+
 	abstract_voxel_storage* get_or_create_chunk(const vec_n<3, size_t>& ijk) {
 		const size_t& i = ijk.get<0>();
 		const size_t& j = ijk.get<1>();
@@ -1681,6 +1753,26 @@ public:
 		END_LOOP;
 
 		return c;
+	}
+
+	abstract_voxel_storage* copy_as(voxel_desc_t* fmt, void* location = nullptr) const {
+		if (fmt->get_size_in_bits() == 1) {
+			
+			auto nc = num_chunks();
+			chunked_voxel_storage<bit_t>* c = new chunked_voxel_storage<bit_t>(grid_offset_, d_, chunk_size_, nc);
+
+			BEGIN_LOOP(size_t(0), nchunksx_, 0U, nchunksy_, 0U, nchunksz_)
+				if (get_chunk(ijk) != nullptr) {
+					c->set_chunk(ijk, get_chunk(ijk)->copy_as(fmt));
+				}
+			END_LOOP;
+
+			return c;
+
+		}
+		else {
+			throw std::runtime_error("Not implemented");
+		}
 	}
 
 	abstract_voxel_storage* get_or_create_chunk(const vec_n<3, size_t>& ijk) {
@@ -1980,6 +2072,7 @@ public:
 	virtual abstract_voxel_storage* copy(void* location = nullptr) const { return base_->copy(); }
 
 	virtual abstract_voxel_storage* empty_copy_as(voxel_desc_t* fmt) const { throw std::runtime_error("Not implemented"); }
+	virtual abstract_voxel_storage* copy_as(voxel_desc_t* fmt, void* location = nullptr) const { throw std::runtime_error("Not implemented"); }
 
 	virtual long long unsigned int count() const {
 		unsigned long long n = 0;

@@ -39,6 +39,12 @@ struct filtered_files_t {};
 #include <BRepBndLib.hxx>
 #include <BRep_Builder.hxx>
 #include <BRepTools.hxx>
+#include <ProjLib.hxx>
+#include <TopExp_Explorer.hxx>
+#include <BRepPrimAPI_MakeBox.hxx>
+#include <BRepBuilderAPI_MakeFace.hxx>
+#include <BRepAlgoAPI_Common.hxx>
+#include <BRepMesh_IncrementalMesh.hxx>
 
 #include <set>
 #include <map>
@@ -55,6 +61,9 @@ struct filtered_files_t {};
 #else
 #define DIRSEP "/"
 #endif
+
+size_t get_padding();
+void set_padding(size_t);
 
 typedef boost::variant<boost::blank, filtered_files_t, geometry_collection_t*, abstract_voxel_storage*, function_arg_value_type> symbol_value;
 
@@ -79,6 +88,10 @@ public:
 		using std::runtime_error::runtime_error;
 	};
 
+	class value_error : public std::runtime_error {
+		using std::runtime_error::runtime_error;
+	};
+
 	template <typename T>
 	const T& get_value_or(const std::string& symbol, const T& default_value) const {
 		auto it = find(symbol);
@@ -92,15 +105,19 @@ public:
 	const T& get_value(const std::string& symbol) const {
 		auto it = find(symbol);
 		if (it == end()) {
-			throw not_in_scope("Not in scope " + symbol);
+			throw not_in_scope("Undefined variable " + symbol);
 		}
-		return get_value_<T>(it->second);
+		try {
+			return get_value_<T>(it->second);
+		} catch (boost::bad_get&) {
+			throw value_error(std::string("Expected ") + typeid(T).name() + " got type index " + std::to_string(it->second.which()));
+		}
 	}
 
 	const int get_length(const std::string& symbol) const {
 		auto it = find(symbol);
 		if (it == end()) {
-			throw not_in_scope("Not in scope " + symbol);
+			throw not_in_scope("Undefined variable " + symbol);
 		}
 		try {
 			return get_value_<int>(it->second);
@@ -151,6 +168,31 @@ public:
 	}
 	virtual ~voxel_operation() {}
 };
+
+namespace {
+	json_logger::meta_data dump_info(abstract_voxel_storage* voxels) {
+		if (dynamic_cast<abstract_chunked_voxel_storage*>(voxels)) {
+			auto csize = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->chunk_size();
+			auto left = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->grid_offset();
+			auto nc = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->num_chunks();
+			auto right = (left + nc.as<long>()) - (decltype(left)::element_type)1;
+			auto sz = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->voxel_size();
+			auto szl = (long)dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->chunk_size();
+			auto left_world = ((voxels->bounds()[0].as<long>() + left * szl).as<double>() * sz);
+			auto right_world = ((voxels->bounds()[1].as<long>() + left * szl).as<double>() * sz);
+
+			return {
+				{"count", (long)voxels->count()},
+				{"grid", left.format() + " - " + right.format()},
+				{"bounds", voxels->bounds()[0].format() + " - " + voxels->bounds()[1].format()},
+				{"world", left_world.format() + " - " + right_world.format()},
+				{"bits", (long)voxels->value_bits()},
+				{"chunk_size", (long) csize}
+			};
+		}
+		return {};
+	}
+}
 
 #ifdef WITH_IFC
 class op_parse_ifc_file : public voxel_operation {
@@ -233,6 +275,14 @@ public:
 	symbol_value invoke(const scope_map& scope) const {
 
 		IfcGeom::entity_filter ef;
+
+		boost::optional<size_t> threads;
+		if (scope.has("THREADS")) {
+			int t = scope.get_value<int>("THREADS");
+			if (t > 1) {
+				threads = (size_t)t;
+			}
+		}
 
 #ifdef IFCOPENSHELL_05
 		auto ifc_roof = IfcSchema::Type::IfcRoof;
@@ -326,12 +376,23 @@ public:
 
 		for (auto ifc_file : ifc_files.files) {
 
-			IfcGeom::Iterator<double> iterator(settings_surface, ifc_file, filters_surface);
+			std::unique_ptr<IfcGeom::Iterator<double>> iterator;
+
+#ifdef IFCOPENSHELL_05
+			iterator.reset(IfcGeom::Iterator<double>(settings_surface, ifc_file, filters_surface));
+#else
+			if (threads) {
+				iterator.reset(new IfcGeom::Iterator<double>(settings_surface, ifc_file, filters_surface, *threads));
+			} else {
+				iterator.reset(new IfcGeom::Iterator<double>(settings_surface, ifc_file, filters_surface));
+			}
+#endif
+			
 			
 			// For debugging geometry creation from IfcOpenShell
 			// Logger::SetOutput(&std::cout, &std::cout);
 
-			if (!iterator.initialize()) {
+			if (!iterator->initialize()) {
 				continue;
 			}
 
@@ -340,7 +401,7 @@ public:
 			int old_progress = -1;
 
 			for (;;) {
-				elem_t* elem = (elem_t*)iterator.get();
+				elem_t* elem = (elem_t*)iterator->get();
 				bool process = true;
 
 				if (boost::to_lower_copy(elem->name()).find("nulpunt") != std::string::npos) {
@@ -391,14 +452,14 @@ public:
 					geometries->push_back(std::make_pair(elem->id(), compound));
 				}
 
-				if (old_progress != iterator.progress()) {
-					old_progress = iterator.progress();
+				if (old_progress != iterator->progress()) {
+					old_progress = iterator->progress();
 					if (application_progress_callback) {
 						(*application_progress_callback)(old_progress / 100.f);
 					}
 				}
 
-				if (!iterator.next()) {
+				if (!iterator->next()) {
 					break;
 				}
 			}
@@ -435,19 +496,17 @@ namespace {
 			BRepBndLib::Add(p.second, global_bounds);
 		}
 
-		const size_t PADDING = 32U;
-
 		global_bounds.Get(x1, y1, z1, x2, y2, z2);
 		nx = (int)ceil((x2 - x1) / vsize);
 		ny = (int)ceil((y2 - y1) / vsize);
 		nz = (int)ceil((z2 - z1) / vsize);
 
-		x1 -= vsize * PADDING;
-		y1 -= vsize * PADDING;
-		z1 -= vsize * PADDING;
-		nx += PADDING * 2;
-		ny += PADDING * 2;
-		nz += PADDING * 2;
+		x1 -= vsize * get_padding();
+		y1 -= vsize * get_padding();
+		z1 -= vsize * get_padding();
+		nx += get_padding() * 2;
+		ny += get_padding() * 2;
+		nz += get_padding() * 2;
 
 		std::unique_ptr<fill_volume_t> method;
 		if (use_volume) {
@@ -457,13 +516,27 @@ namespace {
 		}
 
 		if (std::is_same<V, voxel_uint32_t>::value) {
-			chunked_voxel_storage<voxel_uint32_t>* storage = new chunked_voxel_storage<voxel_uint32_t>(x1, y1, z1, vsize, nx, ny, nz, 64);
-			progress_writer progress("voxelize");
-			processor pr(storage, progress);
-			pr.use_scanline() = false;
+			
 			// @todo, uint32 defaults to VOLUME_PRODUCT_ID, make this explicit
-			pr.process(surfaces->begin(), surfaces->end(), VOLUME_PRODUCT_ID(), output(MERGED()));
-			return storage;
+			// @why
+			// pr.use_scanline() = false;
+
+			chunked_voxel_storage<voxel_uint32_t>* storage = new chunked_voxel_storage<voxel_uint32_t>(x1, y1, z1, vsize, nx, ny, nz, chunksize);
+
+			if (threads) {
+				progress_writer progress("voxelize", silent);
+				threaded_processor p(storage, *threads, progress);
+				p.process(surfaces->begin(), surfaces->end(), VOLUME_PRODUCT_ID(), output(MERGED()));
+				// @todo what actually happens to storage?
+				delete storage;
+				return p.voxels();
+			} else {
+				progress_writer progress("voxelize");
+				processor pr(storage, progress);
+				pr.process(surfaces->begin(), surfaces->end(), VOLUME_PRODUCT_ID(), output(MERGED()));
+				return storage;
+			}			
+
 		} else {
 			if (threads) {
 				progress_writer progress("voxelize", silent);
@@ -536,6 +609,169 @@ public:
 	}
 };
 
+class op_print_values : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" } };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		auto voxels = (regular_voxel_storage*) scope.get_value<abstract_voxel_storage*>("input");
+		uint32_t v;
+		std::set<uint32_t> vs;
+		for (auto& ijk : *voxels) {
+			voxels->Get(ijk, &v);
+			vs.insert(v);
+		}
+		bool first = true;
+		for (auto& x : vs) {
+			if (!first) {
+				std::cout << " ";
+			}
+			first = false;
+			std::cout << x;
+		}
+		symbol_value vv;
+		return vv;
+	}
+};
+
+class op_describe_components : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "output_path", "string" }, { true, "input", "voxels" } };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		const std::string output_path = scope.get_value<std::string>("output_path");
+		std::ofstream ofs(output_path.c_str());
+		ofs << "[";
+		bool first = true;
+		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input");
+		connected_components((regular_voxel_storage*)voxels, [&ofs, &first](regular_voxel_storage* c) {
+			if (!first) {
+				ofs << ",";
+			}
+			auto info = dump_info(c);
+			ofs << json_logger::to_json_string(info);
+			first = false;
+		});
+		ofs << "]";
+		symbol_value v;
+		return v;
+	}
+};
+
+#include <boost/asio/thread_pool.hpp>
+#include <boost/asio/post.hpp>
+#include <thread>
+#include <mutex>
+
+namespace {
+	template <typename T>
+	class mt_list : public std::list<T> {
+		std::mutex m;
+	public:
+		void push_back(const T& t) {
+			std::lock_guard<std::mutex> lock{ m };
+			std::list<T>::push_back(t);
+		}
+	};
+
+	template <typename Fn>
+	void group_by(regular_voxel_storage* groups, abstract_voxel_storage* voxels, Fn fn, int threads=1) {
+
+		uint32_t v;
+		std::set<uint32_t> vs;
+		for (auto& ijk : *groups) {
+			groups->Get(ijk, &v);
+			vs.insert(v);
+		}
+
+		bit_t desc_bits;
+
+		mt_list<std::pair<uint32_t, abstract_voxel_storage*>> results;
+		boost::asio::thread_pool pool(threads); // 4 threads
+		
+		auto process = [&fn, &groups, &desc_bits, &voxels, &results, &threads](uint32_t id) {
+			uint32_t vv;
+			// A {0,1} dataset of `groups`==`id`
+			auto where_id = groups->empty_copy_as(&desc_bits);
+			for (auto& ijk : *groups) {
+				groups->Get(ijk, &vv);
+				if (vv == id) {
+					where_id->Set(ijk);
+				}
+			}
+
+			auto c = voxels->boolean_intersection(where_id);
+
+			delete where_id;
+
+			if (threads <= 1) {
+				fn(id, c);
+			} else {
+				results.push_back({ id, c });
+			}
+		};
+
+		for (auto& id : vs) {
+			if (threads > 1) {
+				boost::asio::post(pool, std::bind(process, id));
+			} else {
+				process(id);
+			}
+		}
+
+		if (threads > 1) {
+			
+			pool.join();
+			for (auto& r : results) {
+				fn(r.first, r.second);
+			}
+		}
+	}
+}
+
+class op_describe_group_by : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "output_path", "string" }, { true, "input", "voxels" }, { true, "groups", "voxels" } };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		const std::string output_path = scope.get_value<std::string>("output_path");
+		std::ofstream ofs(output_path.c_str());
+		ofs << "[";
+		bool first = true;
+		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input");
+		
+		auto groups = (regular_voxel_storage*) scope.get_value<abstract_voxel_storage*>("groups");
+
+		if (groups->value_bits() != 32) {
+			throw std::runtime_error("Expected a uint stored dataset for groups");
+		}
+
+		group_by(groups, voxels, [&ofs, &first](uint32_t id, abstract_voxel_storage* c) {
+			if (!first) {
+				ofs << ",";
+			}
+			auto info = dump_info(c);
+			info["id"] = static_cast<long>(id);
+			ofs << json_logger::to_json_string(info);
+
+			delete c;
+
+			first = false;
+		}, scope.get_value_or<int>("THREADS", 1));
+
+		ofs << "]";
+
+		symbol_value v_null;
+		return v_null;
+	}
+};
+
 class op_keep_components : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
@@ -558,27 +794,6 @@ public:
 };
 
 namespace {
-	json_logger::meta_data dump_info(abstract_voxel_storage* voxels) {
-		if (dynamic_cast<abstract_chunked_voxel_storage*>(voxels)) {
-			auto left = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->grid_offset();
-			auto nc = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->num_chunks();
-			auto right = (left + nc.as<long>()) - (decltype(left)::element_type)1;
-			auto sz = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->voxel_size();
-			auto szl = (long)dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->chunk_size();
-			auto left_world = ((voxels->bounds()[0].as<long>() + left * szl).as<double>() * sz);
-			auto right_world = ((voxels->bounds()[1].as<long>() + left * szl).as<double>() * sz);
-
-			return {
-				{"count", (long)voxels->count()},
-				{"grid", left.format() + " - " + right.format()},
-				{"bounds", voxels->bounds()[0].format() + " - " + voxels->bounds()[1].format()},
-				{"world", left_world.format() + " - " + right_world.format()},
-				{"bits", (long)voxels->value_bits()}
-			};
-		}
-		return {};
-	}
-	
 	template <typename Fn, typename Fn2>
 	void revoxelize_and_check_overlap(abstract_voxel_storage* voxels, const geometry_collection_t& surfaces, Fn fn, Fn2 fn2) {
 		BRep_Builder B;
@@ -898,6 +1113,101 @@ public:
 	}
 };
 
+class op_zeros : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" } };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input");
+		// @todo also implement empty_copy_as() here.
+		return voxels->empty_copy();
+	}
+};
+
+class op_plane : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, {true, "a", "real"}, {true, "b", "real"}, {true, "c", "real"}, {true, "d", "real"} };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		abstract_voxel_storage* v = scope.get_value<abstract_voxel_storage*>("input");
+		
+		auto voxels = dynamic_cast<abstract_chunked_voxel_storage*>(v);
+		if (voxels == nullptr) {
+			throw std::runtime_error("expected chunked storage");
+		}
+
+		auto result = voxels->empty_copy();
+
+		if (voxels->count() == 0) {
+			return result;
+		}
+		
+		gp_Pln pln(
+			scope.get_value<double>("a"),
+			scope.get_value<double>("b"),
+			scope.get_value<double>("c"),
+			scope.get_value<double>("d")
+		);
+		
+		auto left = voxels->grid_offset();
+		auto sz = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->voxel_size();
+		auto szl = (long)dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->chunk_size();
+		auto left_world = ((voxels->bounds()[0].as<long>() + left * szl).as<double>() * sz);
+		auto right_world = ((voxels->bounds()[1].as<long>() + left * szl).as<double>() * sz);
+
+		BRepPrimAPI_MakeBox mb(gp_Pnt(
+			left_world.get<0>(),
+			left_world.get<1>(),
+			left_world.get<2>()
+		), gp_Pnt(
+			right_world.get<0>(),
+			right_world.get<1>(),
+			right_world.get<2>()
+		));
+
+		auto box = mb.Solid();
+		static double inf = std::numeric_limits<double>::infinity();
+		std::array<std::array<double, 2>, 2> uv_min_max = {{ {{+inf, +inf}}, {{-inf,-inf}} }};
+
+		TopExp_Explorer exp(box, TopAbs_VERTEX);
+		for (; exp.More(); exp.Next()) {
+			auto p = BRep_Tool::Pnt(TopoDS::Vertex(exp.Current()));
+			auto p2d = ProjLib::Project(pln, p);
+			for (int i = 0; i < 2; ++i) {
+				auto v = p2d.ChangeCoord().ChangeCoord(i + 1);
+				auto& min_v = uv_min_max[0][i];
+				auto& max_v = uv_min_max[1][i];
+				if (v < min_v) min_v = v;
+				if (v > max_v) max_v = v;
+			}
+		}
+
+		auto face = BRepBuilderAPI_MakeFace(pln,
+			uv_min_max[0][0], uv_min_max[1][0],
+			uv_min_max[0][1], uv_min_max[1][1]
+		);
+
+		auto face_inside = BRepAlgoAPI_Common(face, box).Shape();
+		TopoDS_Compound C;
+		if (face_inside.ShapeType() == TopAbs_COMPOUND) {
+			C = TopoDS::Compound(face_inside);
+		} else {
+			BRep_Builder B;
+			B.MakeCompound(C);
+			B.Add(C, face_inside);
+		}
+
+		BRepMesh_IncrementalMesh(C, 0.001);
+		
+		geometry_collection_t* single = new geometry_collection_t{ { 0, C} };
+		return single;
+	}
+};
+
 class op_offset_xy : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
@@ -1083,7 +1393,7 @@ template <typename T>
 class op_geom : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "dx", "integer|real" },{ true, "dy", "integer|real" },{ true, "dz", "integer|real" } };
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "dx", "integer|real" },{ true, "dy", "integer|real" },{ true, "dz", "integer|real" }, { false, "until", "voxels" } };
 		return nm_;
 	}
 	symbol_value invoke(const scope_map& scope) const {
@@ -1093,7 +1403,13 @@ public:
 		int dy = scope.get_length("dy");
 		int dz = scope.get_length("dz");
 
+		abstract_voxel_storage* until = nullptr;
+		try {
+			until = scope.get_value<abstract_voxel_storage*>("until");
+		} catch (scope_map::not_in_scope&) { }
+
 		T s;
+		s.until = until;
 		return s(voxels, dx, dy, dz);
 	}
 };
@@ -1134,22 +1450,12 @@ class op_less : public op_compare<std::less<size_t>> {};
 class op_traverse : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "seed", "voxels" }, { false, "depth", "integer|real" }, { false, "connectedness", "integer" } };
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "seed", "voxels" }, { false, "depth", "integer|real" }, { false, "connectedness", "integer" }, {false, "type", "string"} };
 		return nm_;
 	}
 	symbol_value invoke(const scope_map& scope) const {
 		regular_voxel_storage* voxels = (regular_voxel_storage*) scope.get_value<abstract_voxel_storage*>("input");
 		regular_voxel_storage* seed = (regular_voxel_storage*) scope.get_value<abstract_voxel_storage*>("seed");
-
-		regular_voxel_storage* output = (regular_voxel_storage*)voxels->empty_copy();
-
-		auto callback = [this, output](const tagged_index& pos) {
-			if (pos.which == tagged_index::VOXEL) {
-				output->Set(pos.pos);
-			} else {
-				((abstract_chunked_voxel_storage*)output)->create_constant(pos.pos, 1U);
-			}
-		};
 
 		boost::optional<double> max_depth;
 		try {
@@ -1158,8 +1464,7 @@ public:
 			// traversal with unconstrained depth
 		}
 
-		// Type erasure to get a runtime argument into a template arg.
-		std::function<void(decltype(callback), decltype(voxels), decltype(seed))> run_visitor;
+		bool use_value = scope.has("type") && scope.get_value<std::string>("type") == "uint";
 
 		int C = 6;
 		try {
@@ -1171,11 +1476,39 @@ public:
 		if (C != 6 && C != 26) {
 			throw std::runtime_error("Connectedness should be 6 or 26");
 		}
+
+		if (use_value && C != 26) {
+			throw std::runtime_error("Connectedness should be 26 when using value");
+		}
+
+		regular_voxel_storage* output;
+		if (use_value) {
+			voxel_uint32_t fmt;
+			output = (regular_voxel_storage*)voxels->empty_copy_as(&fmt);
+		} else {
+			output = (regular_voxel_storage*)voxels->empty_copy();
+		}
 		
 		visitor<6> v6;
 		visitor<26> v26;
 		v6.max_depth = max_depth;
 		v26.max_depth = max_depth;
+
+		uint32_t val;
+
+		auto callback = [this, output, &v26, &val, &use_value](const tagged_index& pos) {
+			if (use_value) {
+				val = v26.depth * 10. + 1;
+				output->Set(pos.pos, &val);
+			} else if (pos.which == tagged_index::VOXEL) {
+				output->Set(pos.pos);
+			} else {
+				((abstract_chunked_voxel_storage*)output)->create_constant(pos.pos, 1U);
+			}
+		};
+
+		// Type erasure to get a runtime argument into a template arg.
+		std::function<void(decltype(callback), decltype(voxels), decltype(seed))> run_visitor;
 
 		if (C == 6) {	
 			run_visitor = std::ref(v6);
@@ -1192,13 +1525,29 @@ public:
 class op_constant_like : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "value", "integer" } };
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "value", "integer" }, { false, "type", "string"} };
 		return nm_;
 	}
 	symbol_value invoke(const scope_map& scope) const {
 		regular_voxel_storage* voxels = (regular_voxel_storage*)scope.get_value<abstract_voxel_storage*>("input");
 		int value = scope.get_value<int>("value");
-		abstract_chunked_voxel_storage* output = (abstract_chunked_voxel_storage*)voxels->empty_copy();
+
+		abstract_chunked_voxel_storage* output;
+
+		if (scope.has("type")) {
+			if (scope.get_value<std::string>("type") == "uint") {
+				voxel_uint32_t fmt;
+				output = (abstract_chunked_voxel_storage*)voxels->empty_copy_as(&fmt);
+			} else if (scope.get_value<std::string>("type") == "bit") {
+				bit_t fmt;
+				output = (abstract_chunked_voxel_storage*)voxels->empty_copy_as(&fmt);
+			} else {
+				throw std::runtime_error("not implemented");
+			}			
+		} else {
+			output = (abstract_chunked_voxel_storage*)voxels->empty_copy();
+		}
+
 		if (value == 1) {
 			auto i = make_vec<size_t>(0U, 0U, 0U);
 			auto j = output->num_chunks();
@@ -1209,6 +1558,36 @@ public:
 		return output;
 	}
 };
+
+class op_copy : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { false, "type", "string"} };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		regular_voxel_storage* voxels = (regular_voxel_storage*)scope.get_value<abstract_voxel_storage*>("input");
+
+		abstract_chunked_voxel_storage* output;
+
+		if (scope.has("type")) {
+			if (scope.get_value<std::string>("type") == "uint") {
+				voxel_uint32_t fmt;
+				output = (abstract_chunked_voxel_storage*)voxels->copy_as(&fmt);
+			} else if (scope.get_value<std::string>("type") == "bit") {
+				bit_t fmt;
+				output = (abstract_chunked_voxel_storage*)voxels->copy_as(&fmt);
+			} else {
+				throw std::runtime_error("not implemented");
+			}
+		} else {
+			output = (abstract_chunked_voxel_storage*)voxels->copy();
+		}
+
+		return output;
+	}
+};
+
 
 #ifdef WITH_IFC
 
@@ -1314,21 +1693,81 @@ public:
 class op_mesh : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "filename", "string"}, {false, "use_value", "integer"} };
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "filename", "string"}, {false, "use_value", "integer"}, {false, "with_components", "integer"}, { false, "groups", "voxels" } };
 		return nm_;
 	}
 	symbol_value invoke(const scope_map& scope) const {
 		auto voxels = scope.get_value<abstract_voxel_storage*>("input");
 		auto use_value = scope.get_value_or<int>("use_value", -1);
+		auto with_components = scope.get_value_or<int>("with_components", -1);
 		auto filename = scope.get_value<std::string>("filename");
+
+		auto groups = (regular_voxel_storage*) scope.get_value_or<abstract_voxel_storage*>("groups", nullptr);
+
 		std::ofstream ofs(filename.c_str());
-		if (voxels->value_bits() == 1) {
-			((regular_voxel_storage*)voxels)->obj_export(ofs);
+
+		if (groups) {
+			obj_export_helper helper(ofs);
+			group_by(groups, voxels, [&helper, &ofs](uint32_t id, abstract_voxel_storage* c) {
+				ofs << "g id-" << id << "\n";
+				((regular_voxel_storage*)c)->obj_export(helper, false, false);
+			}, scope.get_value_or<int>("THREADS", 1));
 		} else {
-			((regular_voxel_storage*)voxels)->obj_export(ofs, use_value != 1, use_value == 1);
+
+			if (voxels->value_bits() == 1) {
+				((regular_voxel_storage*)voxels)->obj_export(ofs, with_components != 0);
+			} else {
+				((regular_voxel_storage*)voxels)->obj_export(ofs, with_components != 0 && use_value != 1, use_value == 1);
+			}
 		}
 		symbol_value v;
 		return v;
+	}
+};
+
+class op_export_csv : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "filename", "string"} };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		auto voxels = (regular_voxel_storage*) scope.get_value<abstract_voxel_storage*>("input");
+		auto filename = scope.get_value<std::string>("filename");
+		std::ofstream ofs(filename.c_str());
+
+		bool use_value = voxels->value_bits() == 32;
+
+		auto sz = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->voxel_size();
+		auto szl = (long)dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->chunk_size();
+		auto left = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->grid_offset();
+
+		uint32_t v;
+
+		for (auto ijk : *voxels) {
+			if (use_value) {
+				voxels->Get(ijk, &v);
+				if (v == 0) {
+					// @todo why is this needed?
+					continue;
+				}
+			}
+
+			auto xyz = (ijk.as<long>() + left * szl).as<double>() * sz;
+			
+			ofs << xyz.get<0>() << ","
+				<< xyz.get<1>() << ","
+				<< xyz.get<2>();
+			
+			if (use_value) {
+				ofs << "," << v;
+			}
+
+			ofs << "\n";
+		}
+
+		symbol_value v_null;
+		return v_null;
 	}
 };
 
@@ -1512,6 +1951,6 @@ public:
 	}
 };
 
-scope_map run(const std::vector<statement_type>& statements, double size, size_t threads = 0, size_t chunk_size = 128, bool with_mesh = false, bool with_progress_on_cout = false);
+scope_map run(const std::vector<statement_or_function_def>& statements, double size, size_t threads = 0, size_t chunk_size = 128, bool with_mesh = false, bool with_progress_on_cout = false);
 
 #endif

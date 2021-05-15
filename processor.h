@@ -155,6 +155,7 @@ public:
 
 class processor : public abstract_processor {
 private:
+	bit_t use_bits;
 	factory factory_;
 	abstract_voxel_storage* voxels_;
 	abstract_voxel_storage* voxels_temp_;
@@ -175,7 +176,7 @@ public:
 
 	processor(abstract_voxel_storage* storage, const std::function<void(int)>& progress)
 		: voxels_(storage)
-		, voxels_temp_(storage->empty_copy())
+		, voxels_temp_(storage->empty_copy_as(&use_bits))
 		, progress_(progress)
 		, use_copy_(true)
 		, use_scanline_(true) {}
@@ -205,33 +206,19 @@ public:
 				to_write->boolean_union_inplace(filled);
 				delete filled;
 
-				output.intermediate_result(it->first, voxels_, voxels_temp_);
-
-				int n = voxels_->value_bits();
 				if (volume.value == PRODUCT_ID) {
+					int n = voxels_->value_bits();
 					// @todo this still needs to be generalized
 					if (n != 32) {
 						throw std::runtime_error("Unable to assign product ids to this voxel value type");
 					}
-					if (auto cvs32 = dynamic_cast<chunked_voxel_storage<voxel_uint32_t>*>(voxels_)) {
-						size_t nchunksx, nchunksy, nchunksz;
-						cvs32->num_chunks().tie(nchunksx, nchunksy, nchunksz);
-						BEGIN_LOOP(size_t(0), nchunksx, 0U, nchunksy, 0U, nchunksz)
-							auto c = cvs32->get_chunk(ijk);
-							if (c != nullptr) {
-								if (!c->is_explicit()) {
-									throw std::runtime_error("Not implemented");
-								}
-								auto c32 = (continuous_voxel_storage<voxel_uint32_t>*) c;
-								auto d = c32->data();
-								for (size_t i = 0; i < c32->size(); ++i) {
-									if (d[i] == 1) {
-										d[i] = it->first;
-									}
-								}
-							}
-						END_LOOP;
+					auto input = (regular_voxel_storage*)to_write;
+					uint32_t v = it->first;
+					for (auto& ijk : *input) {
+						voxels_->Set(ijk, &v);
 					}
+				} else {
+					output.intermediate_result(it->first, voxels_, voxels_temp_);
 				}
 				
 				if (use_copy_) {
@@ -280,8 +267,9 @@ public:
 	threaded_processor(double x1, double y1, double z1, double d, int nx, int ny, int nz, size_t chunk_size, size_t num_threads, progress_writer& p)
 		: x1_(x1), y1_(y1), z1_(z1), d_(d), nx_(nx), ny_(ny), nz_(nz), chunk_size_(chunk_size), num_threads_(num_threads > 0 ? num_threads : std::thread::hardware_concurrency()), p_(p), result_(nullptr), voxels_(nullptr) {}
 
-	threaded_processor(abstract_voxel_storage* storage, progress_writer& progress)
+	threaded_processor(abstract_voxel_storage* storage, size_t num_threads, progress_writer& progress)
 		: voxels_(storage)
+		, num_threads_(num_threads)
 		, p_(progress)
 		, result_(nullptr)
 	{}
@@ -302,9 +290,10 @@ public:
 		auto progress = p_.thread(num_threads_);
 		size_t x0 = 0;
 		bool first = true;
-		for (size_t i = 0; i < num_threads_; ++i, first = false) {
+		for (size_t i = 0; i < num_threads_; ++i) {
 			size_t x1 = (size_t)floor((i + 1) * d);
 			if (x1 == x0) continue;
+			first = false;
 			if (i == num_threads_ - 1) {
 				x1 = N;
 			}

@@ -14,6 +14,7 @@ public:
 	typedef enum { FMT_TEXT, FMT_JSON } format;
 	typedef boost::variant<long, double, std::string> meta_value;
 	typedef std::map<std::string, meta_value> meta_data;
+	static std::string to_json_string(const meta_data&);
 private:
 	static std::vector<std::pair<format, std::ostream*>> log_output;
 	static severity severity_;

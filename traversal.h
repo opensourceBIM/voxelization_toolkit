@@ -341,7 +341,7 @@ private:
 		}
 
 		auto c = pos.second / chunk_size_;
-		if (DofT::use_chunks && is_chunked_ && chunks_.get(c.template get<0>(), c.template get<1>(), c.template get<2>()) != CHUNK_MIXED) {
+		if (!max_depth && DofT::use_chunks && is_chunked_ && chunks_.get(c.template get<0>(), c.template get<1>(), c.template get<2>()) != CHUNK_MIXED) {
 			auto lower = c * chunk_size_;
 			auto upper = (c + 1U) * chunk_size_;
 
@@ -350,6 +350,7 @@ private:
 			chunk_neighbours_queue_add_(pos.first, pos.second, c);
 			set_visited_chunk_(c);
 		} else if (post_condition_(pos.second)) {
+			depth = pos.first;
 			fn(tagged_index{ tagged_index::VOXEL, pos.second });
 
 			neighbours_queue_add_(pos);
@@ -358,6 +359,8 @@ private:
 	}
 
 public:
+	double depth = std::numeric_limits<double>::quiet_NaN();
+
 	// @todo max_depth doesn't work correctly with implicit voxel storage
 	boost::optional<double> max_depth;
 	typename queue_type<CONNECTEDNESS>::type queue;

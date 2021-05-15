@@ -47,16 +47,34 @@ public:
 	}
 };
 
+class function_def_type : public boost::fusion::vector<std::string, std::vector<std::string>, std::vector<statement_type>, std::string> {
+public:
+	const std::string& name() const {
+		return boost::fusion::at_c<0>(*this);
+	}
+	const std::vector<std::string>& args() const {
+		return boost::fusion::at_c<1>(*this);
+	}
+	const std::vector<statement_type>& statements() const {
+		return boost::fusion::at_c<2>(*this);
+	}
+	const std::string& result_identifier() const {
+		return boost::fusion::at_c<3>(*this);
+	}
+};
+
+typedef boost::variant<statement_type, function_def_type> statement_or_function_def;
+
 std::ostream& operator<<(std::ostream& a, const function_call_type& b);
 
 std::ostream& operator<<(std::ostream& a, const statement_type& b);
 
 template <typename It>
-struct voxelfile_parser : grammar<It, std::vector<statement_type>(), blank_type> {
+struct voxelfile_parser : grammar<It, std::vector<statement_or_function_def>(), blank_type> {
 
-	voxelfile_parser() : grammar<It, std::vector<statement_type>(), blank_type>(start) {
+	voxelfile_parser() : grammar<It, std::vector<statement_or_function_def>(), blank_type>(start) {
 		iden = lexeme[(alpha >> *(alnum | char_('_')))];
-		statement = iden >> '=' >> function_call >> eol;
+		statement = -hold[iden >> '='] >> function_call >> eol >> *eol;
 		quoted_string = char_('"') >> *(char_ - '"') >> char_('"');
 		// @todo only sequence of strings for now
 		sequence = '{' >> quoted_string % ',' >> '}';
@@ -64,7 +82,9 @@ struct voxelfile_parser : grammar<It, std::vector<statement_type>(), blank_type>
 		function_arg = -hold[iden >> '='] >> value;
 		function_args = function_arg % ',';
 		function_call = iden >> '(' >> function_args >> ')';
-		start = *statement;
+		argument_list = iden % ',';
+		function_def = "function" >> iden >> '(' >> argument_list >> ')' >> eol >> *eol >> *statement >> "return" >> -hold[iden] >> eol >> *eol;
+		start = *(statement | function_def);
 	}
 
 	real_parser<double, strict_real_policies<double>> strict_double;
@@ -75,6 +95,8 @@ struct voxelfile_parser : grammar<It, std::vector<statement_type>(), blank_type>
 	rule<It, function_call_type(), blank_type> function_call;
 	rule<It, statement_type(), blank_type> statement;
 	rule<It, std::string(), blank_type> iden, quoted_string;
+	rule<It, std::vector<std::string>(), blank_type> argument_list;
+	rule<It, function_def_type(), blank_type> function_def;
 
 	typename voxelfile_parser::start_type start;
 };

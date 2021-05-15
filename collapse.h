@@ -5,6 +5,8 @@
 
 class collapse {
 public:
+	abstract_voxel_storage* until = nullptr;
+
 	regular_voxel_storage* operator()(abstract_voxel_storage* storage, int dx, int dy, int dz) {
 		int d[3] = { dx, dy, dz };
 		int nonzero = 0;
@@ -53,6 +55,8 @@ public:
 // @todo merge with above
 class collapse_count {
 public:
+	abstract_voxel_storage* until = nullptr;
+
 	regular_voxel_storage* operator()(abstract_voxel_storage* storage, int dx, int dy, int dz) {
 		int d[3] = { dx, dy, dz };
 		int nonzero = 0;
