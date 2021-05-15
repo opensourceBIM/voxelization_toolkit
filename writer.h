@@ -93,23 +93,28 @@ public:
 		int col_n = 0;
 
 		for (int i = 0; i < storage->num_chunks().get(0); i++) {
-			auto chunk = storage->get_chunk(make_vec<size_t>(i, 0, 0));
+			auto c = storage->get_chunk(make_vec<size_t>(i, 0, 0));
 
-			if (chunk && chunk->is_explicit()) {
-				if (col_n == 0) {
-					continuous_voxel_storage<bit_t>* casted = (continuous_voxel_storage<bit_t>*)chunk;
-					col_n = casted->size() * casted->value_bits() * 8;
-				}
-
-				continuous_count++;
-
+			if (c == nullptr) {
+				std::cout << "Null pointer" << std::endl;
 			}
+
 			else {
-				if (chunk && chunk->is_constant()) {
-					constant_count++;
+				if (c->is_explicit() || c->is_constant()) {
+					if (c->is_constant()) {
+						std::cout << "Constant chunk" << std::endl;
+						constant_count++;
+					}
+					else {
+						std::cout << "Continuous chunk" << std::endl;
+						continuous_count++;
+					
+					}
 				}
 
 				else {
+
+					std::cout << "Planar chunk" << std::endl;
 					planar_count++;
 				}
 			}
@@ -138,36 +143,80 @@ public:
 		datatype.setOrder(H5T_ORDER_LE);
 		H5::DataSet dataset = file.createDataSet(DATASET_NAME, datatype, dataspace);
 
-		int cont_count = 0;
 
+
+		//const H5std_string DATASET_NAME2("planar_chunks");
+
+		//const int      NP = planar_count;
+		//const int      NXX = storage->chunk_size();
+		//const int      NYY = storage->chunk_size();
+	
+		//const int      RANK = 3;
+		//H5::H5File file(FILE_NAME, H5F_ACC_TRUNC);
+
+		//hsize_t     dimsf2[3];
+		//dimsf2[0] = NP;
+		//dimsf2[1] = NXX;
+		//dimsf2[2] = NYY;
+		//
+		//H5::DataSpace dataspace2(RANK, dimsf2);
+		//H5::IntType datatype2(H5::PredType::NATIVE_INT);
+		//datatype.setOrder(H5T_ORDER_LE);
+		//H5::DataSet dataset2 = file.createDataSet(DATASET_NAME2, datatype2, dataspace2);
+
+
+		std::vector<int> planar_container;
 		std::vector<int> bits_container;
 
 		for (int i = 0; i < storage->num_chunks().get(0); i++) {
 			for (int j = 0; j < storage->num_chunks().get(1); j++) {
 				for (int k = 0; k < storage->num_chunks().get(2); k++) {
 					auto c = storage->get_chunk(make_vec<size_t>(i, j, k));
-					if (c && c->is_explicit()) {
-
-						continuous_voxel_storage<bit_t>* convox = (continuous_voxel_storage<bit_t>*)c;
-						size_t i0, j0, k0, i1, j1, k1;
-						i0 = 0;
-						j0 = 0;
-						k0 = 0;
-						convox->extents().tie(i1, j1, k1);
-
-						BEGIN_LOOP_ZERO_2(make_vec<size_t>(i1, j1, k1))
-							bits_container.push_back(convox->Get(ijk));
-						END_LOOP;
+					if (c == nullptr) {
+						std::cout << "Null pointer" << std::endl; 
 					}
 
-					if (c && c->is_constant() || c==nullptr ){
-						std::cout << "Constant handling to implement." << std::endl;
-					}
 					else {
-						std::cout << "Plane handling to implement." << std::endl;
-						planar_voxel_storage<bit_t>* planvox = (planar_voxel_storage<bit_t>*)c;
-						continuous_voxel_storage<bit_t>* continuoused = planvox->make_explicit();
-						
+						if (c->is_explicit() || c->is_constant()) {
+							if (c->is_constant()) {
+								std::cout << "Constant chunk" << std::endl;
+							}
+							else { 
+								std::cout << "Continuous chunk" << std::endl;
+								continuous_voxel_storage<bit_t>* convox = (continuous_voxel_storage<bit_t>*)c;
+								size_t i0, j0, k0, i1, j1, k1;
+								i0 = 0;
+								j0 = 0;
+								k0 = 0;
+								convox->extents().tie(i1, j1, k1);
+
+								BEGIN_LOOP_ZERO_2(make_vec<size_t>(i1, j1, k1))
+									bits_container.push_back(convox->Get(ijk));
+								END_LOOP;
+							}
+						}
+
+						else {
+							std::cout << "Planar chunk" << std::endl;
+							planar_voxel_storage<bit_t>* planvox = (planar_voxel_storage<bit_t>*)c;
+							auto off = planvox->offsets();
+							auto axis = planvox->axis();
+
+							bool make_explicit = 0; 
+							if (make_explicit) {
+								continuous_voxel_storage<bit_t>* convox = planvox->make_explicit();
+								size_t i0, j0, k0, i1, j1, k1;
+								i0 = 0;
+								j0 = 0;
+								k0 = 0;
+								convox->extents().tie(i1, j1, k1);
+
+								BEGIN_LOOP_ZERO_2(make_vec<size_t>(i1, j1, k1))
+									bits_container.push_back(convox->Get(ijk));
+								END_LOOP;
+
+							}
+						}		
 					}
 				}
 			}

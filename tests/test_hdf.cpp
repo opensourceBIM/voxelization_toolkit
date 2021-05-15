@@ -1,24 +1,51 @@
 #include "../voxelizer.h"
 #include "../writer.h"
+#include "../processor.h"
+
 #include "H5Cpp.h"
 #include <gtest/gtest.h>
 
 #include <BRepBuilderAPI_MakePolygon.hxx>
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepPrimAPI_MakeBox.hxx>
+#include <BRepPrimAPI_MakeSphere.hxx>
 #include <BRep_Builder.hxx>
 #include <BRepBndLib.hxx>
 #include <Bnd_Box.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
+#include <BRepTools.hxx>
 
+#ifdef WITH_IFC
+#include <ifcparse/IfcFile.h>
+#ifdef IFCOPENSHELL_05
+#include <ifcgeom/IfcGeomIterator.h>
+using namespace Ifc2x3;
+#else
+#include <ifcgeom_schema_agnostic/IfcGeomIterator.h>
+#endif
+#endif
+
+
+#ifdef WIN32
+#define DIRSEP "\\"
+#else
+#define DIRSEP "/"
+#endif
 
 
 TEST(HdfFileName, HDF) {
 
-	auto storage2 = new chunked_voxel_storage<bit_t>(0., 0., 0., 1, 32, 32, 32, 32);
 
-	BRepPrimAPI_MakeBox mb(gp_Pnt(1, 1, 1), gp_Pnt(10, 10, 10));
-	auto x = mb.Solid();
+	BRepPrimAPI_MakeBox mb(gp_Pnt(0, 0, 0), gp_Pnt(10, 10, 10));
+	BRepPrimAPI_MakeSphere s(gp_Pnt(10, 10, 10), 7);
+
+	auto x = s.Solid();
+
+	auto storage2 = new chunked_voxel_storage<bit_t>( 0, 0, 0, 1, 32, 32, 32, 32);
+	BRepTools breptools; 
+
+	breptools.Write(x, "sphere.brep");
+
 	BRepMesh_IncrementalMesh(x, 0.001);
 	auto vox = voxelizer(x, storage2);
 	vox.Convert();
@@ -26,7 +53,7 @@ TEST(HdfFileName, HDF) {
 	auto storage = new chunked_voxel_storage<bit_t>(0., 0., 0., 0.1, 200, 150, 10, 32);
 
 	{
-		BRepBuilderAPI_MakePolygon mp(gp_Pnt(1, 1, 0), gp_Pnt(16, 1, 0), gp_Pnt(16, 9.8, 0), gp_Pnt(1, 9.8, 0), true);
+		BRepBuilderAPI_MakePolygon mp(gp_Pnt(1, 1, 2), gp_Pnt(16, 1, 2), gp_Pnt(16, 9.8, 2), gp_Pnt(1, 9.8, 2), true);
 		BRepBuilderAPI_MakeFace mf(mp.Wire());
 		TopoDS_Face face = mf.Face();
 
@@ -34,9 +61,11 @@ TEST(HdfFileName, HDF) {
 		vox.Convert();
 	}
 
-	hdf_writer writer; 
-	writer.SetVoxels(storage);
-	writer.Write("voxels.h5");
+
+	
+	hdf_writer writer;
+	writer.SetVoxels(storage2);
+	writer.Write("multi_dim_vox.h5");
 
 	//std::ofstream fs("voxobj.obj");
 	//obj_export_helper oeh{ fs };
@@ -49,7 +78,7 @@ TEST(HdfFileName, HDF) {
 	const int   NX = 32;                    // dataset dimensions
 	const int   NY = 32;
 	const int   NZ = 32;
-	const int   NC = 3; 
+	const int   NC = 3;
 
 	const int   RANK = 4;
 	H5::H5File file(FILE_NAME, H5F_ACC_TRUNC);
@@ -61,18 +90,18 @@ TEST(HdfFileName, HDF) {
 	dimsf[3] = NZ;
 
 	H5::DataSpace dataspace(RANK, dimsf);
-	
+
 	H5::IntType datatype(H5::PredType::NATIVE_INT);
 	datatype.setOrder(H5T_ORDER_LE);
 
 	H5::DataSet dataset = file.createDataSet(DATASET_NAME, datatype, dataspace);
 
-	std::vector<int> data; 
+	//std::vector<int> data; 
 
-	for (int i = 0; i < NX*NY*NZ*NC; i++) {
-		data.push_back(0);
-	}
+	//for (int i = 0; i < NX*NY*NZ*NC; i++) {
+	//	data.push_back(0);
+	//}
 
-	dataset.write(data.data(), H5::PredType::NATIVE_INT);
+	//dataset.write(data.data(), H5::PredType::NATIVE_INT);
 
 }
