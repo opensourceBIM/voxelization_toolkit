@@ -93,32 +93,39 @@ public:
 		int col_n = 0;
 
 		for (int i = 0; i < storage->num_chunks().get(0); i++) {
-			auto c = storage->get_chunk(make_vec<size_t>(i, 0, 0));
+			for (int j = 0; j < storage->num_chunks().get(1); j++) {
+				for (int k = 0; k < storage->num_chunks().get(2); k++) {
+					auto c = storage->get_chunk(make_vec<size_t>(i, j, k));
 
-			if (c == nullptr) {
-				std::cout << "Null pointer" << std::endl;
-			}
-
-			else {
-				if (c->is_explicit() || c->is_constant()) {
-					if (c->is_constant()) {
-						std::cout << "Constant chunk" << std::endl;
+					if (c == nullptr) {
+						std::cout << "Null pointer" << std::endl;
 						constant_count++;
 					}
+
 					else {
-						std::cout << "Continuous chunk" << std::endl;
-						continuous_count++;
-					
+						if (c->is_explicit() || c->is_constant()) {
+							if (c->is_constant()) {
+								std::cout << "Count Constant chunk" << std::endl;
+								constant_count++;
+							}
+							else {
+								std::cout << "Count Continuous chunk" << std::endl;
+								continuous_count++;
+
+							}
+						}
+
+						else {
+
+							std::cout << " Count Planar chunk" << std::endl;
+							planar_count++;
+						}
 					}
-				}
-
-				else {
-
-					std::cout << "Planar chunk" << std::endl;
-					planar_count++;
 				}
 			}
 		}
+		
+
 
 
 		const H5std_string FILE_NAME(fnc);
@@ -202,7 +209,7 @@ public:
 							auto off = planvox->offsets();
 							auto axis = planvox->axis();
 
-							bool make_explicit = 0; 
+							bool make_explicit = 1; 
 							if (make_explicit) {
 								continuous_voxel_storage<bit_t>* convox = planvox->make_explicit();
 								size_t i0, j0, k0, i1, j1, k1;
