@@ -90,8 +90,6 @@ public:
 		int planar_count = 0;
 		int constant_count = 0;
 
-		int col_n = 0;
-
 		for (int i = 0; i < storage->num_chunks().get(0); i++) {
 			for (int j = 0; j < storage->num_chunks().get(1); j++) {
 				for (int k = 0; k < storage->num_chunks().get(2); k++) {
@@ -111,7 +109,6 @@ public:
 							else {
 								std::cout << "Count Continuous chunk" << std::endl;
 								continuous_count++;
-
 							}
 						}
 
@@ -127,11 +124,13 @@ public:
 		
 
 
-
 		const H5std_string FILE_NAME(fnc);
-		const H5std_string DATASET_NAME("continuous_chunks");
+		const H5std_string CONTINUOUS_DATASET_NAME("continuous_chunks");
+		const H5std_string PLANAR_DATASET_NAME("continuous_chunks");
 
 		const int      NC = continuous_count;
+		const int      NP = planar_count;
+	
 		const int      NX = storage->chunk_size();
 		const int      NY = storage->chunk_size();
 		const int	   NZ = storage->chunk_size();
@@ -148,48 +147,42 @@ public:
 		H5::DataSpace dataspace(RANK, dimsf);
 		H5::IntType datatype(H5::PredType::NATIVE_INT);
 		datatype.setOrder(H5T_ORDER_LE);
-		H5::DataSet dataset = file.createDataSet(DATASET_NAME, datatype, dataspace);
+		H5::DataSet dataset = file.createDataSet(CONTINUOUS_DATASET_NAME, datatype, dataspace);
 
 
+		//Hyperslab prep
+		hsize_t     offset[4];
+		offset[0] = -1;
+		offset[1] = 0;
+		offset[2] = 0;
+		offset[3] = 0;
 
-		//const H5std_string DATASET_NAME2("planar_chunks");
-
-		//const int      NP = planar_count;
-		//const int      NXX = storage->chunk_size();
-		//const int      NYY = storage->chunk_size();
-	
-		//const int      RANK = 3;
-		//H5::H5File file(FILE_NAME, H5F_ACC_TRUNC);
-
-		//hsize_t     dimsf2[3];
-		//dimsf2[0] = NP;
-		//dimsf2[1] = NXX;
-		//dimsf2[2] = NYY;
-		//
-		//H5::DataSpace dataspace2(RANK, dimsf2);
-		//H5::IntType datatype2(H5::PredType::NATIVE_INT);
-		//datatype.setOrder(H5T_ORDER_LE);
-		//H5::DataSet dataset2 = file.createDataSet(DATASET_NAME2, datatype2, dataspace2);
+		hsize_t     slab_dimsf[4] = { 1, 1, 1, 1 };
+		H5::DataSpace mspace2(RANK, slab_dimsf);
 
 
-		std::vector<int> planar_container;
-		std::vector<int> bits_container;
+		for (int x = 0; x < storage->num_chunks().get(0); x++) {
+			for (int y = 0; y < storage->num_chunks().get(1); y++) {
+				for (int z = 0; z < storage->num_chunks().get(2); z++) {
+					auto c = storage->get_chunk(make_vec<size_t>(x, y, z));
 
-		for (int i = 0; i < storage->num_chunks().get(0); i++) {
-			for (int j = 0; j < storage->num_chunks().get(1); j++) {
-				for (int k = 0; k < storage->num_chunks().get(2); k++) {
-					auto c = storage->get_chunk(make_vec<size_t>(i, j, k));
+
 					if (c == nullptr) {
 						std::cout << "Null pointer" << std::endl; 
+
 					}
 
 					else {
 						if (c->is_explicit() || c->is_constant()) {
 							if (c->is_constant()) {
 								std::cout << "Constant chunk" << std::endl;
+								
 							}
 							else { 
 								std::cout << "Continuous chunk" << std::endl;
+
+								offset[0]++;
+
 								continuous_voxel_storage<bit_t>* convox = (continuous_voxel_storage<bit_t>*)c;
 								size_t i0, j0, k0, i1, j1, k1;
 								i0 = 0;
@@ -198,7 +191,13 @@ public:
 								convox->extents().tie(i1, j1, k1);
 
 								BEGIN_LOOP_ZERO_2(make_vec<size_t>(i1, j1, k1))
-									bits_container.push_back(convox->Get(ijk));
+									offset[1] = ijk.get(0);
+									offset[2] = ijk.get(1);
+									offset[3] = ijk.get(2);
+									dataspace.selectHyperslab(H5S_SELECT_SET, slab_dimsf, offset);
+
+									std::vector<int> hslab = { convox->Get(ijk) };
+									dataset.write(hslab.data(), H5::PredType::NATIVE_INT, mspace2, dataspace);
 								END_LOOP;
 							}
 						}
@@ -209,28 +208,11 @@ public:
 							auto off = planvox->offsets();
 							auto axis = planvox->axis();
 
-							bool make_explicit = 1; 
-							if (make_explicit) {
-								continuous_voxel_storage<bit_t>* convox = planvox->make_explicit();
-								size_t i0, j0, k0, i1, j1, k1;
-								i0 = 0;
-								j0 = 0;
-								k0 = 0;
-								convox->extents().tie(i1, j1, k1);
-
-								BEGIN_LOOP_ZERO_2(make_vec<size_t>(i1, j1, k1))
-									bits_container.push_back(convox->Get(ijk));
-								END_LOOP;
-
-							}
 						}		
 					}
 				}
 			}
 		}
-
-		dataset.write(bits_container.data(), H5::PredType::NATIVE_INT);
-
 	}
 
 
