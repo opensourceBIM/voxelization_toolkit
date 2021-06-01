@@ -123,10 +123,9 @@ public:
 		}
 		
 
-
 		const H5std_string FILE_NAME(fnc);
 		const H5std_string CONTINUOUS_DATASET_NAME("continuous_chunks");
-		const H5std_string PLANAR_DATASET_NAME("continuous_chunks");
+		const H5std_string PLANAR_DATASET_NAME("planar_chunks");
 
 		const int      NC = continuous_count;
 		const int      NP = planar_count;
@@ -149,7 +148,6 @@ public:
 		datatype.setOrder(H5T_ORDER_LE);
 		H5::DataSet dataset = file.createDataSet(CONTINUOUS_DATASET_NAME, datatype, dataspace);
 
-
 		//Hyperslab prep
 		hsize_t     offset[4];
 		offset[0] = -1;
@@ -160,12 +158,39 @@ public:
 		hsize_t     slab_dimsf[4] = { 1, 1, 1, 1 };
 		H5::DataSpace mspace2(RANK, slab_dimsf);
 
+		//Regions dataset
+		const H5std_string REGIONS_DATASET_NAME("regions");
+		const int      REGION_RANK = 2;
+		hsize_t     regions_dimsf[2];
+		regions_dimsf[0] = NC;
+		regions_dimsf[1] = 1;
+		H5::DataSpace regions_dataspace(REGION_RANK, regions_dimsf);
+		H5::PredType regions_datatype(H5::PredType::STD_REF_DSETREG);
+		regions_datatype.setOrder(H5T_ORDER_LE);
+
+		H5::DataSet regions_dataset = file.createDataSet(REGIONS_DATASET_NAME, regions_datatype, regions_dataspace);
+		// Regions hyperlab
+		hsize_t     region_offset[2];
+		region_offset[0] = -1;
+		region_offset[1] = 0;
+		hsize_t     region_slab_dimsf[2] = { 1, 1 };
+		H5::DataSpace mspace3(REGION_RANK, region_slab_dimsf);
+
+		//Chunk hyperslab 
+		hsize_t     chunk_offset[4];
+		const int CHUNK_RANK = 4;
+		chunk_offset[0] = -1;
+		chunk_offset[1] = 0;
+		chunk_offset[2] = 0;
+		chunk_offset[3] = 0;
+		hsize_t     chunk_dimsf[4] = { 1, NX, NY, NZ };
+		H5::DataSpace chunk_space(CHUNK_RANK, chunk_dimsf);
 
 		for (int x = 0; x < storage->num_chunks().get(0); x++) {
 			for (int y = 0; y < storage->num_chunks().get(1); y++) {
 				for (int z = 0; z < storage->num_chunks().get(2); z++) {
 					auto c = storage->get_chunk(make_vec<size_t>(x, y, z));
-
+					
 
 					if (c == nullptr) {
 						std::cout << "Null pointer" << std::endl; 
@@ -199,6 +224,17 @@ public:
 									std::vector<int> hslab = { convox->Get(ijk) };
 									dataset.write(hslab.data(), H5::PredType::NATIVE_INT, mspace2, dataspace);
 								END_LOOP;
+
+								region_offset[0]++;
+								regions_dataspace.selectHyperslab(H5S_SELECT_SET, region_slab_dimsf, region_offset);
+
+								chunk_offset[0]++;
+
+								dataspace.selectHyperslab(H5S_SELECT_SET, chunk_dimsf, chunk_offset);
+
+								hobj_ref_t inter[1];
+								file.reference(&inter[0], "/continuous_chunks", dataspace, H5R_DATASET_REGION);
+								regions_dataset.write(inter, H5::PredType::STD_REF_DSETREG, mspace3, regions_dataspace);
 							}
 						}
 
@@ -214,8 +250,6 @@ public:
 			}
 		}
 	}
-
-
 };
 
 
