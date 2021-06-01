@@ -61,10 +61,14 @@ TEST(HdfFileName, HDF) {
 		vox.Convert();
 	}
 
+	const double dim = 0.1;
+	auto storage3 = new chunked_voxel_storage<bit_t>(-dim, -dim, -dim, dim, 100, 100, 100, 16);	
+	BRepPrimAPI_MakeBox make_box(8., 8., 8.);
+	auto vox3 = voxelizer(make_box.Solid(), storage3);
+	vox3.Convert();
 
-	
 	hdf_writer writer;
-	writer.SetVoxels(storage2);
+	writer.SetVoxels(storage3);
 	writer.Write("multi_dim_vox.h5");
 
 	//std::ofstream fs("voxobj.obj");
