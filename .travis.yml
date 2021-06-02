@@ -18,7 +18,9 @@ install:
 script:
   - mkdir build && cd build
   - | 
-    cmake -DHDF5_INCLUDE_DIR=/usr/include/hdf5/serial -DHDF5_LIBRARIES="/usr/lib/x86_64-linux-gnu/libhdf5_cpp.a;/usr/lib/x86_64-linux-gnu/libhdf5.a;/usr/lib/x86_64-linux-gnu/libzlib.a;/usr/lib/x86_64-linux-gnu/libsz.a;/usr/lib/x86_64-linux-gnu/libaec.a" .. \
+    cmake .. \
+    -DHDF5_INCLUDE_DIR=/usr/include/hdf5/serial 
+    -DHDF5_LIBRARIES="/usr/lib/x86_64-linux-gnu/libhdf5_cpp.a;/usr/lib/x86_64-linux-gnu/libhdf5.a;/usr/lib/x86_64-linux-gnu/libzlib.a;/usr/lib/x86_64-linux-gnu/libsz.a;/usr/lib/x86_64-linux-gnu/libaec.a" 
     -DIFC_SUPPORT=Off \
     -DOCC_INCLUDE_DIR=/usr/include/opencascade \
     -DOCC_LIBRARY_DIR=/usr/lib/x86_64-linux-gnu \
