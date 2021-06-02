@@ -112,18 +112,6 @@ endif()
 set(BOOST_COMPONENTS regex program_options iostreams system)
 
 
-SET(HDF5_INCLUDE_DIR ${IFCOPENSHELL_ROOT}/_deps-vs2017-x64-installed/HDF5-1.8.22-win64/include)
-SET(HDF5_LIBRARY_DIR ${IFCOPENSHELL_ROOT}/_deps-vs2017-x64-installed/HDF5-1.8.22-win64/lib)
-
-
-SET(HDF5_LIBRARIES 
-		"${HDF5_LIBRARY_DIR}/libhdf5_cpp.lib"
-		"${HDF5_LIBRARY_DIR}/libhdf5.lib"
-		"${HDF5_LIBRARY_DIR}/libzlib.lib"
-		"${HDF5_LIBRARY_DIR}/libsz.lib"
-		"${HDF5_LIBRARY_DIR}/libaec.lib")
-
-
 if (IFC_SUPPORT)
 # Find IfcOpenShell version, v0.6.0 does not have the IfcSchema namespace anymore
 file(READ "${IFCOPENSHELL_ROOT}/src/ifcparse/IfcParse.h" header)
@@ -161,6 +149,17 @@ if(UNIX)
         string(REGEX REPLACE "([^;]+)" "${ICU_LIBRARY_DIR}/lib\\1.a" ICU_LIBRARIES "${ICU_LIBRARY_NAMES}")
     endif()
 else()
+	
+	SET(HDF5_INCLUDE_DIR ${IFCOPENSHELL_ROOT}/_deps-vs2017-x64-installed/HDF5-1.8.22-win64/include)
+	SET(HDF5_LIBRARY_DIR ${IFCOPENSHELL_ROOT}/_deps-vs2017-x64-installed/HDF5-1.8.22-win64/lib)
+
+	SET(HDF5_LIBRARIES 
+		"${HDF5_LIBRARY_DIR}/libhdf5_cpp.lib"
+		"${HDF5_LIBRARY_DIR}/libhdf5.lib"
+		"${HDF5_LIBRARY_DIR}/libzlib.lib"
+		"${HDF5_LIBRARY_DIR}/libsz.lib"
+		"${HDF5_LIBRARY_DIR}/libaec.lib")
+
     set(BOOST_ROOT       ${IFCOPENSHELL_ROOT}/_deps/boost_1_74_0)
     set(BOOST_LIBRARYDIR ${IFCOPENSHELL_ROOT}/_deps/boost_1_74_0/stage/vs${MSVC_YEAR}-${WIN_ARCH}/lib)
 	
