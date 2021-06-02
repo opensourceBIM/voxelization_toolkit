@@ -12,6 +12,7 @@ install:
   - |
     sudo apt-get install -y \
     libocct-* \
+    libhdf5-dev \
     libboost-all-dev
     
 script:
