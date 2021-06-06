@@ -159,20 +159,20 @@ public:
 
 		//Regions dataset
 		const H5std_string REGIONS_DATASET_NAME("regions");
-		const int      REGION_RANK = 2;
-		hsize_t     regions_dimsf[2];
+		const int      REGION_RANK = 1;
+		hsize_t     regions_dimsf[1];
 		regions_dimsf[0] = NC;
-		regions_dimsf[1] = 1;
+		//regions_dimsf[1] = 1;
 		H5::DataSpace regions_dataspace(REGION_RANK, regions_dimsf);
 		H5::PredType regions_datatype(H5::PredType::STD_REF_DSETREG);
 		regions_datatype.setOrder(H5T_ORDER_LE);
 
 		H5::DataSet regions_dataset = file.createDataSet(REGIONS_DATASET_NAME, regions_datatype, regions_dataspace);
 		// Regions hyperlab
-		hsize_t     region_offset[2];
+		hsize_t     region_offset[1];
 		region_offset[0] = -1;
-		region_offset[1] = 0;
-		hsize_t     region_slab_dimsf[2] = { 1, 1 };
+		//region_offset[1] = 0;
+		hsize_t     region_slab_dimsf[1] = { 1};
 		H5::DataSpace mspace3(REGION_RANK, region_slab_dimsf);
 
 		//Chunk hyperslab 
@@ -231,7 +231,7 @@ public:
 
 						hobj_ref_t inter[1];
 						file.reference(&inter[0], "/continuous_chunks", dataspace, H5R_DATASET_REGION);
-						//regions_dataset.write(inter, H5::PredType::STD_REF_DSETREG, mspace3, regions_dataspace);
+						regions_dataset.write(inter, H5::PredType::STD_REF_DSETREG, mspace3, regions_dataspace);
 					}
 				}
 
