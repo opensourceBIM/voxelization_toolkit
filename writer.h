@@ -85,10 +85,6 @@ class hdf_writer :public abstract_writer {
 public:
 	void Write(const std::string& fnc) {
 
-
-
-
-
 		chunked_voxel_storage<bit_t>* storage = (chunked_voxel_storage<bit_t>*)voxels_;
 
 		int continuous_count = 0;
@@ -127,20 +123,20 @@ public:
 		}
 		END_LOOP;
 
+
 		const H5std_string FILE_NAME(fnc);
+		H5::H5File file(FILE_NAME, H5F_ACC_TRUNC);
+
+		// Continuous chunks dataset
 		const H5std_string CONTINUOUS_DATASET_NAME("continuous_chunks");
 
-
 		const int      NC = continuous_count;
-		const int      NP = planar_count;
-
 		const int      NX = storage->chunk_size();
 		const int      NY = storage->chunk_size();
 		const int	   NZ = storage->chunk_size();
 
 		const int      RANK = 4;
-		H5::H5File file(FILE_NAME, H5F_ACC_TRUNC);
-
+		
 		hsize_t     dimsf[4];
 		dimsf[0] = NC;
 		dimsf[1] = NX;
@@ -152,7 +148,7 @@ public:
 		datatype.setOrder(H5T_ORDER_LE);
 		H5::DataSet dataset = file.createDataSet(CONTINUOUS_DATASET_NAME, datatype, dataspace);
 
-		// Hyperslab prep
+		// Continuous dataset hyperslab preparation
 		hsize_t     offset[4];
 		offset[0] = -1;
 		offset[1] = 0;
@@ -162,25 +158,55 @@ public:
 		hsize_t     slab_dimsf[4] = { 1, 1, 1, 1 };
 		H5::DataSpace mspace2(RANK, slab_dimsf);
 
+
+
+		//Planar chunks dataset
+		typedef struct s2_t {
+			int axis;
+			hvl_t offsets;
+		} s2_t;
+
+		const H5std_string AXIS("axis");
+		const H5std_string OFFSETS("offsets");
+
+		H5::VarLenType varlen_type(&H5::PredType::NATIVE_INT);
+		H5::CompType mtype2(sizeof(s2_t));
+		mtype2.insertMember(AXIS, HOFFSET(s2_t, axis), H5::PredType::NATIVE_INT);
+		mtype2.insertMember(OFFSETS, HOFFSET(s2_t, offsets), varlen_type);
+		const H5std_string PLANAR_DATASET_NAME("planar_chunks");
+
+		const int      PLANAR_RANK = 1;
+		hsize_t     planar_dimsf[1];
+		planar_dimsf[0] = planar_count;
+		H5::DataSpace planar_dataspace(PLANAR_RANK, planar_dimsf);
+		H5::DataSet planar_dataset = file.createDataSet(PLANAR_DATASET_NAME, mtype2, planar_dataspace);
+		hsize_t     planar_offset[1];
+		planar_offset[0] = -1;
+		hsize_t     planar_dims[1] = { 1 };
+		H5::DataSpace planar_space(PLANAR_RANK, planar_dims);
+
+
+
 		// Regions dataset
 		const H5std_string REGIONS_DATASET_NAME("regions");
-		const int      REGION_RANK = 1;
+
 		hsize_t     regions_dimsf[1];
 		regions_dimsf[0] = continuous_count + constant_count + planar_count;
-		//regions_dimsf[1] = 1;
+
+		const int      REGION_RANK = 1;
+
 		H5::DataSpace regions_dataspace(REGION_RANK, regions_dimsf);
 		H5::PredType regions_datatype(H5::PredType::STD_REF_DSETREG);
 		regions_datatype.setOrder(H5T_ORDER_LE);
-
 		H5::DataSet regions_dataset = file.createDataSet(REGIONS_DATASET_NAME, regions_datatype, regions_dataspace);
-		// Regions hyperlab
+
+		//  Regions dataset hyperslab preparation
 		hsize_t     region_offset[1];
 		region_offset[0] = -1;
-		//region_offset[1] = 0;
 		hsize_t     region_slab_dimsf[1] = { 1 };
 		H5::DataSpace mspace3(REGION_RANK, region_slab_dimsf);
 
-		// Chunk hyperslab 
+		// Continuous chunks region hyperslab preparation
 		hsize_t     chunk_offset[4];
 		const int CHUNK_RANK = 4;
 		chunk_offset[0] = -1;
@@ -190,75 +216,29 @@ public:
 		hsize_t     chunk_dimsf[4] = { 1, NX, NY, NZ };
 		H5::DataSpace chunk_space(CHUNK_RANK, chunk_dimsf);
 
-
-		typedef struct s2_t {
-			int a;
-			hvl_t b;
-		} s2_t;
-
-		const H5std_string AXIS("axis");
-		const H5std_string OFFSETS("offsets");
-
-		H5::VarLenType varlen_type(&H5::PredType::NATIVE_INT);
-		H5::CompType mtype2(sizeof(s2_t));
-		mtype2.insertMember(AXIS, HOFFSET(s2_t, a), H5::PredType::NATIVE_INT);
-		mtype2.insertMember(OFFSETS, HOFFSET(s2_t, b), varlen_type);
-		const H5std_string PLANAR_DATASET_NAME("planar_chunks");
-
-
-		const int      PLANAR_RANK = 1;
-		hsize_t     planar_dimsf[1];
-		planar_dimsf[0] = planar_count;
-		//planar_dimsf[1] = 1;
-
-
-		H5::DataSpace planar_dataspace(PLANAR_RANK, planar_dimsf);
-
-		H5::DataSet planar_dataset = file.createDataSet(PLANAR_DATASET_NAME, mtype2, planar_dataspace);
-
-
-
-		hsize_t     planar_offset[1];
-		planar_offset[0] = 1;
-	
-
-		hsize_t     planar_dims[2] = { 1,1};
-		H5::DataSpace planar_space(PLANAR_RANK, planar_dims);
-
-		planar_dataspace.selectHyperslab(H5S_SELECT_SET, planar_dims, planar_offset);
-
-
-
-		std::vector<s2_t> input_vec;
-
-		hvl_t varlen_offsets;
-		std::vector<int> tt = { 1,2,4,4,4,4 };
-		varlen_offsets.p = tt.data();
-
-
-		// No bug but nothing written when inspecting output file
-		s2_t ss;
-		ss.a = 4;
-		ss.b = varlen_offsets;
-		input_vec.push_back(ss);
-		planar_dataset.write(&ss, mtype2, planar_space, planar_dataspace);
-
+		// Planar chunks region hyperslab preparation 
+		hsize_t     planar_chunk_offset[1];
+		const int PLANAR_CHUNK_RANK = 1;
+		planar_chunk_offset[0] = 1;
+		hsize_t     planar_chunk_dimsf[1] = { 1 };
+		H5::DataSpace planar_chunk_space(PLANAR_CHUNK_RANK, planar_chunk_dimsf);
 
 
 		BEGIN_LOOP(size_t(0), nchunks_x, 0U, nchunks_y, 0U, nchunks_z)
 			auto c = storage->get_chunk(ijk);
 
-		if (c == nullptr) {
-			std::cout << "Null pointer" << std::endl;
+			if (c == nullptr) {
+				std::cout << "Null pointer" << std::endl;
 
-		}
+			}
 
-		else {
-			if (c->is_explicit() || c->is_constant()) {
-				if (c->is_constant()) {
+			else {
+				if (c->is_explicit() || c->is_constant()) {
+					if (c->is_constant()) {
 					std::cout << "Constant chunk" << std::endl;
 
 				}
+
 				else {
 					std::cout << "Continuous chunk" << std::endl;
 
@@ -294,18 +274,45 @@ public:
 				}
 			}
 
-			else {
-				std::cout << "Planar chunk" << std::endl;
-				planar_voxel_storage<bit_t>* planvox = (planar_voxel_storage<bit_t>*)c;
+				else {
+					std::cout << "Planar chunk" << std::endl;
+					planar_voxel_storage<bit_t>* planvox = (planar_voxel_storage<bit_t>*)c;
 
-				auto off = planvox->offsets();
-				auto axis = planvox->axis();
+					auto axis = planvox->axis();
+					auto off = planvox->offsets();
+
+					std::vector<int> offsets(off.begin(), off.end());
+
+					planar_offset[0]++;
+				
+					planar_dataspace.selectHyperslab(H5S_SELECT_SET, planar_dims, planar_offset);
+					std::vector<s2_t> input_vec;
+					hvl_t varlen_offsets;
+
+			
+					varlen_offsets.len = offsets.size();
+
+					varlen_offsets.p = offsets.data();
+					s2_t compound_data;
+					compound_data.axis = axis;
+					compound_data.offsets = varlen_offsets;
+					input_vec.push_back(compound_data);
+					planar_dataset.write(&compound_data, mtype2, planar_space, planar_dataspace);
 
 
+					region_offset[0]++;
+					regions_dataspace.selectHyperslab(H5S_SELECT_SET, region_slab_dimsf, region_offset);
 
+					planar_chunk_offset[0]++;
 
+					dataspace.selectHyperslab(H5S_SELECT_SET, planar_chunk_dimsf, planar_chunk_offset);
+
+					hobj_ref_t inter[1];
+					file.reference(&inter[0], "/planar_chunks", planar_dataspace, H5R_DATASET_REGION);
+					regions_dataset.write(inter, H5::PredType::STD_REF_DSETREG, mspace3, regions_dataspace);
+
+				}
 			}
-		}
 		END_LOOP
 	}
 };
