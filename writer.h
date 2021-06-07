@@ -192,7 +192,7 @@ public:
 
 
 		typedef struct s2_t {
-			double a;
+			int a;
 			hvl_t b;
 		} s2_t;
 
@@ -206,10 +206,10 @@ public:
 		const H5std_string PLANAR_DATASET_NAME("planar_chunks");
 
 
-		const int      PLANAR_RANK = 2;
+		const int      PLANAR_RANK = 1;
 		hsize_t     planar_dimsf[1];
 		planar_dimsf[0] = planar_count;
-		planar_dimsf[1] = 1;
+		//planar_dimsf[1] = 1;
 
 
 		H5::DataSpace planar_dataspace(PLANAR_RANK, planar_dimsf);
@@ -218,11 +218,11 @@ public:
 
 
 
-		hsize_t     planar_offset[2];
+		hsize_t     planar_offset[1];
 		planar_offset[0] = 1;
-		planar_offset[1] = 0;
+	
 
-		hsize_t     planar_dims[2] = { 1,1 };
+		hsize_t     planar_dims[2] = { 1,1};
 		H5::DataSpace planar_space(PLANAR_RANK, planar_dims);
 
 		planar_dataspace.selectHyperslab(H5S_SELECT_SET, planar_dims, planar_offset);
@@ -233,7 +233,7 @@ public:
 
 		hvl_t varlen_offsets;
 		std::vector<int> tt = { 1,2,4,4,4,4 };
-		varlen_offsets.p = &tt;
+		varlen_offsets.p = tt.data();
 
 
 		// No bug but nothing written when inspecting output file
@@ -241,7 +241,7 @@ public:
 		ss.a = 4;
 		ss.b = varlen_offsets;
 		input_vec.push_back(ss);
-		planar_dataset.write(input_vec.data(), mtype2, planar_space, planar_dataspace);
+		planar_dataset.write(&ss, mtype2, planar_space, planar_dataspace);
 
 
 
