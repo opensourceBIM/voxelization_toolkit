@@ -130,10 +130,10 @@ public:
 		// Continuous chunks dataset
 		const H5std_string CONTINUOUS_DATASET_NAME("continuous_chunks");
 
-		const int      NC = continuous_count;
-		const int      NX = storage->chunk_size();
-		const int      NY = storage->chunk_size();
-		const int	   NZ = storage->chunk_size();
+		const hsize_t      NC = continuous_count;
+		const hsize_t      NX = storage->chunk_size();
+		const hsize_t      NY = storage->chunk_size();
+		const hsize_t	   NZ = storage->chunk_size();
 
 		const int      RANK = 4;
 
