@@ -251,6 +251,23 @@ public:
 
 		if (c == nullptr) {
 			std::cout << "Null pointer" << std::endl;
+
+			constant_offset[0]++;
+			constant_dataspace.selectHyperslab(H5S_SELECT_SET, constant_dims, constant_offset);
+			int constant_value[1] = { 0 };
+			dataset.write(constant_value, H5::PredType::NATIVE_INT, constant_space, constant_dataspace);
+
+
+			region_offset[0]++;
+			regions_dataspace.selectHyperslab(H5S_SELECT_SET, region_slab_dimsf, region_offset);
+
+			constant_chunk_offset[0]++;
+
+			//dataspace.selectHyperslab(H5S_SELECT_SET, planar_chunk_dimsf, planar_chunk_offset);
+
+			hobj_ref_t inter[1];
+			file.reference(&inter[0], "/constant_chunks", constant_dataspace, H5R_DATASET_REGION);
+			regions_dataset.write(inter, H5::PredType::STD_REF_DSETREG, mspace3, regions_dataspace);
 		}
 
 		else {
@@ -260,8 +277,22 @@ public:
 
 					constant_offset[0]++;
 					constant_dataspace.selectHyperslab(H5S_SELECT_SET, constant_dims, constant_offset);
-					int inter[1] = { 1 };
-					dataset.write(inter, H5::PredType::NATIVE_INT, constant_space, constant_dataspace);
+					int constant_value[1] = { 1 };
+					dataset.write(constant_value , H5::PredType::NATIVE_INT, constant_space, constant_dataspace);
+
+
+					region_offset[0]++;
+					regions_dataspace.selectHyperslab(H5S_SELECT_SET, region_slab_dimsf, region_offset);
+
+					constant_chunk_offset[0]++;
+
+					//dataspace.selectHyperslab(H5S_SELECT_SET, planar_chunk_dimsf, planar_chunk_offset);
+
+					hobj_ref_t inter[1];
+					file.reference(&inter[0], "/constant_chunks", constant_dataspace, H5R_DATASET_REGION);
+					regions_dataset.write(inter, H5::PredType::STD_REF_DSETREG, mspace3, regions_dataspace);
+
+
 
 				}
 
@@ -331,7 +362,7 @@ public:
 
 				planar_chunk_offset[0]++;
 
-				dataspace.selectHyperslab(H5S_SELECT_SET, planar_chunk_dimsf, planar_chunk_offset);
+				//dataspace.selectHyperslab(H5S_SELECT_SET, planar_chunk_dimsf, planar_chunk_offset);
 
 				hobj_ref_t inter[1];
 				file.reference(&inter[0], "/planar_chunks", planar_dataspace, H5R_DATASET_REGION);
