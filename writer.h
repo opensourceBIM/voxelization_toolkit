@@ -99,28 +99,35 @@ public:
 			auto c = storage->get_chunk(ijk);
 
 		if (c == nullptr) {
-			std::cout << "Null pointer" << std::endl;
+			std::cout << "Null pointer count" << std::endl;
 			constant_count++;
+
 		}
 
 		else {
-			if (c->is_explicit() || c->is_constant()) {
-				if (c->is_constant()) {
-					std::cout << "Count Constant chunk" << std::endl;
-					constant_count++;
-				}
-				else {
-					std::cout << "Count Continuous chunk" << std::endl;
-					continuous_count++;
-				}
+
+			if (c->is_explicit()) {
+				std::cout << "Continuous chunk count" << std::endl;
+				continuous_count++;
 			}
 
 			else {
+				if (c->is_constant()) {
+					std::cout << "Constant chunk count" << std::endl;
+					constant_count++;
+				}
 
-				std::cout << " Count Planar chunk" << std::endl;
-				planar_count++;
+
+				else {
+					std::cout << "Planar chunk count" << std::endl;
+					planar_count++;
+				
+				}
 			}
+
+
 		}
+
 		END_LOOP;
 
 
@@ -271,14 +278,50 @@ public:
 		}
 
 		else {
-			if (c->is_explicit() || c->is_constant()) {
+
+			if (c->is_explicit()) {
+				std::cout << "Continuous chunk" << std::endl;
+
+				offset[0]++;
+
+				continuous_voxel_storage<bit_t>* convox = (continuous_voxel_storage<bit_t>*)c;
+				size_t i0, j0, k0, i1, j1, k1;
+				i0 = 0;
+				j0 = 0;
+				k0 = 0;
+				convox->extents().tie(i1, j1, k1);
+
+				BEGIN_LOOP_ZERO_2(make_vec<size_t>(i1, j1, k1))
+					offset[1] = ijk.get(0);
+				offset[2] = ijk.get(1);
+				offset[3] = ijk.get(2);
+				dataspace.selectHyperslab(H5S_SELECT_SET, slab_dimsf, offset);
+
+				std::vector<int> hslab = { convox->Get(ijk) };
+				dataset.write(hslab.data(), H5::PredType::NATIVE_INT, mspace2, dataspace);
+				END_LOOP;
+
+				region_offset[0]++;
+				regions_dataspace.selectHyperslab(H5S_SELECT_SET, region_slab_dimsf, region_offset);
+
+				chunk_offset[0]++;
+
+				dataspace.selectHyperslab(H5S_SELECT_SET, chunk_dimsf, chunk_offset);
+
+				hobj_ref_t inter[1];
+				file.reference(&inter[0], "/continuous_chunks", dataspace, H5R_DATASET_REGION);
+				regions_dataset.write(inter, H5::PredType::STD_REF_DSETREG, mspace3, regions_dataspace);
+
+			}
+
+			else {
 				if (c->is_constant()) {
 					std::cout << "Constant chunk" << std::endl;
 
 					constant_offset[0]++;
 					constant_dataspace.selectHyperslab(H5S_SELECT_SET, constant_dims, constant_offset);
 					int constant_value[1] = { 1 };
-					dataset.write(constant_value , H5::PredType::NATIVE_INT, constant_space, constant_dataspace);
+					dataset.write(constant_value, H5::PredType::NATIVE_INT, constant_space, constant_dataspace);
 
 
 					region_offset[0]++;
@@ -296,79 +339,48 @@ public:
 
 				}
 
+
 				else {
-					std::cout << "Continuous chunk" << std::endl;
+					std::cout << "Planar chunk" << std::endl;
+					planar_voxel_storage<bit_t>* planvox = (planar_voxel_storage<bit_t>*)c;
 
-					offset[0]++;
+					auto axis = planvox->axis();
+					auto off = planvox->offsets();
 
-					continuous_voxel_storage<bit_t>* convox = (continuous_voxel_storage<bit_t>*)c;
-					size_t i0, j0, k0, i1, j1, k1;
-					i0 = 0;
-					j0 = 0;
-					k0 = 0;
-					convox->extents().tie(i1, j1, k1);
+					std::vector<int> offsets(off.begin(), off.end());
 
-					BEGIN_LOOP_ZERO_2(make_vec<size_t>(i1, j1, k1))
-						offset[1] = ijk.get(0);
-					offset[2] = ijk.get(1);
-					offset[3] = ijk.get(2);
-					dataspace.selectHyperslab(H5S_SELECT_SET, slab_dimsf, offset);
+					planar_offset[0]++;
 
-					std::vector<int> hslab = { convox->Get(ijk) };
-					dataset.write(hslab.data(), H5::PredType::NATIVE_INT, mspace2, dataspace);
-					END_LOOP;
+					planar_dataspace.selectHyperslab(H5S_SELECT_SET, planar_dims, planar_offset);
+					std::vector<s2_t> input_vec;
+					hvl_t varlen_offsets;
+
+
+					varlen_offsets.len = offsets.size();
+
+					varlen_offsets.p = offsets.data();
+					s2_t compound_data;
+					compound_data.axis = axis;
+					compound_data.offsets = varlen_offsets;
+					input_vec.push_back(compound_data);
+					planar_dataset.write(&compound_data, mtype2, planar_space, planar_dataspace);
+
 
 					region_offset[0]++;
 					regions_dataspace.selectHyperslab(H5S_SELECT_SET, region_slab_dimsf, region_offset);
 
-					chunk_offset[0]++;
+					planar_chunk_offset[0]++;
 
-					dataspace.selectHyperslab(H5S_SELECT_SET, chunk_dimsf, chunk_offset);
+					//dataspace.selectHyperslab(H5S_SELECT_SET, planar_chunk_dimsf, planar_chunk_offset);
 
 					hobj_ref_t inter[1];
-					file.reference(&inter[0], "/continuous_chunks", dataspace, H5R_DATASET_REGION);
+					file.reference(&inter[0], "/planar_chunks", planar_dataspace, H5R_DATASET_REGION);
 					regions_dataset.write(inter, H5::PredType::STD_REF_DSETREG, mspace3, regions_dataspace);
+
 				}
 			}
 
-			else {
-				std::cout << "Planar chunk" << std::endl;
-				planar_voxel_storage<bit_t>* planvox = (planar_voxel_storage<bit_t>*)c;
 
-				auto axis = planvox->axis();
-				auto off = planvox->offsets();
-
-				std::vector<int> offsets(off.begin(), off.end());
-
-				planar_offset[0]++;
-
-				planar_dataspace.selectHyperslab(H5S_SELECT_SET, planar_dims, planar_offset);
-				std::vector<s2_t> input_vec;
-				hvl_t varlen_offsets;
-
-
-				varlen_offsets.len = offsets.size();
-
-				varlen_offsets.p = offsets.data();
-				s2_t compound_data;
-				compound_data.axis = axis;
-				compound_data.offsets = varlen_offsets;
-				input_vec.push_back(compound_data);
-				planar_dataset.write(&compound_data, mtype2, planar_space, planar_dataspace);
-
-
-				region_offset[0]++;
-				regions_dataspace.selectHyperslab(H5S_SELECT_SET, region_slab_dimsf, region_offset);
-
-				planar_chunk_offset[0]++;
-
-				//dataspace.selectHyperslab(H5S_SELECT_SET, planar_chunk_dimsf, planar_chunk_offset);
-
-				hobj_ref_t inter[1];
-				file.reference(&inter[0], "/planar_chunks", planar_dataspace, H5R_DATASET_REGION);
-				regions_dataset.write(inter, H5::PredType::STD_REF_DSETREG, mspace3, regions_dataspace);
-
-			}
 		}
 		END_LOOP
 	}
