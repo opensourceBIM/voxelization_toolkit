@@ -85,8 +85,8 @@ class hdf_writer :public abstract_writer {
 public:
 	void Write(const std::string& fnc) {
 
-		chunked_voxel_storage<bit_t>* storage = (chunked_voxel_storage<bit_t>*)voxels_;
-
+		abstract_chunked_voxel_storage* storage = (abstract_chunked_voxel_storage*)voxels_;
+				
 		int continuous_count = 0;
 		int planar_count = 0;
 		int constant_count = 0;
@@ -255,6 +255,8 @@ public:
 
 		BEGIN_LOOP(size_t(0), nchunks_x, 0U, nchunks_y, 0U, nchunks_z)
 			auto c = storage->get_chunk(ijk);
+		
+		
 
 		if (c == nullptr) {
 			std::cout << "Null pointer" << std::endl;
@@ -283,22 +285,35 @@ public:
 				std::cout << "Continuous chunk" << std::endl;
 
 				offset[0]++;
-
-				continuous_voxel_storage<bit_t>* convox = (continuous_voxel_storage<bit_t>*)c;
+			
 				size_t i0, j0, k0, i1, j1, k1;
 				i0 = 0;
 				j0 = 0;
 				k0 = 0;
-				convox->extents().tie(i1, j1, k1);
+				c->extents().tie(i1, j1, k1);
 
 				BEGIN_LOOP_ZERO_2(make_vec<size_t>(i1, j1, k1))
 					offset[1] = ijk.get(0);
-				offset[2] = ijk.get(1);
-				offset[3] = ijk.get(2);
-				dataspace.selectHyperslab(H5S_SELECT_SET, slab_dimsf, offset);
+					offset[2] = ijk.get(1);
+					offset[3] = ijk.get(2);
+					dataspace.selectHyperslab(H5S_SELECT_SET, slab_dimsf, offset);
 
-				std::vector<int> hslab = { convox->Get(ijk) };
-				dataset.write(hslab.data(), H5::PredType::NATIVE_INT, mspace2, dataspace);
+					if (c->value_bits() == 32) {
+
+						uint32_t  v;
+						std::vector<uint32_t> hslab;
+						c->Get(ijk, &v);
+						hslab.push_back(v);
+						dataset.write(hslab.data(), H5::PredType::NATIVE_INT, mspace2, dataspace);
+					
+					}
+
+					else {
+						std::vector<int> hslab = { c->Get(ijk) };
+						dataset.write(hslab.data(), H5::PredType::NATIVE_INT, mspace2, dataspace);
+					}
+
+					
 				END_LOOP;
 
 				region_offset[0]++;
