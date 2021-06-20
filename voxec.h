@@ -980,7 +980,7 @@ class op_export_elements : public voxel_operation {
 				num_faces++;
 			}
 
-			// @todo arbitary value alert
+			// @todo arbitrary value alert
 			if (num_faces > 3) {
 				std::string guid = *((IfcUtil::IfcBaseEntity*)f0->instance_by_id(iden))->get("GlobalId");
 				if (n) {
@@ -1029,7 +1029,7 @@ class op_export_ifc : public voxel_operation  {
 				num_faces++;
 			}
 
-			// @todo arbitary value alert
+			// @todo arbitrary value alert
 			if (num_faces >= 1) {
 				auto inst = f0->instance_by_id(iden);
 				new_file.addEntity(inst);
