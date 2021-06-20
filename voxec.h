@@ -609,6 +609,24 @@ public:
 	}
 };
 
+
+class op_count_components : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" } };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input");
+		int cnt = 0;
+		connected_components((regular_voxel_storage*)voxels, [&cnt](regular_voxel_storage* c) {
+			++cnt;
+		});
+		symbol_value v = cnt;
+		return v;
+	}
+};
+
 class op_print_values : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
@@ -1648,6 +1666,64 @@ namespace {
 #endif			
 		}
 	};
+
+	// @todo this is a very minimal implementation for specific cases
+	class instance_by_property_map_filter : public instance_filter_t {
+	public:
+		typedef std::vector<std::pair<std::string, int> > values_t;
+	private:
+		values_t attr_pattern_;
+	public:
+		instance_by_property_map_filter(const values_t& pattern)
+			: attr_pattern_(pattern)
+		{}
+
+		bool operator()(const IfcUtil::IfcBaseEntity* inst) const {
+#ifdef IFCOPENSHELL_05
+			throw std::runtime_error("Not implemented");
+#else
+			for (auto& p : attr_pattern_) {
+				auto rels = inst->get_inverse("IsDefinedBy");
+				bool has_match = false;
+				if (rels) {
+					for (auto& rel : *rels) {
+						if (rel->declaration().is("IfcRelDefinesByProperties")) {
+							IfcUtil::IfcBaseClass* pset = *((IfcUtil::IfcBaseEntity*)rel)->get("RelatingPropertyDefinition");
+							if (pset->declaration().is("IfcPropertySet")) {
+								IfcEntityList::ptr props = *((IfcUtil::IfcBaseEntity*)pset)->get("HasProperties");
+								for (auto& prop : *props) {
+									if (prop->declaration().is("IfcPropertySingleValue")) {
+										auto name = (std::string) *((IfcUtil::IfcBaseEntity*)prop)->get("Name");
+										if (name == p.first) {
+											has_match = true;
+											IfcUtil::IfcBaseClass* val = *((IfcUtil::IfcBaseEntity*)prop)->get("NominalValue");
+											auto val_attr = val->data().getArgument(0);
+											if (val_attr->type() == IfcUtil::Argument_BOOL) {
+												auto b = (bool)*val_attr;
+												bool match = (b ? 1 : 0) == p.second;
+												if (!match) {
+													return false;
+												}
+											} else {
+												return false;
+											}
+										}
+									}
+								}
+							}
+						}
+					}
+				}
+
+				if (!has_match) {
+					return false;
+				}
+			}
+			
+			return true;
+#endif
+		}
+	};
 }
 
 class op_create_attr_filter : public voxel_operation {
@@ -1683,8 +1759,24 @@ public:
 		static std::vector<argument_spec> nm_ = { { true, "input", "ifcfile" } };
 		return nm_;
 	}
+	bool catch_all() const {
+		return true;
+	}
+	bool only_local() const {
+		return true;
+	}
 	symbol_value invoke(const scope_map& scope) const {
-		throw std::runtime_error("Not implemented");
+		static std::set<std::string> to_exclude{ "input" };
+		filtered_files_t ifc_files_copy = scope.get_value<filtered_files_t>("input");
+		instance_by_property_map_filter::values_t vs;
+		for (auto& p : scope) {
+			if (to_exclude.find(p.first) == to_exclude.end()) {
+				auto s = boost::get<int>(boost::get<function_arg_value_type>(p.second));
+				vs.push_back({ p.first, s });
+			}
+		}
+		ifc_files_copy.filter = new instance_by_property_map_filter(vs);
+		return ifc_files_copy;
 	}
 };
 
