@@ -39,7 +39,7 @@ public:
 		voxels_ = voxels;
 	}
 
-	virtual void Write(const std::string& fnc) = 0;
+	virtual void Write(const std::string& fnc, std::string statement="default") = 0;
 
 
 };
@@ -55,7 +55,7 @@ private:
 	}
 
 public:
-	void Write(const std::string& fnc) {
+	void Write(const std::string& fnc, std::string statement = "default") {
 		{
 			std::string fn = fnc + std::string(".index");
 			std::ofstream fs(fn.c_str());
@@ -83,10 +83,10 @@ public:
 class hdf_writer :public abstract_writer {
 
 public:
-	void Write(const std::string& fnc) {
+	void Write(const std::string& fnc, std::string statement="default") {
 
 		abstract_chunked_voxel_storage* storage = (abstract_chunked_voxel_storage*)voxels_;
-				
+
 		int continuous_count = 0;
 		int planar_count = 0;
 		int constant_count = 0;
@@ -99,7 +99,6 @@ public:
 			auto c = storage->get_chunk(ijk);
 
 		if (c == nullptr) {
-			std::cout << "Null pointer count" << std::endl;
 			constant_count++;
 
 		}
@@ -107,19 +106,16 @@ public:
 		else {
 
 			if (c->is_explicit()) {
-				std::cout << "Continuous chunk count" << std::endl;
 				continuous_count++;
 			}
 
 			else {
 				if (c->is_constant()) {
-					std::cout << "Constant chunk count" << std::endl;
 					constant_count++;
 				}
 
 
 				else {
-					std::cout << "Planar chunk count" << std::endl;
 					planar_count++;
 				
 				}
@@ -131,9 +127,14 @@ public:
 		END_LOOP;
 
 
-		const H5std_string FILE_NAME(fnc);
-		H5::H5File file(FILE_NAME, H5F_ACC_TRUNC);
 
+		//TODO: Handle existing file (with group) case
+		const H5std_string FILE_NAME(fnc);
+		H5::H5File file(FILE_NAME, H5F_ACC_RDWR);
+		
+		H5::Group operation_group = H5::Group(file.createGroup(statement));
+
+		
 		// Continuous chunks dataset
 		const H5std_string CONTINUOUS_DATASET_NAME("continuous_chunks");
 
@@ -153,7 +154,7 @@ public:
 		H5::DataSpace dataspace(RANK, dimsf);
 		H5::IntType datatype(H5::PredType::NATIVE_INT);
 		datatype.setOrder(H5T_ORDER_LE);
-		H5::DataSet dataset = file.createDataSet(CONTINUOUS_DATASET_NAME, datatype, dataspace);
+		H5::DataSet dataset = operation_group.createDataSet(CONTINUOUS_DATASET_NAME, datatype, dataspace);
 
 		// Continuous dataset hyperslab preparation
 		hsize_t     offset[4];
@@ -186,7 +187,7 @@ public:
 		hsize_t     planar_dimsf[1];
 		planar_dimsf[0] = planar_count;
 		H5::DataSpace planar_dataspace(PLANAR_RANK, planar_dimsf);
-		H5::DataSet planar_dataset = file.createDataSet(PLANAR_DATASET_NAME, mtype2, planar_dataspace);
+		H5::DataSet planar_dataset = operation_group.createDataSet(PLANAR_DATASET_NAME, mtype2, planar_dataspace);
 		hsize_t     planar_offset[1];
 		planar_offset[0] = -1;
 		hsize_t     planar_dims[1] = { 1 };
@@ -201,7 +202,7 @@ public:
 		hsize_t     constant_dimsf[1];
 		constant_dimsf[0] = constant_count;
 		H5::DataSpace constant_dataspace(CONSTANT_RANK, constant_dimsf);
-		H5::DataSet constant_dataset = file.createDataSet(CONSTANT_DATASET_NAME, H5::PredType::NATIVE_INT, constant_dataspace);
+		H5::DataSet constant_dataset = operation_group.createDataSet(CONSTANT_DATASET_NAME, H5::PredType::NATIVE_INT, constant_dataspace);
 		hsize_t     constant_offset[1];
 		constant_offset[0] = -1;
 		hsize_t     constant_dims[1] = { 1 };
@@ -220,7 +221,7 @@ public:
 		H5::DataSpace regions_dataspace(REGION_RANK, regions_dimsf);
 		H5::PredType regions_datatype(H5::PredType::STD_REF_DSETREG);
 		regions_datatype.setOrder(H5T_ORDER_LE);
-		H5::DataSet regions_dataset = file.createDataSet(REGIONS_DATASET_NAME, regions_datatype, regions_dataspace);
+		H5::DataSet regions_dataset = operation_group.createDataSet(REGIONS_DATASET_NAME, regions_datatype, regions_dataspace);
 
 		//  Regions dataset hyperslab preparation
 		hsize_t     region_offset[1];
@@ -259,8 +260,7 @@ public:
 		
 
 		if (c == nullptr) {
-			std::cout << "Null pointer" << std::endl;
-
+			
 			constant_offset[0]++;
 			constant_dataspace.selectHyperslab(H5S_SELECT_SET, constant_dims, constant_offset);
 			int constant_value[1] = { 0 };
@@ -272,18 +272,15 @@ public:
 
 			constant_chunk_offset[0]++;
 
-			//dataspace.selectHyperslab(H5S_SELECT_SET, planar_chunk_dimsf, planar_chunk_offset);
-
 			hobj_ref_t inter[1];
-			file.reference(&inter[0], "/constant_chunks", constant_dataspace, H5R_DATASET_REGION);
+			file.reference(&inter[0], "/" + statement + "/constant_chunks", constant_dataspace, H5R_DATASET_REGION);
 			regions_dataset.write(inter, H5::PredType::STD_REF_DSETREG, mspace3, regions_dataspace);
 		}
 
 		else {
 
 			if (c->is_explicit()) {
-				std::cout << "Continuous chunk" << std::endl;
-
+				
 				offset[0]++;
 			
 				size_t i0, j0, k0, i1, j1, k1;
@@ -324,15 +321,14 @@ public:
 				dataspace.selectHyperslab(H5S_SELECT_SET, chunk_dimsf, chunk_offset);
 
 				hobj_ref_t inter[1];
-				file.reference(&inter[0], "/continuous_chunks", dataspace, H5R_DATASET_REGION);
+				file.reference(&inter[0], "/" + statement + "/continuous_chunks", dataspace, H5R_DATASET_REGION);
 				regions_dataset.write(inter, H5::PredType::STD_REF_DSETREG, mspace3, regions_dataspace);
 
 			}
 
 			else {
 				if (c->is_constant()) {
-					std::cout << "Constant chunk" << std::endl;
-
+				
 					constant_offset[0]++;
 					constant_dataspace.selectHyperslab(H5S_SELECT_SET, constant_dims, constant_offset);
 					int constant_value[1] = { 1 };
@@ -344,19 +340,16 @@ public:
 
 					constant_chunk_offset[0]++;
 
-					//dataspace.selectHyperslab(H5S_SELECT_SET, planar_chunk_dimsf, planar_chunk_offset);
 
 					hobj_ref_t inter[1];
-					file.reference(&inter[0], "/constant_chunks", constant_dataspace, H5R_DATASET_REGION);
+					file.reference(&inter[0], "/" + statement + "/constant_chunks", constant_dataspace, H5R_DATASET_REGION);
 					regions_dataset.write(inter, H5::PredType::STD_REF_DSETREG, mspace3, regions_dataspace);
-
-
 
 				}
 
 
 				else {
-					std::cout << "Planar chunk" << std::endl;
+
 					planar_voxel_storage<bit_t>* planvox = (planar_voxel_storage<bit_t>*)c;
 
 					auto axis = planvox->axis();
@@ -386,10 +379,9 @@ public:
 
 					planar_chunk_offset[0]++;
 
-					//dataspace.selectHyperslab(H5S_SELECT_SET, planar_chunk_dimsf, planar_chunk_offset);
 
 					hobj_ref_t inter[1];
-					file.reference(&inter[0], "/planar_chunks", planar_dataspace, H5R_DATASET_REGION);
+					file.reference(&inter[0], "/" + statement + "/planar_chunks", planar_dataspace, H5R_DATASET_REGION);
 					regions_dataset.write(inter, H5::PredType::STD_REF_DSETREG, mspace3, regions_dataspace);
 
 				}
