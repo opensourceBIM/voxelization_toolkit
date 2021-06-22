@@ -268,7 +268,7 @@ public:
 class op_create_geometry : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "input", "ifcfile" }, { false, "include", "sequence"}, { false, "exclude", "sequence"} };
+		static std::vector<argument_spec> nm_ = { { true, "input", "ifcfile" }, { false, "include", "sequence"}, { false, "exclude", "sequence"}, { false, "optional", "integer"} };
 		return nm_;
 	}
 		
@@ -466,7 +466,7 @@ public:
 
 		}		
 
-		if (!at_least_one_succesful) {
+		if (scope.get_value_or<int>("optional", 0) == 0 && !at_least_one_succesful) {
 			json_logger::message(json_logger::LOG_FATAL, "Failed to generate geometry");
 			abort();
 		}
