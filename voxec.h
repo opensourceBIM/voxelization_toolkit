@@ -1374,12 +1374,15 @@ template <abstract_voxel_storage*(abstract_voxel_storage::*Fn)(const abstract_vo
 class op_boolean : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "a", "voxels" }, { true, "b", "voxels" } };
+		static std::vector<argument_spec> nm_ = { { true, "a", "voxels" }, { true, "b", "voxels" }, {false, "if_non_empty", "integer"} };
 		return nm_;
 	}
 	symbol_value invoke(const scope_map& scope) const {
 		abstract_voxel_storage* a = scope.get_value<abstract_voxel_storage*>("a");
 		abstract_voxel_storage* b = scope.get_value<abstract_voxel_storage*>("b");
+		if (scope.get_value_or<int>("if_non_empty", 0) == 1 && b->count() == 0) {
+			return a;
+		}
 		return (a->*Fn)(b);
 	}
 };
