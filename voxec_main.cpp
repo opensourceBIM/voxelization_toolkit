@@ -108,13 +108,27 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
+	boost::optional<std::string> error;
+
 	try {
 		run(tree, d, threads.get_value_or(1), chunk.get_value_or(128), with_mesh, quiet);
-		return 0;
 	} catch (const std::runtime_error& e) {
-		json_logger::message(json_logger::LOG_FATAL, "encountered {error} while running voxelfile", {
-			{"error", {{"message", std::string(e.what())}}}
-		});
-		return 1;
+		error = std::string(e.what());
+	} catch (const Standard_Failure& e) {
+		if (e.GetMessageString()) {
+			error = std::string(e.GetMessageString());
+		} else {
+			error.emplace();
+		}
+	} catch (...) {
+		error.emplace();
 	}
+
+	if (error) {
+		json_logger::message(json_logger::LOG_FATAL, "encountered {error} while running voxelfile", {
+				{"error", {{"message", *error}}}
+		});
+	}
+	
+	return error ? 1 : 0;
 }
