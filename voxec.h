@@ -496,6 +496,10 @@ namespace {
 			BRepBndLib::Add(p.second, global_bounds);
 		}
 
+		if (global_bounds.IsVoid()) {
+			return (abstract_voxel_storage*) new chunked_voxel_storage<V>(make_vec<long>(0, 0, 0), vsize, chunksize, make_vec<size_t>(1U, 1U, 1U));
+		}
+
 		global_bounds.Get(x1, y1, z1, x2, y2, z2);
 		nx = (int)ceil((x2 - x1) / vsize);
 		ny = (int)ceil((y2 - y1) / vsize);
