@@ -6,6 +6,7 @@
 class collapse {
 public:
 	abstract_voxel_storage* until = nullptr;
+	boost::optional<int> max_depth;
 
 	regular_voxel_storage* operator()(abstract_voxel_storage* storage, int dx, int dy, int dz) {
 		int d[3] = { dx, dy, dz };
@@ -56,6 +57,7 @@ public:
 class collapse_count {
 public:
 	abstract_voxel_storage* until = nullptr;
+	boost::optional<int> max_depth;
 
 	regular_voxel_storage* operator()(abstract_voxel_storage* storage, int dx, int dy, int dz) {
 		int d[3] = { dx, dy, dz };

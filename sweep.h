@@ -6,6 +6,7 @@
 class sweep {
 public:
 	abstract_voxel_storage* until = nullptr;
+	boost::optional<int> max_depth;
 
 	regular_voxel_storage* operator()(abstract_voxel_storage* storage, int dx, int dy, int dz) {
 		int d[3] = { dx, dy, dz };
@@ -49,15 +50,19 @@ public:
 						ijk2.get(D)--;
 					}
 
+					if (!((ijk2 >= zero).all() && (ijk2 < extents).all())) {
+						break;
+					}
+
 					if (until) {
 						if (until->Get(ijk2.as<size_t>())) {
 							break;
 						}
 					}
+					
+					swepts->Set(ijk2.as<size_t>());
 
-					if ((ijk2 >= zero).all() && (ijk2 < extents).all()) {
-						swepts->Set(ijk2.as<size_t>());
-					} else {
+					if (max_depth && i >= *max_depth) {
 						break;
 					}
 
