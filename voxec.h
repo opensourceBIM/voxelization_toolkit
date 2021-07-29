@@ -19,6 +19,8 @@
 
 #include <boost/filesystem.hpp>
 
+// #define OLD_GROUP_BY
+
 struct instance_filter_t {
 	virtual bool operator()(const IfcUtil::IfcBaseEntity*) const = 0;
 };
@@ -700,6 +702,7 @@ namespace {
 		}
 	};
 
+#ifdef OLD_GROUP_BY
 	template <typename Fn>
 	void group_by(regular_voxel_storage* groups, abstract_voxel_storage* voxels, Fn fn, int threads=1) {
 
@@ -753,6 +756,33 @@ namespace {
 			}
 		}
 	}
+#else
+	template <typename Fn>
+	void group_by(regular_voxel_storage* groups, abstract_voxel_storage* voxels, Fn fn) {
+
+		uint32_t v;
+		
+		std::map<uint32_t, abstract_voxel_storage*> map;
+
+		// @todo this flattens to bits, make this configurable.
+		// @todo use regions for multi threading
+		for (auto& ijk : *(regular_voxel_storage*)voxels) {
+			groups->Get(ijk, &v);
+			abstract_voxel_storage* r;
+			auto it = map.find(v);
+			if (it == map.end()) {
+				map.insert({ v, r = voxels->empty_copy() });
+			} else {
+				r = it->second;
+			}
+			r->Set(ijk);
+		}
+
+		for (auto& r : map) {
+			fn(r.first, r.second);
+		}
+	}
+#endif
 }
 
 class op_describe_group_by : public voxel_operation {
@@ -785,7 +815,11 @@ public:
 			delete c;
 
 			first = false;
-		}, scope.get_value_or<int>("THREADS", 1));
+		}
+#ifdef OLD_GROUP_BY
+		,scope.get_value_or<int>("THREADS", 1)
+#endif
+		);
 
 		ofs << "]";
 
@@ -1816,7 +1850,11 @@ public:
 			group_by(groups, voxels, [&helper, &ofs](uint32_t id, abstract_voxel_storage* c) {
 				ofs << "g id-" << id << "\n";
 				((regular_voxel_storage*)c)->obj_export(helper, false, false);
-			}, scope.get_value_or<int>("THREADS", 1));
+			}
+#ifdef OLD_GROUP_BY
+			, scope.get_value_or<int>("THREADS", 1)
+#endif
+			);
 		} else {
 
 			if (voxels->value_bits() == 1) {
