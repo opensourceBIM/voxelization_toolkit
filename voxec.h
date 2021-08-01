@@ -768,6 +768,9 @@ namespace {
 		// @todo use regions for multi threading
 		for (auto& ijk : *(regular_voxel_storage*)voxels) {
 			groups->Get(ijk, &v);
+			if (v == 0) {
+				continue;
+			}
 			abstract_voxel_storage* r;
 			auto it = map.find(v);
 			if (it == map.end()) {
@@ -1494,14 +1497,15 @@ class op_compare : public voxel_operation {
 	symbol_value invoke(const scope_map& scope) const {
 		auto* voxels = (regular_voxel_storage*) scope.get_value<abstract_voxel_storage*>("input");
 		auto rhs = (uint32_t)scope.get_value<int>("rhs");
-
-		auto result = voxels->empty_copy();
+		
+		bit_t fmt;
+		auto result = voxels->empty_copy_as(&fmt);
 		uint32_t val;
 
 		for (auto& pos : *voxels) {
 			voxels->Get(pos, &val);
 			if (Pred()(val, rhs)) {
-				result->Set(pos, &val);
+				result->Set(pos);
 			}
 		}
 
