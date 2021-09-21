@@ -183,7 +183,7 @@ namespace {
 			auto left_world = ((voxels->bounds()[0].as<long>() + left * szl).as<double>() * sz);
 			auto right_world = ((voxels->bounds()[1].as<long>() + left * szl).as<double>() * sz);
 
-			return {
+			json_logger::meta_data md = {
 				{"count", (long)voxels->count()},
 				{"grid", left.format() + " - " + right.format()},
 				{"bounds", voxels->bounds()[0].format() + " - " + voxels->bounds()[1].format()},
@@ -191,6 +191,23 @@ namespace {
 				{"bits", (long)voxels->value_bits()},
 				{"chunk_size", (long) csize}
 			};
+
+			if (voxels->value_bits() == 32) {
+				uint32_t v, mi = std::numeric_limits<uint32_t>::max(), ma = std::numeric_limits<uint32_t>::min();
+				for (auto& ijk : *(regular_voxel_storage*)voxels) {
+					voxels->Get(ijk, &v);
+					if (v < mi) {
+						mi = v;
+					}
+					if (v > ma) {
+						ma = v;
+					}
+				}
+				md.insert({ "min_value", (long)mi });
+				md.insert({ "max_value", (long)ma });
+			}
+
+			return md;
 		}
 		return {};
 	}
@@ -758,13 +775,12 @@ namespace {
 	}
 #else
 	template <typename Fn>
-	void group_by(regular_voxel_storage* groups, abstract_voxel_storage* voxels, Fn fn) {
+	void group_by(regular_voxel_storage* groups, abstract_voxel_storage* voxels, Fn fn, bool use_bits=true) {
 
 		uint32_t v;
 		
 		std::map<uint32_t, abstract_voxel_storage*> map;
 
-		// @todo this flattens to bits, make this configurable.
 		// @todo use regions for multi threading
 		for (auto& ijk : *(regular_voxel_storage*)voxels) {
 			groups->Get(ijk, &v);
@@ -774,11 +790,21 @@ namespace {
 			abstract_voxel_storage* r;
 			auto it = map.find(v);
 			if (it == map.end()) {
-				map.insert({ v, r = voxels->empty_copy() });
+				if (use_bits) {
+					static bit_t fmt;
+					map.insert({ v, r = voxels->empty_copy_as(&fmt) });
+				} else {
+					map.insert({ v, r = voxels->empty_copy() });
+				}
 			} else {
 				r = it->second;
 			}
-			r->Set(ijk);
+			if (use_bits) {
+				r->Set(ijk);
+			} else {
+				voxels->Get(ijk, &v);
+				r->Set(ijk, &v);
+			}
 		}
 
 		for (auto& r : map) {
@@ -791,7 +817,7 @@ namespace {
 class op_describe_group_by : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "output_path", "string" }, { true, "input", "voxels" }, { true, "groups", "voxels" } };
+		static std::vector<argument_spec> nm_ = { { true, "output_path", "string" }, { true, "input", "voxels" }, { true, "groups", "voxels" }, { false, "use_bits", "integer" } };
 		return nm_;
 	}
 	symbol_value invoke(const scope_map& scope) const {
@@ -807,6 +833,8 @@ public:
 			throw std::runtime_error("Expected a uint stored dataset for groups");
 		}
 
+		bool use_bits = scope.get_value_or<int>("use_bits", 1) == 1;
+
 		group_by(groups, voxels, [&ofs, &first](uint32_t id, abstract_voxel_storage* c) {
 			if (!first) {
 				ofs << ",";
@@ -821,6 +849,8 @@ public:
 		}
 #ifdef OLD_GROUP_BY
 		,scope.get_value_or<int>("THREADS", 1)
+#else
+		, use_bits
 #endif
 		);
 
