@@ -1751,7 +1751,7 @@ namespace {
 	// @todo this is a very minimal implementation for specific cases
 	class instance_by_property_map_filter : public instance_filter_t {
 	public:
-		typedef std::vector<std::pair<std::string, int> > values_t;
+		typedef std::vector<std::pair<std::string, function_arg_value_type> > values_t;
 	private:
 		values_t attr_pattern_;
 	public:
@@ -1775,13 +1775,48 @@ namespace {
 								for (auto& prop : *props) {
 									if (prop->declaration().is("IfcPropertySingleValue")) {
 										auto name = (std::string) *((IfcUtil::IfcBaseEntity*)prop)->get("Name");
+										
+										/*
+										// In the voxelfile grammer we can also have keywords starting with an alpha character
+										// so for the string comparison we need to trim off any others.
+										auto it = std::find_if(name.begin(), name.end(), [](char c) { return std::isalpha(c); });
+										if (it == name.end()) {
+											return false;
+										}
+										name = name.substr(std::distance(name.begin(), it));
+										*/
+
+										std::replace_if(name.begin(), name.end(), [](char c) { return std::isdigit(c); }, 'n');
+
+										std::cout << name << " == " << p.first << std::endl;
+
 										if (name == p.first) {
 											has_match = true;
 											IfcUtil::IfcBaseClass* val = *((IfcUtil::IfcBaseEntity*)prop)->get("NominalValue");
 											auto val_attr = val->data().getArgument(0);
 											if (val_attr->type() == IfcUtil::Argument_BOOL) {
-												auto b = (bool)*val_attr;
-												bool match = (b ? 1 : 0) == p.second;
+												auto v_ifc = (bool)*val_attr;
+												int v_filter = 0;
+												try {
+													v_filter = boost::get<int>(p.second);
+												} catch (boost::bad_get&) {
+													return false;
+												}
+												bool match = (v_ifc ? 1 : 0) == v_filter;
+												if (!match) {
+													return false;
+												}
+											} else if (val_attr->type() == IfcUtil::Argument_STRING) {
+												auto v_ifc = (std::string)*val_attr;
+												std::string v_filter;
+												try {
+													v_filter = boost::get<std::string>(p.second);
+												} catch (boost::bad_get&) {
+													return false;
+												}
+												// v_filter = v_filter.substr(1, v_filter.size() - 2);
+												std::cout << v_ifc << " == " << v_filter << std::endl;
+												bool match = v_ifc == v_filter;
 												if (!match) {
 													return false;
 												}
@@ -1852,7 +1887,7 @@ public:
 		instance_by_property_map_filter::values_t vs;
 		for (auto& p : scope) {
 			if (to_exclude.find(p.first) == to_exclude.end()) {
-				auto s = boost::get<int>(boost::get<function_arg_value_type>(p.second));
+				auto s = boost::get<function_arg_value_type>(p.second);
 				vs.push_back({ p.first, s });
 			}
 		}
