@@ -1788,8 +1788,6 @@ namespace {
 
 										std::replace_if(name.begin(), name.end(), [](char c) { return std::isdigit(c); }, 'n');
 
-										std::cout << name << " == " << p.first << std::endl;
-
 										if (name == p.first) {
 											has_match = true;
 											IfcUtil::IfcBaseClass* val = *((IfcUtil::IfcBaseEntity*)prop)->get("NominalValue");
@@ -1814,8 +1812,6 @@ namespace {
 												} catch (boost::bad_get&) {
 													return false;
 												}
-												// v_filter = v_filter.substr(1, v_filter.size() - 2);
-												std::cout << v_ifc << " == " << v_filter << std::endl;
 												bool match = v_ifc == v_filter;
 												if (!match) {
 													return false;
