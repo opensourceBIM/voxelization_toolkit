@@ -288,7 +288,7 @@ public:
 class op_create_geometry : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "input", "ifcfile" }, { false, "include", "sequence"}, { false, "exclude", "sequence"}, { false, "optional", "integer"} };
+		static std::vector<argument_spec> nm_ = { { true, "input", "ifcfile" }, { false, "include", "sequence"}, { false, "exclude", "sequence"}, { false, "optional", "integer"}, { false, "only_transparent", "integer"}, { false, "only_opaque", "integer"} };
 		return nm_;
 	}
 		
@@ -303,6 +303,9 @@ public:
 				threads = (size_t)t;
 			}
 		}
+
+		bool only_transparent = scope.get_value_or<int>("only_transparent", 0) == 1;
+		bool only_opaque = scope.get_value_or<int>("only_opaque", 0) == 1;
 
 #ifdef IFCOPENSHELL_05
 		auto ifc_roof = IfcSchema::Type::IfcRoof;
@@ -468,9 +471,32 @@ public:
 
 				if (process) {
 					TopoDS_Compound compound = elem->geometry().as_compound();
-					compound.Move(elem->transformation().data());
-					BRepMesh_IncrementalMesh(compound, 0.001);
-					geometries->push_back(std::make_pair(elem->id(), compound));
+					
+					bool filtered_non_empty = true;
+					if (only_transparent || only_opaque) {
+						filtered_non_empty = false;
+						TopoDS_Compound filtered;
+						BRep_Builder B;
+						B.MakeCompound(filtered);
+
+						auto it = elem->geometry().begin();
+						for (TopoDS_Iterator jt(compound); jt.More(); ++it, jt.Next()) {
+							bool is_transparent = it->hasStyle() && it->Style().Transparency().get_value_or(0.0) > 1.e-9;
+							if (only_transparent == is_transparent) {
+								B.Add(filtered, jt.Value());
+								filtered_non_empty = true;
+							}
+						}
+
+						std::swap(compound, filtered);
+					}
+
+					if (filtered_non_empty) {
+						compound.Move(elem->transformation().data());
+
+						BRepMesh_IncrementalMesh(compound, 0.001);
+						geometries->push_back(std::make_pair(elem->id(), compound));
+					}
 				}
 
 				if (old_progress != iterator->progress()) {
@@ -1705,6 +1731,72 @@ public:
 	}
 };
 
+class op_repeat_slice : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, {true, "axis", "integer"}, {true, "location", "real"}, {true, "repetitions", "integer"} };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		auto voxels = (chunked_voxel_storage<bit_t>*)scope.get_value<abstract_voxel_storage*>("input");
+		
+		auto grid_offset = voxels->grid_offset();
+		auto num_chunks = voxels->num_chunks();
+
+		auto axis = scope.get_value<int>("axis");
+		auto location = scope.get_value<double>("location");
+		auto repetitions = scope.get_value<int>("repetitions");
+		size_t location_i = (size_t) std::floor((location - voxels->origin().get(axis)) / voxels->voxel_size());
+
+		vec_n<3, size_t> offset = make_vec<size_t>(0, 0, 0);
+		vec_n<3, size_t> offset_after_repeat = make_vec<size_t>(0, 0, 0);
+		offset_after_repeat.get(axis) = (size_t)std::abs(repetitions);
+
+		if (repetitions < 0) {
+			size_t d = integer_ceil_div((size_t)-repetitions, voxels->chunk_size());
+			grid_offset.get(axis) -= d;
+			num_chunks.get(axis) += d;
+			offset.get(axis) = d * voxels->chunk_size();
+		} else if (repetitions > 0) {
+			num_chunks.get(axis) += integer_ceil_div((size_t)repetitions, voxels->chunk_size());
+		}
+
+		abstract_chunked_voxel_storage* output = new chunked_voxel_storage<bit_t>(
+			grid_offset,
+			voxels->voxel_size(),
+			voxels->chunk_size(),
+			num_chunks
+		);
+
+		for (auto it = voxels->begin(); it != voxels->end(); ++it) {
+			if ((*it).get(axis) < location_i) {
+				if (repetitions < 0) {
+					output->Set(offset + (*it) - offset_after_repeat);
+				} else {
+					output->Set(offset + (*it));
+				}
+			} else if ((*it).get(axis) == location_i) {
+				auto ijk = offset + (*it);
+				if (repetitions < 0) {
+					ijk -= offset_after_repeat;
+				}
+				for (size_t i = 0; i <= (size_t) std::abs(repetitions); ++i) {
+					auto ijk2 = ijk;
+					ijk2.get(axis) += i;
+					output->Set(ijk2);
+				}
+			} else { // greater than
+				if (repetitions < 0) {
+					output->Set(offset + (*it));
+				} else {
+					output->Set(offset + (*it) + offset_after_repeat);
+				}
+			}
+		}
+
+		return output;
+	}
+};
 
 #ifdef WITH_IFC
 
@@ -1951,6 +2043,7 @@ public:
 	}
 };
 
+template <int sweep_or_move>
 class op_local_sweep : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
@@ -1970,7 +2063,7 @@ public:
 		
 		auto copy = new geometry_collection_t;
 		// note n inclusive
-		for (int i = 0; i < n; ++i) {
+		for (int i = sweep_or_move == 0 ? 0 : n; i <= n; ++i) {
 			auto s = copy->size();
 			copy->insert(copy->end(), surfaces->begin(), surfaces->end());
 			if (i == 0) {
