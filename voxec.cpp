@@ -53,9 +53,11 @@ voxel_operation_map::map_t& voxel_operation_map::map() {
 		m.insert(std::make_pair(std::string("filter_properties"), &instantiate<op_create_prop_filter>));
 #endif
 		m.insert(std::make_pair(std::string("zeros"), &instantiate<op_zeros>));
-		m.insert(std::make_pair(std::string("plane"), &instantiate<op_plane>));
+		m.insert(std::make_pair(std::string("plane"), &instantiate<op_plane<>>));
+		m.insert(std::make_pair(std::string("halfspace"), &instantiate<op_plane<1>>));
 		m.insert(std::make_pair(std::string("mesh"), &instantiate<op_mesh>));
 		m.insert(std::make_pair(std::string("export_csv"), &instantiate<op_export_csv>));
+		m.insert(std::make_pair(std::string("local_sweep"), &instantiate<op_local_sweep>));
 		initialized = true;
 	}
 	return m;

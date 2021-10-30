@@ -47,6 +47,7 @@ struct filtered_files_t {};
 #include <BRepBuilderAPI_MakeFace.hxx>
 #include <BRepAlgoAPI_Common.hxx>
 #include <BRepMesh_IncrementalMesh.hxx>
+#include <BRepPrimAPI_MakeHalfSpace.hxx>
 
 #include <set>
 #include <map>
@@ -326,7 +327,7 @@ public:
 
 		IfcGeom::IteratorSettings settings_surface;
 		settings_surface.set(IfcGeom::IteratorSettings::DISABLE_TRIANGULATION, true);
-		settings_surface.set(IfcGeom::IteratorSettings::USE_WORLD_COORDS, true);
+		// settings_surface.set(IfcGeom::IteratorSettings::USE_WORLD_COORDS, true);
 		// Only to determine whether building element parts decompositions of slabs should be processed as roofs
 		settings_surface.set(IfcGeom::IteratorSettings::SEARCH_FLOOR, true);
 		
@@ -467,6 +468,7 @@ public:
 
 				if (process) {
 					TopoDS_Compound compound = elem->geometry().as_compound();
+					compound.Move(elem->transformation().data());
 					BRepMesh_IncrementalMesh(compound, 0.001);
 					geometries->push_back(std::make_pair(elem->id(), compound));
 				}
@@ -1215,6 +1217,7 @@ public:
 	}
 };
 
+template <int plane_or_halfspace=0>
 class op_plane : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
@@ -1278,16 +1281,31 @@ public:
 		auto face = BRepBuilderAPI_MakeFace(pln,
 			uv_min_max[0][0], uv_min_max[1][0],
 			uv_min_max[0][1], uv_min_max[1][1]
-		);
+		).Face();
 
-		auto face_inside = BRepAlgoAPI_Common(face, box).Shape();
+		TopoDS_Shape bool_result;
+
+		if (plane_or_halfspace == 0) {
+			bool_result = BRepAlgoAPI_Common(face, box).Shape();
+		} else {
+			BRepGProp_Face prop(face);
+			double u1, u2, v1, v2;
+			prop.Bounds(u1, u2, v1, v2);
+			gp_Pnt p;
+			gp_Vec v;
+			prop.Normal((u1 + u2) / 2., (v1 + v2) / 2, p, v);
+			// mass opposite of normal
+			BRepPrimAPI_MakeHalfSpace mhs(face, p.XYZ() - v.XYZ());
+			bool_result = BRepAlgoAPI_Common(box, mhs.Solid()).Shape();
+		}
+
 		TopoDS_Compound C;
-		if (face_inside.ShapeType() == TopAbs_COMPOUND) {
-			C = TopoDS::Compound(face_inside);
+		if (bool_result.ShapeType() == TopAbs_COMPOUND) {
+			C = TopoDS::Compound(bool_result);
 		} else {
 			BRep_Builder B;
 			B.MakeCompound(C);
-			B.Add(C, face_inside);
+			B.Add(C, bool_result);
 		}
 
 		BRepMesh_IncrementalMesh(C, 0.001);
@@ -1930,6 +1948,45 @@ public:
 		}
 		symbol_value v;
 		return v;
+	}
+};
+
+class op_local_sweep : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "surfaceset" }, { true, "dx", "real"}, { true, "dy", "real"}, { true, "dz", "real"}, {false, "VOXELSIZE", "real"} };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		geometry_collection_t* surfaces = scope.get_value<geometry_collection_t*>("input");
+		auto dx = scope.get_value<double>("dx");
+		auto dy = scope.get_value<double>("dy");
+		auto dz = scope.get_value<double>("dz");
+		auto vs = scope.get_value<double>("VOXELSIZE");
+
+		auto l = gp_Vec(dx, dy, dz).Magnitude();
+		size_t n = (size_t)std::ceil(l / vs);
+		double stp = l / n;
+		
+		auto copy = new geometry_collection_t;
+		// note n inclusive
+		for (int i = 0; i < n; ++i) {
+			auto s = copy->size();
+			copy->insert(copy->end(), surfaces->begin(), surfaces->end());
+			if (i == 0) {
+				// no sense in applying the zero length translation
+				continue;
+			}
+			for (auto it = copy->begin() + s; it != copy->end(); ++it) {
+				gp_Trsf trsf;
+				trsf.SetTranslation(gp_Vec(dx * stp * i, dy * stp * i, dz * stp * i));
+
+				it->second.Location(
+					it->second.Location().Transformation() * trsf
+				);
+			}
+		}
+		return copy;
 	}
 };
 
