@@ -96,7 +96,7 @@ public:
 		} else {
 			auto block = make_vec<int>(-factor_, -factor_, -factor_).as<size_t>();
 			auto grid_difference_in_voxels = input->grid_offset() * (long)input->chunk_size() / ((long)(-factor_)) - result->grid_offset() * (long)input->chunk_size();
-			std::cout << "grid_difference_in_voxels " << grid_difference_in_voxels.format() << std::endl;
+			// std::cout << "grid_difference_in_voxels " << grid_difference_in_voxels.format() << std::endl;
 
 			// @todo constrain loop to input so that no further check is necessary?
 			BEGIN_LOOP_ZERO_2(result->extents())
