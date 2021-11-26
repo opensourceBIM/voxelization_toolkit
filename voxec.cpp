@@ -56,7 +56,8 @@ voxel_operation_map::map_t& voxel_operation_map::map() {
 		m.insert(std::make_pair(std::string("plane"), &instantiate<op_plane<>>));
 		m.insert(std::make_pair(std::string("halfspace"), &instantiate<op_plane<1>>));
 		m.insert(std::make_pair(std::string("mesh"), &instantiate<op_mesh>));
-		m.insert(std::make_pair(std::string("export_csv"), &instantiate<op_export_csv>));
+		m.insert(std::make_pair(std::string("export_csv"), &instantiate<op_export_csv<>>));
+		m.insert(std::make_pair(std::string("export_point_cloud"), &instantiate<op_export_csv<1>>));
 		m.insert(std::make_pair(std::string("local_sweep"), &instantiate<op_local_sweep<0>>));
 		m.insert(std::make_pair(std::string("local_move"), &instantiate<op_local_sweep<1>>));
 		m.insert(std::make_pair(std::string("repeat_slice"), &instantiate<op_repeat_slice>));

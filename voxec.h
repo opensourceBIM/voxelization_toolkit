@@ -2083,6 +2083,7 @@ public:
 	}
 };
 
+template <int mode=0>
 class op_export_csv : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
@@ -2094,13 +2095,16 @@ public:
 		auto filename = scope.get_value<std::string>("filename");
 		std::ofstream ofs(filename.c_str());
 
-		bool use_value = voxels->value_bits() == 32;
+		bool use_value = mode == 0 && voxels->value_bits() == 32;
 
 		auto sz = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->voxel_size();
 		auto szl = (long)dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->chunk_size();
 		auto left = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->grid_offset();
 
 		uint32_t v;
+
+		std::string prefix = mode == 0 ? "" : "v ";
+		std::string sep = mode == 0 ? "," : " ";
 
 		for (auto ijk : *voxels) {
 			if (use_value) {
@@ -2113,12 +2117,13 @@ public:
 
 			auto xyz = (ijk.as<long>() + left * szl).as<double>() * sz;
 			
-			ofs << xyz.get<0>() << ","
-				<< xyz.get<1>() << ","
+			ofs << prefix
+				<< xyz.get<0>() << sep
+				<< xyz.get<1>() << sep
 				<< xyz.get<2>();
 			
 			if (use_value) {
-				ofs << "," << v;
+				ofs << sep << v;
 			}
 
 			ofs << "\n";
