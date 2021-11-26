@@ -539,12 +539,23 @@ public:
 
 	void boolean_subtraction_inplace(const abstract_voxel_storage* other_) {
 		const continuous_voxel_storage<T>* other = (const continuous_voxel_storage<T>*) other_;
-		for (size_t i = 0; i < size(); ++i) {
-			if (T::size_in_bits < 8U) {
-				data_[i] &= ~other->data_[i];
-			} else if (other->data_[i]) {
-				data_[i] = 0;
+		if (this->value_bits() == other_->value_bits()) {
+			for (size_t i = 0; i < size(); ++i) {
+				if (T::size_in_bits < 8U) {
+					data_[i] &= ~other->data_[i];
+				} else if (other->data_[i]) {
+					data_[i] = 0;
+				}
 			}
+		} else if (this->value_bits() == 32 && other_->value_bits() == 1) {
+			uint32_t zero = 0;
+			BEGIN_LOOP(size_t(0), dimx_, 0U, dimy_, 0U, dimz_)
+				if (other_->Get(ijk)) {
+					Set(ijk, &zero);
+				}
+			END_LOOP;
+		} else {
+			throw std::runtime_error("Not implemented");
 		}
 		calculate_count_();
 		calculate_bounds_();
@@ -1122,6 +1133,10 @@ protected:
 
 		auto left = grid_offset_;
 		auto right = left + num_chunks().as<long>();
+
+		if (std::fabs(voxel_size() - other->voxel_size()) > 1.e-7) {
+			throw std::runtime_error("Cowardly refusing to perform different boolean operation on differently spaced grids");
+		}
 
 		if (inplace) {
 			if ((grid_offset_ != other->grid_offset_).any() || (num_chunks() != other->num_chunks()).any()) {
