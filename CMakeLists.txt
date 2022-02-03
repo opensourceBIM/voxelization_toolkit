@@ -69,16 +69,27 @@ else()
 		elseif(MSVC_VERSION GREATER 1919)
 			set(MSVC_YEAR 2019)
         endif()
-        
+		
+		file(READ "${IFCOPENSHELL_ROOT}/src/ifcparse/IfcParse.h" header)
+		string(REGEX MATCH "#define IFCOPENSHELL_VERSION \"[0-9a-zA-Z\\.\\-]+\"" ifcopenshell_version "${header}")
+		string(REGEX MATCH "[0-9]\\.[0-9]" ifcopenshell_major_version "${ifcopenshell_version}")
         file(TO_CMAKE_PATH "${IFCOPENSHELL_ROOT}" IFCOPENSHELL_ROOT)
         if (EXISTS ${IFCOPENSHELL_ROOT}/_deps-vs${MSVC_YEAR}-${WIN_ARCH}-installed/oce/${WIN_ARCH}/lib)
             set(OCC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/_deps-vs${MSVC_YEAR}-${WIN_ARCH}-installed/oce/${WIN_ARCH}/lib)    
         else()
-            set(OCC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/_deps-vs${MSVC_YEAR}-${WIN_ARCH}-installed/opencascade-7.3.0p3/win${BITS}/lib)
+			if (${ifcopenshell_major_version} STREQUAL "0.7")
+				set(OCC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/_deps-vs${MSVC_YEAR}-${WIN_ARCH}-installed/opencascade-7.5.3/win${BITS}/lib)
+			else()
+				set(OCC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/_deps-vs${MSVC_YEAR}-${WIN_ARCH}-installed/opencascade-7.3.0p3/win${BITS}/lib)
+			endif()
         endif()
-                             
-        set(OCC_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/_deps-vs${MSVC_YEAR}-${WIN_ARCH}-installed/oce/include/oce
-                             ${IFCOPENSHELL_ROOT}/_deps-vs${MSVC_YEAR}-${WIN_ARCH}-installed/opencascade-7.3.0p3/inc)
+        if (${ifcopenshell_major_version} STREQUAL "0.7")   
+			set(OCC_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/_deps-vs${MSVC_YEAR}-${WIN_ARCH}-installed/opencascade-7.5.3/inc)
+		else()
+			set(OCC_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/_deps-vs${MSVC_YEAR}-${WIN_ARCH}-installed/oce/include/oce
+                             ${IFCOPENSHELL_ROOT}/_deps-vs${MSVC_YEAR}-${WIN_ARCH}-installed/opencascade-7.3.0p3/inc)			 
+		endif()					 
+		
     else()
         file(TO_CMAKE_PATH "${OCC_LIBRARY_DIR}" OCC_LIBRARY_DIR)
     endif()
@@ -119,6 +130,11 @@ string(REGEX MATCH "#define IFCOPENSHELL_VERSION \"[0-9a-zA-Z\\.\\-]+\"" ifcopen
 string(REGEX MATCH "[0-9]\\.[0-9]" ifcopenshell_major_version "${ifcopenshell_version}")
 message(STATUS "IfcOpenShell version ${ifcopenshell_major_version}")
 
+if (${ifcopenshell_major_version} STREQUAL "0.7")
+		add_definitions("-DIFCOPENSHELL_07")
+endif()
+
+
 if (${ifcopenshell_major_version} STREQUAL "0.5")
 set(IFC_LIBRARY_NAMES IfcGeom IfcParse)
 add_definitions("-DIFCOPENSHELL_05")
@@ -149,17 +165,18 @@ if(UNIX)
         string(REGEX REPLACE "([^;]+)" "${ICU_LIBRARY_DIR}/lib\\1.a" ICU_LIBRARIES "${ICU_LIBRARY_NAMES}")
     endif()
 else()
+	if (${ifcopenshell_major_version} STREQUAL "0.7")
+		SET(HDF5_INCLUDE_DIR ${IFCOPENSHELL_ROOT}/_deps-vs${MSVC_YEAR}-${WIN_ARCH}-installed/HDF5-1.8.22-win64/include)
+		SET(HDF5_LIBRARY_DIR ${IFCOPENSHELL_ROOT}/_deps-vs${MSVC_YEAR}-${WIN_ARCH}-installed/HDF5-1.8.22-win64/lib)
+		
+		SET(HDF5_LIBRARIES 
+			"${HDF5_LIBRARY_DIR}/libhdf5_cpp.lib"
+			"${HDF5_LIBRARY_DIR}/libhdf5.lib"
+			"${HDF5_LIBRARY_DIR}/libzlib.lib"
+			"${HDF5_LIBRARY_DIR}/libsz.lib"
+			"${HDF5_LIBRARY_DIR}/libaec.lib")
+	endif()
 	
-	SET(HDF5_INCLUDE_DIR ${IFCOPENSHELL_ROOT}/_deps-vs2017-x64-installed/HDF5-1.8.22-win64/include)
-	SET(HDF5_LIBRARY_DIR ${IFCOPENSHELL_ROOT}/_deps-vs2017-x64-installed/HDF5-1.8.22-win64/lib)
-
-	SET(HDF5_LIBRARIES 
-		"${HDF5_LIBRARY_DIR}/libhdf5_cpp.lib"
-		"${HDF5_LIBRARY_DIR}/libhdf5.lib"
-		"${HDF5_LIBRARY_DIR}/libzlib.lib"
-		"${HDF5_LIBRARY_DIR}/libsz.lib"
-		"${HDF5_LIBRARY_DIR}/libaec.lib")
-
     set(BOOST_ROOT       ${IFCOPENSHELL_ROOT}/_deps/boost_1_74_0)
     set(BOOST_LIBRARYDIR ${IFCOPENSHELL_ROOT}/_deps/boost_1_74_0/stage/vs${MSVC_YEAR}-${WIN_ARCH}/lib)
 	

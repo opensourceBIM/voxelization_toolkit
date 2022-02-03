@@ -46,8 +46,11 @@ TEST(Voxelization, IfcWallIds) {
 
 	auto filters = std::vector<IfcGeom::filter_t>({ ef });
 
+#ifdef IFCOPENSHELL_07
+	IfcGeom::Iterator it(settings_surface, &ifc_file, filters, 1);
+#else
 	IfcGeom::Iterator<double> it(settings_surface, &ifc_file, filters, 1);
-
+#endif
 	ASSERT_TRUE(it.initialize());
 
 	geometry_collection_t geoms;

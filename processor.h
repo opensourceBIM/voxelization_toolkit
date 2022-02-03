@@ -19,7 +19,12 @@
 #include <ifcparse/IfcLogger.h>   // @todo < commit in IfcopenShell
 #include <ifcgeom/IfcGeomElement.h>
 
+#ifdef IFCOPENSHELL_07
+typedef IfcGeom::BRepElement elem_t;
+#else
 typedef IfcGeom::BRepElement<double> elem_t;
+#endif
+
 #endif
 
 typedef TopoDS_Shape geometry_t;

@@ -309,8 +309,11 @@ public:
 		settings_surface.set(IfcGeom::IteratorSettings::DISABLE_TRIANGULATION, true);
 		settings_surface.set(IfcGeom::IteratorSettings::USE_WORLD_COORDS, true);
 		// Only to determine whether building element parts decompositions of slabs should be processed as roofs
+#ifdef IFCOPENSHELL_07
+		settings_surface.set(IfcGeom::IteratorSettings::ELEMENT_HIERARCHY, true);
+#else
 		settings_surface.set(IfcGeom::IteratorSettings::SEARCH_FLOOR, true);
-		
+#endif
 
 		boost::optional<bool> include, roof_slabs;
 		std::vector<std::string> entities;
@@ -376,10 +379,25 @@ public:
 
 		for (auto ifc_file : ifc_files.files) {
 
-			std::unique_ptr<IfcGeom::Iterator<double>> iterator;
+#ifdef IFCOPENSHELL_07
+		std::unique_ptr<IfcGeom::Iterator> iterator;
+#else
+		std::unique_ptr<IfcGeom::Iterator<double>> iterator;
+#endif
+
 
 #ifdef IFCOPENSHELL_05
 			iterator.reset(IfcGeom::Iterator<double>(settings_surface, ifc_file, filters_surface));
+
+
+#elif IFCOPENSHELL_07
+
+			if (threads) {
+				iterator.reset(new IfcGeom::Iterator(settings_surface, ifc_file, filters_surface, *threads));
+			}
+			else {
+				iterator.reset(new IfcGeom::Iterator(settings_surface, ifc_file, filters_surface));
+			}
 #else
 			if (threads) {
 				iterator.reset(new IfcGeom::Iterator<double>(settings_surface, ifc_file, filters_surface, *threads));
