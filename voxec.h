@@ -19,6 +19,8 @@
 
 #include <boost/filesystem.hpp>
 
+#include <Eigen/Dense>
+
 // #define OLD_GROUP_BY
 
 struct instance_filter_t {
@@ -87,6 +89,8 @@ protected:
 	}
 
 public:
+	const std::map<std::string, function_def_type>* functions;
+
 	class not_in_scope : public std::runtime_error {
 		using std::runtime_error::runtime_error;
 	};
@@ -171,6 +175,8 @@ public:
 	}
 	virtual ~voxel_operation() {}
 };
+
+void invoke_function_by_name(scope_map& context, const std::string& function_name);
 
 namespace {
 	json_logger::meta_data dump_info(abstract_voxel_storage* voxels) {
@@ -837,6 +843,9 @@ namespace {
 
 		for (auto& r : map) {
 			fn(r.first, r.second);
+
+			// @todo double check, untested
+			delete r.second;
 		}
 	}
 #endif
@@ -2131,6 +2140,210 @@ public:
 
 		symbol_value v_null;
 		return v_null;
+	}
+};
+
+class op_component_foreach : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "function", "string"}, { true, "argument", "string"} };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input");
+		const std::string& function_name = scope.get_value<std::string>("function");
+		const std::string& argument_name = scope.get_value<std::string>("argument");
+
+		auto fn = [&scope, &function_name, &argument_name](regular_voxel_storage* c) {
+			std::cout << "Component " << c->count() << std::endl;
+			auto scope_copy = scope;
+			scope_copy.functions = scope.functions;
+			scope_copy[argument_name] = c;
+
+			invoke_function_by_name(scope_copy, function_name);
+		};
+
+		if (voxels->value_bits() == 1) {
+			// Invoke by connected component traversal
+
+			connected_components((regular_voxel_storage*)voxels, fn);
+		} else if (voxels->value_bits() == 32) {
+			// Invoke by uint32 value groups
+
+			// @todo eliminate overlap with group_by()
+
+			uint32_t v;
+			static bit_t fmt;
+
+			std::map<uint32_t, abstract_voxel_storage*> map;
+
+			for (auto& ijk : *(regular_voxel_storage*)voxels) {
+				voxels->Get(ijk, &v);
+				if (v == 0) {
+					continue;
+				}
+				abstract_voxel_storage* r;
+				auto it = map.find(v);
+				if (it == map.end()) {
+					map.insert({ v, r = voxels->empty_copy_as(&fmt) });
+				} else {
+					r = it->second;
+				}
+				r->Set(ijk);
+			}
+
+			for (auto& r : map) {
+				fn((regular_voxel_storage*)r.second);
+				delete r.second;
+			}
+		}
+
+		symbol_value v;
+		return v;
+	}
+};
+
+class op_normal_estimate : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "max_depth", "integer"} };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		static normal_and_curvature_t fmt;
+		normal_and_curvature<int16_t> v;
+
+		auto voxels = (regular_voxel_storage*)scope.get_value<abstract_voxel_storage*>("input");
+		auto result = voxels->empty_copy_as(&fmt);
+
+		const int max_depth = scope.get_value<int>("max_depth");
+		auto box_dim = 1 + max_depth * 2;
+
+		std::vector<float> coords;
+		coords.reserve(box_dim * box_dim * box_dim);
+
+		for (auto it = voxels->begin(); it != voxels->end(); ++it) {
+			visitor<26> vis;
+			vis.max_depth = max_depth;
+
+			coords.clear();
+			
+			vis([&coords](const tagged_index& pos) {
+				if (pos.which == tagged_index::VOXEL) {
+					coords.push_back(pos.pos.get(0));
+					coords.push_back(pos.pos.get(1));
+					coords.push_back(pos.pos.get(2));
+				} else {
+					throw std::runtime_error("Unexpected");
+				}
+			}, voxels, *it);
+
+			Eigen::MatrixXf points = Eigen::Map<Eigen::MatrixXf>(coords.data(), 3, coords.size() / 3).transpose();
+
+			Eigen::MatrixXf centered = points.rowwise() - points.colwise().mean();
+			Eigen::MatrixXf cov = centered.adjoint() * centered;
+			Eigen::SelfAdjointEigenSolver<Eigen::MatrixXf> eig(cov);
+
+			auto vec = eig.eigenvectors().col(0);
+			auto norm = vec.normalized();
+			auto curv = eig.eigenvalues().col(0).value() / eig.eigenvalues().sum();
+
+			v.nxyz_curv = {
+				(int16_t) (norm.x() * (float) std::numeric_limits<int16_t>::max()),
+				(int16_t) (norm.y() * (float) std::numeric_limits<int16_t>::max()),
+				(int16_t) (norm.z() * (float) std::numeric_limits<int16_t>::max()),
+				(int16_t) (curv * (float) std::numeric_limits<int16_t>::max())
+			};
+
+			result->Set(*it, &v);
+		}
+
+		return result;
+	}
+};
+
+namespace {
+	class check_curvature_and_normal_deviation {
+	private:
+		regular_voxel_storage* voxels_;
+		normal_and_curvature<float> seed_data_float_;
+
+	public:
+		check_curvature_and_normal_deviation(regular_voxel_storage* voxels, const vec_n<3, size_t>& seed)
+			: voxels_(voxels)
+		{
+			normal_and_curvature<int16_t> seed_data;
+			voxels->Get(seed, &seed_data);
+			seed_data_float_ = seed_data.convert<float>();
+		}
+
+		inline bool operator()(const vec_n<3, size_t>& pos) {
+			normal_and_curvature<int16_t> data;
+			voxels_->Get(pos, &data);
+			auto data_float = data.convert<float>();
+
+			if (data_float.nxyz_curv[4] > 0.1) {
+				return false;
+			}
+			
+			Eigen::Map<Eigen::Vector3f> v0(seed_data_float_.nxyz_curv.data());
+			Eigen::Map<Eigen::Vector3f> v1(data_float.nxyz_curv.data());
+
+			double angle = std::acos(std::abs(v0.dot(v1)));
+
+			if (angle > 0.1) {
+				return false;
+			}
+
+			return true;
+		}
+	};
+}
+
+class op_segment : public voxel_operation {
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" } };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		static bit_t bits;
+		static voxel_uint32_t uints;
+		
+		auto voxels = (regular_voxel_storage*)scope.get_value<abstract_voxel_storage*>("input");
+		if (voxels->value_bits() != normal_and_curvature_t::size_in_bits) {
+			throw std::runtime_error("Expected normal and curvature voxel type");
+		}
+		
+		auto result = (regular_voxel_storage*)voxels->empty_copy_as(&uints);
+
+		auto voxels_bit = (regular_voxel_storage*) voxels->copy_as(&bits);
+
+		uint32_t component_index = 0;
+
+		while (voxels_bit->count()) {
+			++component_index;
+
+			auto seed = std::min_element(voxels_bit->begin(), voxels_bit->end(), [&voxels](const vec_n<3, size_t>& a, const vec_n<3, size_t>& b) {
+				normal_and_curvature<int16_t> A, B;
+				voxels->Get(a, &A);
+				voxels->Get(b, &B);
+				return A.curvature() < B.curvature();
+			});
+
+			check_curvature_and_normal_deviation lookup_curv(voxels, *seed);
+
+			visitor<26, DOF_XYZ, std::function<bool(const vec_n<3, size_t>&)>> vis;
+
+			vis.set_postcondition(std::ref(lookup_curv));
+
+			vis([&result, &component_index](const tagged_index& pos) {
+				result->Set(pos.pos, &component_index);
+			}, voxels_bit, *seed);
+
+			voxels_bit->boolean_subtraction_inplace(vis.get_visited());
+		}
+	
+		return result;
 	}
 };
 

@@ -425,6 +425,14 @@ public:
 		}
 	}
 
+	regular_voxel_storage* get_visited() const {
+		return visited_;
+	}
+	
+	void set_postcondition(const PostT& fn) {
+		post_condition_ = fn;
+	}
+
 	~visitor() {
 		delete visited_;
 	}
