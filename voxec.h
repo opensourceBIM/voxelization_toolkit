@@ -2104,20 +2104,21 @@ public:
 		auto filename = scope.get_value<std::string>("filename");
 		std::ofstream ofs(filename.c_str());
 
-		bool use_value = mode == 0 && voxels->value_bits() == 32;
+		bool use_value = mode == 0 && (voxels->value_bits() == 32 || voxels->value_bits() == 64);
 
 		auto sz = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->voxel_size();
 		auto szl = (long)dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->chunk_size();
 		auto left = dynamic_cast<abstract_chunked_voxel_storage*>(voxels)->grid_offset();
 
 		uint32_t v;
+		normal_and_curvature<int16_t> v2;
 
 		std::string prefix = mode == 0 ? "" : "v ";
 		std::string sep = mode == 0 ? "," : " ";
 
 		for (auto ijk : *voxels) {
 			if (use_value) {
-				voxels->Get(ijk, &v);
+				voxels->Get(ijk, voxels->value_bits() == 32 ? (void*)&v : (void*)&v2 );
 				if (v == 0) {
 					// @todo why is this needed?
 					continue;
@@ -2132,7 +2133,15 @@ public:
 				<< xyz.get<2>();
 			
 			if (use_value) {
-				ofs << sep << v;
+				if (voxels->value_bits() == 32) {
+					ofs << sep << v;
+				} else {
+					auto v3 = v2.convert<float>();
+					ofs << sep << v3.nxyz_curv[0] << sep
+						<< v3.nxyz_curv[1] << sep
+						<< v3.nxyz_curv[2] << sep
+						<< v3.nxyz_curv[3];
+				}
 			}
 
 			ofs << "\n";
@@ -2249,10 +2258,10 @@ public:
 			auto curv = eig.eigenvalues().col(0).value() / eig.eigenvalues().sum();
 
 			v.nxyz_curv = {
-				(int16_t) (norm.x() * (float) std::numeric_limits<int16_t>::max()),
-				(int16_t) (norm.y() * (float) std::numeric_limits<int16_t>::max()),
-				(int16_t) (norm.z() * (float) std::numeric_limits<int16_t>::max()),
-				(int16_t) (curv * (float) std::numeric_limits<int16_t>::max())
+				(int16_t) (norm.x() * (float) (std::numeric_limits<int16_t>::max()-1)),
+				(int16_t) (norm.y() * (float) (std::numeric_limits<int16_t>::max()-1)),
+				(int16_t) (norm.z() * (float) (std::numeric_limits<int16_t>::max()-1)),
+				(int16_t) (curv * (float) (std::numeric_limits<int16_t>::max()-1))
 			};
 
 			result->Set(*it, &v);
@@ -2267,10 +2276,13 @@ namespace {
 	private:
 		regular_voxel_storage* voxels_;
 		normal_and_curvature<float> seed_data_float_;
+		double angular_tolerance_, max_curvature_;
 
 	public:
-		check_curvature_and_normal_deviation(regular_voxel_storage* voxels, const vec_n<3, size_t>& seed)
+		check_curvature_and_normal_deviation(regular_voxel_storage* voxels, const vec_n<3, size_t>& seed, double angular_tolerance, double max_curvature)
 			: voxels_(voxels)
+			, angular_tolerance_(angular_tolerance)
+			, max_curvature_(max_curvature)
 		{
 			normal_and_curvature<int16_t> seed_data;
 			voxels->Get(seed, &seed_data);
@@ -2282,7 +2294,7 @@ namespace {
 			voxels_->Get(pos, &data);
 			auto data_float = data.convert<float>();
 
-			if (data_float.nxyz_curv[4] > 0.1) {
+			if (data_float.curvature() > max_curvature_) {
 				return false;
 			}
 			
@@ -2291,7 +2303,7 @@ namespace {
 
 			double angle = std::acos(std::abs(v0.dot(v1)));
 
-			if (angle > 0.1) {
+			if (angle > angular_tolerance_) {
 				return false;
 			}
 
@@ -2301,8 +2313,9 @@ namespace {
 }
 
 class op_segment : public voxel_operation {
+public:
 	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" } };
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { false, "angular_tolerance", "real" }, { false, "max_curvature", "real" } };
 		return nm_;
 	}
 	symbol_value invoke(const scope_map& scope) const {
@@ -2313,6 +2326,9 @@ class op_segment : public voxel_operation {
 		if (voxels->value_bits() != normal_and_curvature_t::size_in_bits) {
 			throw std::runtime_error("Expected normal and curvature voxel type");
 		}
+
+		const double angular_tolerance = scope.get_value_or<double>("angular_tolerance", 0.1);
+		const double max_curvature = scope.get_value_or<double>("max_curvature", 0.01);
 		
 		auto result = (regular_voxel_storage*)voxels->empty_copy_as(&uints);
 
@@ -2330,7 +2346,14 @@ class op_segment : public voxel_operation {
 				return A.curvature() < B.curvature();
 			});
 
-			check_curvature_and_normal_deviation lookup_curv(voxels, *seed);
+			normal_and_curvature<int16_t> A;
+			voxels->Get(*seed, &A);
+
+			if (A.convert<float>().curvature() > max_curvature) {
+				break;
+			}
+
+			check_curvature_and_normal_deviation lookup_curv(voxels, *seed, angular_tolerance, max_curvature);
 
 			visitor<26, DOF_XYZ, std::function<bool(const vec_n<3, size_t>&)>> vis;
 

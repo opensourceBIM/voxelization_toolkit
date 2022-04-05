@@ -77,7 +77,11 @@ template <typename T>
 struct normal_and_curvature {
 	std::array<T, 4> nxyz_curv;
 
-	normal_and_curvature(int i = 0) {
+	normal_and_curvature() {
+		nxyz_curv.fill(0);
+	}
+
+	normal_and_curvature(int i) {
 		nxyz_curv.fill(T(i));
 	}
 
@@ -129,10 +133,10 @@ struct normal_and_curvature {
 		const bool remap = std::is_integral<T>::value && !std::is_integral<U>::value;
 		return remap
 			? normal_and_curvature<U>(
-				(U) nxyz_curv[0] / std::numeric_limits<T>::max(),
-				(U) nxyz_curv[1] / std::numeric_limits<T>::max(),
-				(U) nxyz_curv[2] / std::numeric_limits<T>::max(),
-				(U) nxyz_curv[3] / std::numeric_limits<T>::max()
+				(U) nxyz_curv[0] / (std::numeric_limits<T>::max()-1),
+				(U) nxyz_curv[1] / (std::numeric_limits<T>::max()-1),
+				(U) nxyz_curv[2] / (std::numeric_limits<T>::max()-1),
+				(U) nxyz_curv[3] / (std::numeric_limits<T>::max()-1)
 			)
 			: normal_and_curvature<U>(
 				nxyz_curv[0], nxyz_curv[1], nxyz_curv[2], nxyz_curv[3]
@@ -441,21 +445,24 @@ public:
 		, count_(0) 
 	{
 		if (location != nullptr) {
-			data_ = new (location) typename T::storage_type[dimx_*dimy_*dimz_bytes_];
+			data_ = new (location) typename T::storage_type[dimx_*dimy_*((T::size_in_bits == 1) ? dimz_bytes_ : dimz_)];
 			mapped_ = true;
 
 			// @todo: store these also in the mmap
 			calculate_count_();
 			calculate_bounds_();
 		} else {
-			data_ = new typename T::storage_type[dimx_*dimy_*dimz_bytes_]{ 0 };
+			data_ = new typename T::storage_type[dimx_*dimy_*((T::size_in_bits == 1) ? dimz_bytes_ : dimz_)];
+			// Not entirely understood, but this was necessary to initialize the normal_and_curvature data to zeros
+			memset(data_, 0, size());
 			mapped_ = false;
 		}
 	}
 
 	void unmap() {
 		auto old = data_;
-		data_ = new typename T::storage_type[dimx_*dimy_*dimz_bytes_];
+		data_ = new typename T::storage_type[dimx_*dimy_*((T::size_in_bits == 1) ? dimz_bytes_ : dimz_)];
+		// Not entirely understood, but this was necessary to initialize the normal_and_curvature data to zeros
 		memcpy(data_, old, size());
 		mapped_ = false;
 	}
