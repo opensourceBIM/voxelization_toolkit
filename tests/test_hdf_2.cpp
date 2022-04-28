@@ -24,8 +24,9 @@ using namespace Ifc2x3;
 #define DIRSEP "/"
 #endif
 
+
 #if defined(WITH_IFC) && !defined(IFCOPENSHELL_05)
-TEST(Voxelization, IfcSpaceIds) {
+TEST(Voxelization, IfcWallIds) {
 	const std::string input_filename = ".." DIRSEP "tests" DIRSEP "fixtures" DIRSEP "duplex.ifc";
 
 	IfcParse::IfcFile ifc_file(input_filename);
@@ -40,7 +41,7 @@ TEST(Voxelization, IfcSpaceIds) {
 
 	IfcGeom::entity_filter ef;
 	ef.include = true;
-	ef.entity_names = { "IfcSpace" };
+	ef.entity_names = { "IfcWall" };
 	ef.traverse = false;
 
 	auto filters = std::vector<IfcGeom::filter_t>({ ef });
@@ -50,7 +51,6 @@ TEST(Voxelization, IfcSpaceIds) {
 #else
 	IfcGeom::Iterator<double> it(settings_surface, &ifc_file, filters, 1);
 #endif
-
 	ASSERT_TRUE(it.initialize());
 
 	geometry_collection_t geoms;
@@ -63,7 +63,7 @@ TEST(Voxelization, IfcSpaceIds) {
 			break;
 		}
 	}
-	
+
 	Bnd_Box global_bounds;
 	for (auto& P : geoms) {
 		BRepBndLib::Add(P.second, global_bounds);
@@ -82,17 +82,23 @@ TEST(Voxelization, IfcSpaceIds) {
 	chunked_voxel_storage<voxel_uint32_t>* storage = new chunked_voxel_storage<voxel_uint32_t>(x1, y1, z1, d, nx, ny, nz, 64);
 
 	{
-		progress_writer progress_1("test_space_ids");
+		progress_writer progress_1("test_wall_ids");
 		processor pr(storage, progress_1);
 		pr.use_scanline() = false;
-		pr.process(geoms.begin(), geoms.end(), VOLUME_PRODUCT_ID(), output(MERGED(), "test_space_ids.vox"));
+		pr.process(geoms.begin(), geoms.end(), VOLUME_PRODUCT_ID(), output(MERGED(), "test_wall_ids.vox"));
 	}
 
 	// PRINT WORLD BOUNDS OF STORAGE...e b
 
-	std::ofstream fs("boundaries.obj");
-	obj_export_helper oeh{ fs };
-	storage->obj_export(oeh, false, true);
+	//std::ofstream fs("boundaries.obj");
+	//obj_export_helper oeh{ fs };
+	//storage->obj_export(oeh, false, true);
+
+
+	hdf_writer writer;
+	writer.SetVoxels(storage);
+	writer.Write("test_walls.h5");
+
 }
 #else
 TEST(Voxelization, DISABLED_IfcSpaceIds) {}
