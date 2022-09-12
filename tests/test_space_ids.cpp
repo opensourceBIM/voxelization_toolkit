@@ -45,7 +45,7 @@ TEST(Voxelization, IfcSpaceIds) {
 
 	auto filters = std::vector<IfcGeom::filter_t>({ ef });
 
-	IfcGeom::Iterator<double> it(settings_surface, &ifc_file, filters, 1);
+	IfcGeom::Iterator it(settings_surface, &ifc_file, filters, 1);
 
 	ASSERT_TRUE(it.initialize());
 

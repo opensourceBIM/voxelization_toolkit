@@ -4,6 +4,7 @@ project (voxel)
 OPTION(IFC_SUPPORT "Build Volization Toolkit with IFC support (requires IfcOpenShell/master)." ON)
 OPTION(USE_STATIC_MSVC_RUNTIME "Link to the static runtime on MSVC." ON)
 OPTION(ENABLE_TESTS "Enable tests." ON)
+OPTION(USE_BUILD_SCRIPT_OUTPUT "Use the ifcopenshell nix/build-all.py or win/build-all.cmd build script output to find dependencies." ON)
 
 include(CTest)
 
@@ -22,140 +23,173 @@ if(IFC_SUPPORT)
 add_definitions(-DWITH_IFC)
 endif()
 
-
-if(UNIX)
-    set(IFCOPENSHELL_INSTALL ${IFCOPENSHELL_ROOT}/build/Linux/x86_64/install)
+if (USE_BUILD_SCRIPT_OUTPUT) 
+	if(UNIX)
+		set(IFCOPENSHELL_INSTALL ${IFCOPENSHELL_ROOT}/build/Linux/x86_64/install)
     
-    if(IFC_SUPPORT)
-        foreach(occt_dir occt-7.3.0 occt-7.3.0p3)
-            if(EXISTS "${IFCOPENSHELL_INSTALL}/${occt_dir}/")
-                set(OCCT_PATH "${IFCOPENSHELL_INSTALL}/${occt_dir}/")
-            endif()
-        endforeach()
+		if(IFC_SUPPORT)
+			foreach(occt_dir occt-7.3.0 occt-7.3.0p3)
+				if(EXISTS "${IFCOPENSHELL_INSTALL}/${occt_dir}/")
+					set(OCCT_PATH "${IFCOPENSHELL_INSTALL}/${occt_dir}/")
+				endif()
+			endforeach()
 
-        set(OCC_LIBRARY_DIR  ${OCCT_PATH}/lib)
-        set(OCC_INCLUDE_DIR  ${OCCT_PATH}/include/opencascade)
-    endif()
-    
-    foreach(libname ${OCC_LIBRARY_NAMES})
-        unset(lib CACHE)
-    	find_library(lib NAMES "${libname}" PATHS "${OCC_LIBRARY_DIR}" NO_DEFAULT_PATH)
-    	list(APPEND OCC_LIBRARIES "${lib}")
-    endforeach()
-
-    if(NOT APPLE)
-        set(LIB_RT rt)
-    endif()
-
-    find_package(Threads)
-    find_library(dl NAMES dl)
-
-    if(NOT APPLE)
-        set(OCC_LIBRARIES -Wl,--start-group ${OCC_LIBRARIES} -Wl,--end-group)
-    endif()
-    
-    add_definitions(-Wno-deprecated-declarations)
-else()
-    if(IFC_SUPPORT)
-        set(MSVC_YEAR 2017)
-        if ("${MSVC_VERSION}" STREQUAL "1900")
-            set(MSVC_YEAR 2015)
-        endif()
+			set(OCC_LIBRARY_DIR  ${OCCT_PATH}/lib)
+			set(OCC_INCLUDE_DIR  ${OCCT_PATH}/include/opencascade)
+		endif()
+	else()
+		if(IFC_SUPPORT)
+			set(MSVC_YEAR 2017)
+			if ("${MSVC_VERSION}" STREQUAL "1900")
+				set(MSVC_YEAR 2015)
+			endif()
         
-        file(TO_CMAKE_PATH "${IFCOPENSHELL_ROOT}" IFCOPENSHELL_ROOT)
-        if (EXISTS ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/oce/${WIN_ARCH}/lib)
-            set(OCC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/oce/${WIN_ARCH}/lib)    
-        else()
-            set(OCC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/opencascade-7.3.0p3/win32/lib)
-        endif()
+			file(TO_CMAKE_PATH "${IFCOPENSHELL_ROOT}" IFCOPENSHELL_ROOT)
+			if (EXISTS ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/oce/${WIN_ARCH}/lib)
+				set(OCC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/oce/${WIN_ARCH}/lib)    
+			else()
+				set(OCC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/opencascade-7.3.0/win32/lib)
+			endif()
                              
-        set(OCC_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/oce/include/oce
-                             ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/opencascade-7.3.0p3/inc)
-    else()
-        file(TO_CMAKE_PATH "${OCC_LIBRARY_DIR}" OCC_LIBRARY_DIR)
-    endif()
+			set(OCC_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/oce/include/oce
+								 ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/opencascade-7.3.0/inc)
+		else()
+			file(TO_CMAKE_PATH "${OCC_LIBRARY_DIR}" OCC_LIBRARY_DIR)
+		endif()
     
-	add_definitions(-D_SCL_SECURE_NO_WARNINGS -D_CRT_SECURE_NO_WARNINGS -D_UNICODE)
-    
-    string(REGEX REPLACE "([^;]+)" "${OCC_LIBRARY_DIR}/\\1.lib" OCC_LIBRARIES "${OCC_LIBRARY_NAMES}")
-    
-	set(Boost_USE_STATIC_LIBS   ON)
-	set(Boost_USE_MULTITHREADED ON)
+		set(Boost_USE_STATIC_LIBS   ON)
+		set(Boost_USE_MULTITHREADED ON)
 
-	if(USE_STATIC_MSVC_RUNTIME)
-		set(Boost_USE_STATIC_RUNTIME ON)
+		if(USE_STATIC_MSVC_RUNTIME)
+			set(Boost_USE_STATIC_RUNTIME ON)
     
-		# Copied from IfcOpenShell to match compilation flags, todo detect whether necessary
-		FOREACH(flag CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE CMAKE_CXX_FLAGS_MINSIZEREL
-				CMAKE_CXX_FLAGS_RELWITHDEBINFO CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
-				CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO)
-			IF(${flag} MATCHES "/MD")
-				STRING(REGEX REPLACE "/MD" "/MT" ${flag} "${${flag}}")
-			ENDIF()
-			IF(${flag} MATCHES "/MDd")
-				STRING(REGEX REPLACE "/MDd" "/MTd" ${flag} "${${flag}}")
-			ENDIF()
-		ENDFOREACH()
-    endif()
+			# Copied from IfcOpenShell to match compilation flags, todo detect whether necessary
+			FOREACH(flag CMAKE_CXX_FLAGS CMAKE_CXX_FLAGS_DEBUG CMAKE_CXX_FLAGS_RELEASE CMAKE_CXX_FLAGS_MINSIZEREL
+					CMAKE_CXX_FLAGS_RELWITHDEBINFO CMAKE_C_FLAGS CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_RELEASE
+					CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELWITHDEBINFO)
+				IF(${flag} MATCHES "/MD")
+					STRING(REGEX REPLACE "/MD" "/MT" ${flag} "${${flag}}")
+				ENDIF()
+				IF(${flag} MATCHES "/MDd")
+					STRING(REGEX REPLACE "/MDd" "/MTd" ${flag} "${${flag}}")
+				ENDIF()
+			ENDFOREACH()
+		endif()
+	endif()
+else()
+	set (IFC_INCLUDE_DIR "${IFCOPENSHELL_ROOT}/src")
+	# user to supply:
+	#  * IFCOPENSHELL_ROOT
+	#  * OCC_INCLUDE_DIR
+	#  * OCC_LIBRARY_DIR
+	#  * BOOST_ROOT
+	#  * IFC_LIBRARY_DIR
+	#  * (BOOST_LIBRARYDIR)
+	#  * (USE_STATIC_MSVC_RUNTIME=Off)
+	#  * (Boost_USE_STATIC_LIBS=On)
+endif()
 
-    set(WS2_LIBRARIES ws2_32.lib)
+foreach(libname ${OCC_LIBRARY_NAMES})
+	unset(lib CACHE)
+    find_library(lib NAMES "${libname}" PATHS "${OCC_LIBRARY_DIR}" NO_DEFAULT_PATH)
+    list(APPEND OCC_LIBRARIES "${lib}")
+endforeach()
+
+if (UNIX)
+	if(NOT APPLE)
+		set(LIB_RT rt)
+	endif()
+
+	find_package(Threads)
+	find_library(dl NAMES dl)
+
+	if(NOT APPLE)
+		set(OCC_LIBRARIES -Wl,--start-group ${OCC_LIBRARIES} -Wl,--end-group)
+	endif()
+    
+	add_definitions(-Wno-deprecated-declarations)
+else()
+	add_definitions(-D_SCL_SECURE_NO_WARNINGS -D_CRT_SECURE_NO_WARNINGS -D_UNICODE)    
+	set(WS2_LIBRARIES ws2_32.lib)
 endif()
 
 set(BOOST_COMPONENTS regex program_options iostreams system)
 
 if (IFC_SUPPORT)
-# Find IfcOpenShell version, v0.6.0 does not have the IfcSchema namespace anymore
-file(READ "${IFCOPENSHELL_ROOT}/src/ifcparse/IfcParse.h" header)
-string(REGEX MATCH "#define IFCOPENSHELL_VERSION \"[0-9a-zA-Z\\.\\-]+\"" ifcopenshell_version "${header}")
-string(REGEX MATCH "[0-9]\\.[0-9]" ifcopenshell_major_version "${ifcopenshell_version}")
-message(STATUS "IfcOpenShell version ${ifcopenshell_major_version}")
+	# Find IfcOpenShell version, v0.6.0 does not have the IfcSchema namespace anymore
+	file(READ "${IFCOPENSHELL_ROOT}/src/ifcparse/IfcParse.h" header)
+	string(REGEX MATCH "#define IFCOPENSHELL_VERSION \"[0-9a-zA-Z\\.\\-]+\"" ifcopenshell_version "${header}")
+	string(REGEX MATCH "[0-9]\\.[0-9]" ifcopenshell_major_version "${ifcopenshell_version}")
+	message(STATUS "IfcOpenShell version ${ifcopenshell_major_version}")
 
-if (${ifcopenshell_major_version} STREQUAL "0.5")
-set(IFC_LIBRARY_NAMES IfcGeom IfcParse)
-add_definitions("-DIFCOPENSHELL_05")
-else()
-set(IFC_LIBRARY_NAMES IfcGeom IfcGeom_ifc2x3 IfcGeom_ifc4 IfcGeom_ifc4x1
-                      IfcGeom_ifc4x2 IfcGeom_ifc4x3_rc1 IfcGeom_ifc4x3_rc2 IfcParse)
-endif()
+	if (${ifcopenshell_major_version} STREQUAL "0.5")
+		set(IFC_LIBRARY_NAMES IfcGeom IfcParse)
+		add_definitions("-DIFCOPENSHELL_05")
+	else()
+		if(${ifcopenshell_major_version} STREQUAL "0.7")
+			add_definitions("-DIFCOPENSHELL_07")
+
+			if(NOT SCHEMA_VERSIONS)
+				set(SCHEMA_VERSIONS "2x3" "4" "4x1" "4x2" "4x3_rc1" "4x3_rc2" "4x3_rc3" "4x3_rc4" "4x3")
+			endif()
+			string(REPLACE ";" ")(" schema_version_seq "(${SCHEMA_VERSIONS})")
+			ADD_DEFINITIONS(-DSCHEMA_SEQ=${schema_version_seq})
+
+			IF(MSVC)
+				# warning due to virtual inheritance
+				ADD_DEFINITIONS(-wd4250)
+				# warning due to select definitions in the schema being redundant
+				ADD_DEFINITIONS(-wd4584)
+			endif()
+		endif()
+		set(IFC_LIBRARY_NAMES IfcGeom IfcGeom_ifc2x3 IfcGeom_ifc4 IfcGeom_ifc4x1
+							  IfcGeom_ifc4x2 IfcGeom_ifc4x3_rc1 IfcGeom_ifc4x3_rc2 IfcParse)
+	endif()
 endif()
 
 if (UNIX)
-set(IFC_LIBRARY_NAMES ${IFC_LIBRARY_NAMES} ${IFC_LIBRARY_NAMES})
+	set(IFC_LIBRARY_NAMES ${IFC_LIBRARY_NAMES} ${IFC_LIBRARY_NAMES})
 endif()
 
-if(IFC_SUPPORT)
-set(BOOST_COMPONENTS ${BOOST_COMPONENTS} filesystem)
-if(UNIX)
-    set(BOOST_ROOT       ${IFCOPENSHELL_INSTALL}/boost-1.71.0)
+if(IFC_SUPPORT AND USE_BUILD_SCRIPT_OUTPUT)
+	set(BOOST_COMPONENTS ${BOOST_COMPONENTS} filesystem)
+	if(UNIX)
+		set(BOOST_ROOT       ${IFCOPENSHELL_INSTALL}/boost-1.71.0)
     
-    set(IFC_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/src)
-    set(IFC_LIBRARY_DIR  ${IFCOPENSHELL_INSTALL}/ifcopenshell/lib)
+		set(IFC_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/src)
+		set(IFC_LIBRARY_DIR  ${IFCOPENSHELL_INSTALL}/ifcopenshell/lib)
     
-    string(REGEX REPLACE "([^;]+)" "${IFC_LIBRARY_DIR}/lib\\1.a" IFC_LIBRARIES "${IFC_LIBRARY_NAMES}")
-
-    if (${ifcopenshell_major_version} STREQUAL "0.5")
-        set(ICU_LIBRARY_NAMES icuuc icudata)
-        set(ICU_LIBRARY_DIR  ${IFCOPENSHELL_INSTALL}/icu-56.1/lib)
-        set(ICU_INCLUDE_DIR  ${IFCOPENSHELL_INSTALL}/icu-56.1/include)
-        string(REGEX REPLACE "([^;]+)" "${ICU_LIBRARY_DIR}/lib\\1.a" ICU_LIBRARIES "${ICU_LIBRARY_NAMES}")
-    endif()
-else()
-    set(BOOST_ROOT       ${IFCOPENSHELL_ROOT}/deps/boost_1_67_0)
-    set(BOOST_LIBRARYDIR ${IFCOPENSHELL_ROOT}/deps/boost_1_67_0/stage/vs${MSVC_YEAR}-${WIN_ARCH}/lib)
+		if (${ifcopenshell_major_version} STREQUAL "0.5")
+			set(ICU_LIBRARY_NAMES icuuc icudata)
+			set(ICU_LIBRARY_DIR  ${IFCOPENSHELL_INSTALL}/icu-56.1/lib)
+			set(ICU_INCLUDE_DIR  ${IFCOPENSHELL_INSTALL}/icu-56.1/include)
+			string(REGEX REPLACE "([^;]+)" "${ICU_LIBRARY_DIR}/lib\\1.a" ICU_LIBRARIES "${ICU_LIBRARY_NAMES}")
+		endif()
+	else()
+		set(BOOST_ROOT       ${IFCOPENSHELL_ROOT}/deps/boost_1_67_0)
+		set(BOOST_LIBRARYDIR ${IFCOPENSHELL_ROOT}/deps/boost_1_67_0/stage/vs${MSVC_YEAR}-${WIN_ARCH}/lib)
 	
-    set(IFC_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/src)
-    set(IFC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/build-vs${MSVC_YEAR}-x86/${CMAKE_BUILD_TYPE})
+		set(IFC_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/src)
+		set(IFC_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/build-vs${MSVC_YEAR}-x86/${CMAKE_BUILD_TYPE})
     
-    string(REGEX REPLACE "([^;]+)" "${IFC_LIBRARY_DIR}/\\1.lib" IFC_LIBRARIES "${IFC_LIBRARY_NAMES}")
+		if (${ifcopenshell_major_version} STREQUAL "0.5")
+			set(ICU_LIBRARY_NAMES icuuc icudt)
+			set(ICU_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/icu/lib)
+			set(ICU_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/icu/include)
+			string(REGEX REPLACE "([^;]+)" "${ICU_LIBRARY_DIR}/\\1.lib" ICU_LIBRARIES "${ICU_LIBRARY_NAMES}")
+		endif()
+	endif()
+endif()
 
-    if (${ifcopenshell_major_version} STREQUAL "0.5")
-        set(ICU_LIBRARY_NAMES icuuc icudt)
-        set(ICU_LIBRARY_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/icu/lib)
-        set(ICU_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/icu/include)
-        string(REGEX REPLACE "([^;]+)" "${ICU_LIBRARY_DIR}/\\1.lib" ICU_LIBRARIES "${ICU_LIBRARY_NAMES}")
-    endif()
-endif()
-endif()
+foreach(libname ${IFC_LIBRARY_NAMES})
+	unset(lib CACHE)
+    find_library(lib NAMES "${libname}" PATHS "${IFC_LIBRARY_DIR}" NO_DEFAULT_PATH)
+	if (lib)
+		list(APPEND IFC_LIBRARIES "${lib}")
+	else()
+		message(WARNING "IfcOpenShell library ${libname} not found")
+	endif()
+endforeach()
 
 find_package(Boost REQUIRED COMPONENTS ${BOOST_COMPONENTS})
 

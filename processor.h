@@ -15,11 +15,18 @@
 #include <thread>
 
 #ifdef WITH_IFC
+
+#ifdef IFCOPENSHELL_07
+#include <ifcgeom_schema_agnostic/IfcGeomElement.h>
+
+typedef IfcGeom::BRepElement elem_t;
+#else
 #include <map>                    // @todo < commit in IfcopenShell
 #include <ifcparse/IfcLogger.h>   // @todo < commit in IfcopenShell
 #include <ifcgeom/IfcGeomElement.h>
 
 typedef IfcGeom::BRepElement<double> elem_t;
+#endif
 #endif
 
 typedef TopoDS_Shape geometry_t;

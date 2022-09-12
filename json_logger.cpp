@@ -9,6 +9,7 @@
 #include <ctime>
 #include <sstream>
 #include <chrono>
+#include <array>
 
 namespace {
 	struct ptree_writer {

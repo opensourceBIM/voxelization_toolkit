@@ -291,6 +291,16 @@ public:
 	}
 };
 
+#ifdef WITH_IFC
+#ifdef IFCOPENSHELL_07
+typedef IfcGeom::Iterator iterator_t;
+typedef aggregate_of_instance instance_list_t;
+#else
+typedef IfcGeom::Iterator<double> iterator_t;
+typedef IfcEntityList instance_list_t;
+#endif
+#endif
+
 class op_create_geometry : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
@@ -338,9 +348,12 @@ public:
 		settings_surface.set(IfcGeom::IteratorSettings::DISABLE_TRIANGULATION, true);
 		// settings_surface.set(IfcGeom::IteratorSettings::USE_WORLD_COORDS, true);
 		// Only to determine whether building element parts decompositions of slabs should be processed as roofs
+#ifdef IFCOPENSHELL_07
+		settings_surface.set(IfcGeom::IteratorSettings::ELEMENT_HIERARCHY, true);
+#else
 		settings_surface.set(IfcGeom::IteratorSettings::SEARCH_FLOOR, true);
+#endif
 		
-
 		boost::optional<bool> include, roof_slabs;
 		std::vector<std::string> entities;
 		if (scope.has("include")) {
@@ -405,15 +418,15 @@ public:
 
 		for (auto ifc_file : ifc_files.files) {
 
-			std::unique_ptr<IfcGeom::Iterator<double>> iterator;
+			std::unique_ptr<iterator_t> iterator;
 
 #ifdef IFCOPENSHELL_05
-			iterator.reset(IfcGeom::Iterator<double>(settings_surface, ifc_file, filters_surface));
+			iterator.reset(iterator_t(settings_surface, ifc_file, filters_surface));
 #else
 			if (threads) {
-				iterator.reset(new IfcGeom::Iterator<double>(settings_surface, ifc_file, filters_surface, *threads));
+				iterator.reset(new iterator_t(settings_surface, ifc_file, filters_surface, *threads));
 			} else {
-				iterator.reset(new IfcGeom::Iterator<double>(settings_surface, ifc_file, filters_surface));
+				iterator.reset(new iterator_t(settings_surface, ifc_file, filters_surface));
 			}
 #endif
 			
@@ -1890,7 +1903,7 @@ namespace {
 						if (rel->declaration().is("IfcRelDefinesByProperties")) {
 							IfcUtil::IfcBaseClass* pset = *((IfcUtil::IfcBaseEntity*)rel)->get("RelatingPropertyDefinition");
 							if (pset->declaration().is("IfcPropertySet")) {
-								IfcEntityList::ptr props = *((IfcUtil::IfcBaseEntity*)pset)->get("HasProperties");
+								instance_list_t::ptr props = *((IfcUtil::IfcBaseEntity*)pset)->get("HasProperties");
 								for (auto& prop : *props) {
 									if (prop->declaration().is("IfcPropertySingleValue")) {
 										auto name = (std::string) *((IfcUtil::IfcBaseEntity*)prop)->get("Name");
