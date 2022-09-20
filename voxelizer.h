@@ -41,11 +41,10 @@ public:
 			return;
 			throw std::runtime_error("No triangulation!");
 		} else {
-			const TColgp_Array1OfPnt& nodes = tri->Nodes();
 			std::vector<gp_XYZ> xyzs;
-			xyzs.reserve(nodes.Length());
-			for (int i = 1; i <= nodes.Length(); ++i) {
-				gp_XYZ xyz = nodes(i).Transformed(loc).XYZ();
+			xyzs.reserve(tri->NbNodes());
+			for (int i = 1; i <= tri->NbNodes(); ++i) {
+				gp_XYZ xyz = tri->Node(i).Transformed(loc).XYZ();
 				xyzs.push_back(xyz);
 			}
 

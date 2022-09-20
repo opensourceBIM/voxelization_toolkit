@@ -5,9 +5,9 @@
 TEST(Sweep, SweepWithMax) {
 	const double d = 1;
 	auto a = new chunked_voxel_storage<bit_t>(0, 0, 0, d, 20, 20, 20, 10);
-	a->Set(make_vec(1U, 1U, 1U));
+	a->Set(make_vec<size_t>(1U, 1U, 1U));
 	auto b = new chunked_voxel_storage<bit_t>(0, 0, 0, d, 20, 20, 20, 10);
-	b->Set(make_vec(1U, 1U, 10U));
+	b->Set(make_vec<size_t>(1U, 1U, 10U));
 
 	{
 		sweep s;

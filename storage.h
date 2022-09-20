@@ -535,7 +535,7 @@ public:
 	}
 
 	void Set(const vec_n<3, size_t>& xyz) {
-		Set(xyz, T::value_type_non_ref(1));
+		Set(xyz, typename T::value_type_non_ref(1));
 	}
 
 	void Set(const vec_n<3, size_t>& pos, void* ptr) {

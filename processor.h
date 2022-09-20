@@ -17,6 +17,7 @@
 #ifdef WITH_IFC
 
 #ifdef IFCOPENSHELL_07
+#include <ifcparse/IfcLogger.h>   // @todo < commit in IfcopenShell
 #include <ifcgeom_schema_agnostic/IfcGeomElement.h>
 
 typedef IfcGeom::BRepElement elem_t;

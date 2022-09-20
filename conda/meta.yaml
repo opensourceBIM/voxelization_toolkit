@@ -1,0 +1,35 @@
+{% set name = "voxelization_toolkit" %}
+{% set version = "0.4.0" %}
+
+package:
+  name: {{ name }}
+  version: {{ version }}
+
+source:
+  path: ..
+
+build:
+  binary_relocation: false [osx]
+
+requirements:
+  build:
+    - {{ compiler('cxx') }}
+    - ninja
+    - cmake
+    - ifcopenshell
+
+  host:
+    - python
+    - ifcopenshell
+
+  run: []
+
+about:
+  home: https://github.com/opensourceBIM/voxelization_toolkit
+  license: MIT
+  license_file: LICENSE
+  summary: 'Voxelization Toolkit for (IFC) Building Models'
+  description: |
+     Voxelization Toolkit for (IFC) Building Models 
+  doc_url: https://github.com/opensourceBIM/voxelization_toolkit
+  dev_url: https://github.com/opensourceBIM/voxelization_toolkit

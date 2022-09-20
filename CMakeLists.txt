@@ -8,8 +8,6 @@ OPTION(USE_BUILD_SCRIPT_OUTPUT "Use the ifcopenshell nix/build-all.py or win/bui
 
 include(CTest)
 
-set(CMAKE_BUILD_TYPE "RelWithDebInfo")
-
 if(CMAKE_SIZEOF_VOID_P EQUAL 8)
     set(WIN_ARCH x64)
 elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
@@ -77,9 +75,8 @@ if (USE_BUILD_SCRIPT_OUTPUT)
 		endif()
 	endif()
 else()
-	set (IFC_INCLUDE_DIR "${IFCOPENSHELL_ROOT}/src")
 	# user to supply:
-	#  * IFCOPENSHELL_ROOT
+	#  * IFCOPENSHELL_ROOT or IFC_INCLUDE_DIR
 	#  * OCC_INCLUDE_DIR
 	#  * OCC_LIBRARY_DIR
 	#  * BOOST_ROOT
@@ -87,12 +84,21 @@ else()
 	#  * (BOOST_LIBRARYDIR)
 	#  * (USE_STATIC_MSVC_RUNTIME=Off)
 	#  * (Boost_USE_STATIC_LIBS=On)
+
+	if (NOT DEFINED IFC_INCLUDE_DIR)
+		set (IFC_INCLUDE_DIR "${IFCOPENSHELL_ROOT}/src")
+	endif()
 endif()
 
 foreach(libname ${OCC_LIBRARY_NAMES})
 	unset(lib CACHE)
     find_library(lib NAMES "${libname}" PATHS "${OCC_LIBRARY_DIR}" NO_DEFAULT_PATH)
-    list(APPEND OCC_LIBRARIES "${lib}")
+        if (lib)
+                list(APPEND OCC_LIBRARIES "${lib}")
+        else()
+                message(WARNING "OCC library ${libname} not found in ${OCC_LIBRARY_DIR}")
+		message(STATUS "${OCC_LIBRARY_DIR}")
+        endif()
 endforeach()
 
 if (UNIX)
@@ -113,11 +119,11 @@ else()
 	set(WS2_LIBRARIES ws2_32.lib)
 endif()
 
-set(BOOST_COMPONENTS regex program_options iostreams system)
+set(BOOST_COMPONENTS regex program_options iostreams system filesystem)
 
 if (IFC_SUPPORT)
 	# Find IfcOpenShell version, v0.6.0 does not have the IfcSchema namespace anymore
-	file(READ "${IFCOPENSHELL_ROOT}/src/ifcparse/IfcParse.h" header)
+	file(READ "${IFC_INCLUDE_DIR}/ifcparse/IfcParse.h" header)
 	string(REGEX MATCH "#define IFCOPENSHELL_VERSION \"[0-9a-zA-Z\\.\\-]+\"" ifcopenshell_version "${header}")
 	string(REGEX MATCH "[0-9]\\.[0-9]" ifcopenshell_major_version "${ifcopenshell_version}")
 	message(STATUS "IfcOpenShell version ${ifcopenshell_major_version}")
@@ -143,7 +149,9 @@ if (IFC_SUPPORT)
 			endif()
 		endif()
 		set(IFC_LIBRARY_NAMES IfcGeom IfcGeom_ifc2x3 IfcGeom_ifc4 IfcGeom_ifc4x1
-							  IfcGeom_ifc4x2 IfcGeom_ifc4x3_rc1 IfcGeom_ifc4x3_rc2 IfcParse)
+		                      IfcGeom_ifc4x2 IfcGeom_ifc4x3_rc1 IfcGeom_ifc4x3_rc2
+		                      IfcGeom_ifc4x3_rc3 IfcGeom_ifc4x3_rc4 IfcGeom_ifc4x3
+		                      IfcParse)
 	endif()
 endif()
 
