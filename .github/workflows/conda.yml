@@ -24,12 +24,9 @@ jobs:
           { name: py310, distver: '3.10'}
         ]
         platform: [
-          { name: Windows, distver: windows-2022, upload: 'true' },
-          { name: Windows, distver: windows-2019, upload: 'false' },
-          { name: Linux, distver: ubuntu-20.04,  upload: 'false' },
-          { name: Linux, distver: ubuntu-18.04,  upload: 'true' },
-          { name: macOS, distver: macos-11, upload: 'true' },
-          { name: macOS, distver: macos-10.15, upload: 'false' }
+          { name: Windows, distver: windows-2022 },
+          { name: Linux, distver: ubuntu-18.04 },
+          { name: macOS, distver: macos-11 }
         ]
     steps:
       - uses: actions/checkout@v2
@@ -49,10 +46,6 @@ jobs:
           python-version: ${{ matrix.pyver.distver }}
           environment-file: conda/environment.yml
       - name: build, test and upload ifcopenshell
-        if: ${{ matrix.platform.upload == 'true' }}
         run: |
-          conda-build . --python ${{ matrix.pyver.distver }} -c conda-forge --token ${{ secrets.ANACONDA_TOKEN }} --user ifcopenshell --no-remove-work-dir
-      - name: build & test ifcopenshell
-        if: ${{ matrix.platform.upload == 'false' }}
-        run: |
-          conda-build . --python ${{ matrix.pyver.distver }} -c conda-forge --no-remove-work-dir
+          conda-build . --python ${{ matrix.pyver.distver }} -c conda-forge --token ${{ secrets.ANACONDA_TOKEN }} --user ifcopenshell
+          
