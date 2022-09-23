@@ -9,10 +9,10 @@ cmake -G "Ninja" ^
  -DUSE_BUILD_SCRIPT_OUTPUT=Off ^
  -DUSE_STATIC_MSVC_RUNTIME=Off ^
  -DBoost_USE_STATIC_LIBS=Off ^
- -DIFC_INCLUDE_DIR=%PREFIX%\include ^
- -DIFC_LIBRARY_DIR=%PREFIX%\lib ^
- -DOCC_INCLUDE_DIR=%PREFIX%\include/opencascade ^
- -DOCC_LIBRARY_DIR=%PREFIX%\lib ^
+ -DIFC_INCLUDE_DIR=%BUILD_PREFIX%\include ^
+ -DIFC_LIBRARY_DIR=%BUILD_PREFIX%\lib ^
+ -DOCC_INCLUDE_DIR=%BUILD_PREFIX%\include/opencascade ^
+ -DOCC_LIBRARY_DIR=%BUILD_PREFIX%\lib ^
  %SRC_DIR%
  
 if errorlevel 1 exit 1
