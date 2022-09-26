@@ -17,6 +17,49 @@ The toolkit presented here has been used for:
 * Model conversion (e.g for acoustic analysis - eroding small elements - using PCA to export slanted surfaces derived from voxel grid)
 * ...
 
+## Installation
+
+The `voxec(.exe)` runtime interpreter can be installed using the Anaconda (conda) package manager from the ifcopenshell channel.
+
+```
+conda install -c ifcopenshell voxelization_toolkit
+```
+
+## Usage
+
+Recommended usage is using the `voxec` runtime interpreter, which takes an input "voxelfile" which describes a series of commands. The grammar of such as voxelfile is:
+
+```
+iden = alpha (alnum | '_')*
+statement = iden '=' function_call
+quoted_string = '"' (char - '"')* '"'
+sequence = '{' quoted_string? (',' quoted_string)* '}'
+value = strict_double | int_ | quoted_string | iden | sequence
+function_arg = iden '=' value
+function_args = function_arg? (',' function_arg)*
+function_call = iden '(' function_args ')'
+argument_list = iden? (',' iden)*
+function_def = "function" iden '(' argument_list ')' statement* "return" iden
+start = (statement | function_def)*
+```
+
+For example:
+
+```
+file = parse("duplex.ifc")
+slabss = create_geometry(file, include={"IfcSlab"})
+roofss = create_geometry(file, include={"IfcRoof"})
+slabs = voxelize(slabss)
+roofs = voxelize(roofss)
+floors_surface = subtract(slabs, roofs)
+floor_volume = volume2(floors_surface)
+floors = union(floors_surface, floor_volume)
+floors_surface = collapse(floors, 0, 0, -1)
+num = count(floors_surface)
+```
+
+A list of available commands is provide below.
+
 ## Available commands:
 
 ### collapse()
