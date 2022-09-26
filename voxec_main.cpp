@@ -1,8 +1,9 @@
 #include "voxec.h"
 #include "json_logger.h"
 
-#include <boost/program_options.hpp>
 #include <boost/optional.hpp>
+#include <boost/program_options.hpp>
+#include <boost/algorithm/string/replace.hpp>
 
 #include <fstream>
 #include <iostream>
@@ -22,6 +23,7 @@ int main(int argc, char** argv) {
 		("chunk,c", po::value<size_t>(), "chunk size in number of voxels")
 		("mmap,m", "use memory-mapped files instead of pure RAM")
 		("mesh", "emit obj mesh for the last instruction")
+		("help,h", "emit usage information and exit")
 		("input-file", po::value<std::string>(), "input IFC file")
 		("output-file", po::value<std::string>(), "output voxel file");
 
@@ -39,6 +41,24 @@ int main(int argc, char** argv) {
 			{"error", {{"message", std::string(e.what())}}}
 		});
 		return 1;
+	}
+
+	if (vmap.count("help")) {
+		std::cout << "voxec: Voxelization Toolkit Execution Runtime" << std::endl;
+		std::cout << opts << std::endl << std::endl;
+		std::cout << "Available commands:" << std::endl << std::endl;
+		auto& m = voxel_operation_map::map();
+		for (auto& p : m) {
+			voxel_operation* op = voxel_operation_map::create(p.first);
+			std::cout << "### " << p.first << "()" << std::endl << std::endl;
+			std::cout << "name|required|type" << std::endl;
+			std::cout << "---|---|---" << std::endl;
+			for (auto& spec : op->arg_names()) {
+				std::cout << spec.name << "|" << (spec.required ? "Y" : "n") << "|" << boost::replace_all_copy(spec.type, "|", ",") << std::endl;
+			}
+			std::cout << std::endl << std::endl;
+		}
+		return 0;
 	}
 
 	if (!vmap.count("input-file")) {
