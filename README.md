@@ -11,7 +11,7 @@ The toolkit presented here has been used for:
 
 * Reliably compute volume (e.g entire building volume above and under ground; quantity calculation for non-manifold element geometries)
 * Evacuation analysis (providing a length to nearest exit for every reachable place in the model; taking into account obstacles)
-* Building code compliance (e.g of space dimensions including
+* Building code compliance (e.g of space dimensions taking into account contained elements)
 * Safety analysis (by analysing reachable space and fall hazards)
 * Detection of exterior elements (by calculating interior volume using neighbour traversal)
 * Model conversion (e.g for acoustic analysis - eroding small elements - using PCA to export slanted surfaces derived from voxel grid)
