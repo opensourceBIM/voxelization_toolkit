@@ -934,7 +934,7 @@ public:
 
 namespace {
 	template <typename Fn, typename Fn2>
-	void revoxelize_and_check_overlap(abstract_voxel_storage* voxels, const geometry_collection_t& surfaces, Fn fn, Fn2 fn2) {
+	void revoxelize_and_check_overlap(abstract_voxel_storage* voxels, const geometry_collection_t& surfaces, bool indiv_face, int factor, Fn fn, Fn2 fn2) {
 		BRep_Builder B;
 
 		TopoDS_Compound face_subset_all_elem;
@@ -946,17 +946,33 @@ namespace {
 
 			bool any = false;
 
-			TopExp_Explorer exp(pair.second, TopAbs_FACE);
+			int face_idx = 0;
 
-			for (; exp.More(); exp.Next()) {
-				TopoDS_Compound C;
-				B.MakeCompound(C);
-				B.Add(C, exp.Current());
-				geometry_collection_t single = { { pair.first, C} };
+			std::list<TopoDS_Compound> items;
+
+			if (indiv_face) {
+				TopExp_Explorer exp(pair.second, TopAbs_FACE);
+				for (; exp.More(); exp.Next(), ++face_idx) {
+					TopoDS_Compound C;
+					B.MakeCompound(C);
+					B.Add(C, exp.Current());
+					items.emplace_back(C);
+				}
+			} else {
+				items.push_back(pair.second);
+			}
+
+			for (auto& item : items) {
+				geometry_collection_t single = { { pair.first, item} };
 
 				auto vs = voxels->empty_copy();
 				voxelize_2(vs, &single);
 				auto x = vs->boolean_intersection(voxels);
+
+				json_logger::message(
+					json_logger::LOG_DEBUG,
+					std::string("#") + std::to_string(pair.first) + ": " + std::to_string(x->count()) + "/" + std::to_string(vs->count())
+				);
 
 				// std::cout << "#" << pair.first << std::endl;
 				// std::cout << "vs ";
@@ -964,17 +980,22 @@ namespace {
 				// std::cout << "x  ";
 				// dump_info(x);
 
-				if (vs->count() > 0 && x->count() * 2 >= vs->count()) {
+				if (vs->count() > 0 && x->count() * factor >= vs->count()) {
 					// @todo I thought that a valid non-null face would result in at least once voxel.
 					//       there might be differences here with the scanline algorithm and box intersect
 					//       algorithm.
-					B.Add(face_subset, exp.Current());
-					B.Add(face_subset_all_elem, exp.Current());
+					if (indiv_face) {
+						auto face = TopoDS_Iterator(item).Value();
+						B.Add(face_subset, face);
+						B.Add(face_subset_all_elem, face);
+					}
 					any = true;
 				}
 
 				delete vs;
 				delete x;
+
+				face_idx++;
 			}
 
 			if (any) {
@@ -1076,7 +1097,7 @@ class op_json_stats : public voxel_operation {
 
 class op_export_elements : public voxel_operation {
 	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "input", "ifcfile" }, { true, "input_voxels", "voxels" }, { true, "input_surfaces", "surfaceset" }, { true, "output_path", "string" } };
+		static std::vector<argument_spec> nm_ = { { true, "input", "ifcfile" }, { true, "input_voxels", "voxels" }, { true, "input_surfaces", "surfaceset" }, { true, "output_path", "string" }, {false, "individual_faces", "integer"}, {false, "factor", "integer"}, {false, "face_count", "integer"} };
 		return nm_;
 	}
 	symbol_value invoke(const scope_map& scope) const {
@@ -1089,25 +1110,33 @@ class op_export_elements : public voxel_operation {
 		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input_voxels");
 		geometry_collection_t* surfaces = scope.get_value<geometry_collection_t*>("input_surfaces");
 		const std::string output_path = scope.get_value<std::string>("output_path");
+		const bool individual_faces = scope.get_value_or<int>("individual_faces", 1) == 1;
+		const int factor = scope.get_value_or<int>("factor", 2);
+		const int face_count = scope.get_value_or<int>("face_count", 3);
 
 		std::ofstream json(output_path.c_str());
 		json << "[\n";
 		int n = 0;
 
-		revoxelize_and_check_overlap(voxels, *surfaces, [&f0, &json, &n](int iden, const TopoDS_Compound& face_subset) {
-			TopExp_Explorer exp(face_subset, TopAbs_FACE);
-			int num_faces = 0;
-			for (; exp.More(); exp.Next()) {
-				num_faces++;
-			}
+		revoxelize_and_check_overlap(voxels, *surfaces, individual_faces, factor, [&f0, &json, &n, &individual_faces, &face_count](int iden, const TopoDS_Compound& face_subset) {
+			bool include = !individual_faces;
+			if (individual_faces) {
+				TopExp_Explorer exp(face_subset, TopAbs_FACE);
+				int num_faces = 0;
+				for (; exp.More(); exp.Next()) {
+					num_faces++;
+				}
 
-			// @todo arbitrary value alert
-			if (num_faces > 3) {
+				// @todo arbitrary value alert
+				if (num_faces > face_count) {
+					include = true;
+				}
+			}
+			if (include) {
 				std::string guid = *((IfcUtil::IfcBaseEntity*)f0->instance_by_id(iden))->get("GlobalId");
-				if (n) {
+				if (n++) {
 					json << ",\n";
 				}
-				n += 1;
 				json << "{\"id\":" << iden << ",\"guid\":\"" << guid << "\"}";
 			}
 		}, [&output_path](const TopoDS_Compound& face_subset_all_elem) {
@@ -1143,7 +1172,7 @@ class op_export_ifc : public voxel_operation  {
 		geometry_collection_t* surfaces = scope.get_value<geometry_collection_t*>("input_surfaces");
 		const std::string output_path = scope.get_value<std::string>("output_path");
 
-		revoxelize_and_check_overlap(voxels, *surfaces, [&f0, &new_file](int iden, const TopoDS_Compound& face_subset) {
+		revoxelize_and_check_overlap(voxels, *surfaces, true, 2, [&f0, &new_file](int iden, const TopoDS_Compound& face_subset) {
 			TopExp_Explorer exp(face_subset, TopAbs_FACE);
 			int num_faces = 0;
 			for (; exp.More(); exp.Next()) {
@@ -1207,7 +1236,7 @@ public:
 		geometry_collection_t* surfaces = scope.get_value<geometry_collection_t*>("input_surfaces");
 		const std::string output_path = scope.get_value<std::string>("output_path");
 
-		revoxelize_and_check_overlap(voxels, *surfaces, [&output_path](int iden, const TopoDS_Compound& face_subset) {
+		revoxelize_and_check_overlap(voxels, *surfaces, true, 2, [&output_path](int iden, const TopoDS_Compound& face_subset) {
 			std::string fn = output_path + DIRSEP + std::to_string(iden) + ".brep";
 			std::ofstream fs(fn.c_str());
 			BRepTools::Write(face_subset, fs);
