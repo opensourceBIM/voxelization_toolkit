@@ -17,6 +17,28 @@ The toolkit presented here has been used for:
 * Model conversion (e.g for acoustic analysis - eroding small elements - using PCA to export slanted surfaces derived from voxel grid)
 * ...
 
+## Examples
+
+Three examples (including visualization) are elaborated in python code in `./python/voxec`
+
+#### Headroom height
+
+Calculate headroom height in the model taking all geometric elements into account
+
+![](img/heights.png)
+
+#### Evacuation distance
+
+Calculate distance to the exterior for any point in the model taking into account obstacles
+
+![](img/evacuation_distance.png)
+
+#### Exterior elements
+
+Geometricaly assess exterior elements on multi-aspect models as BIM authoring tools often have erroneous IsExternal properties specified.
+
+![](img/exterior_interior.png)
+
 ## Installation
 
 The `voxec(.exe)` runtime interpreter can be installed using the Anaconda (conda) package manager from the ifcopenshell channel.
