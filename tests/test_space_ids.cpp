@@ -54,7 +54,7 @@ TEST(Voxelization, IfcSpaceIds) {
 	while (true) {
 		TopoDS_Compound C = it.get_native()->geometry().as_compound();
 		BRepMesh_IncrementalMesh(C, 0.001);
-		geoms.push_back({ it.get_native()->id(), C });
+		geoms.push_back({ {&ifc_file, it.get_native()->id()}, C });
 		if (!it.next()) {
 			break;
 		}

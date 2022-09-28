@@ -514,7 +514,7 @@ public:
 						compound.Move(elem->transformation().data());
 
 						BRepMesh_IncrementalMesh(compound, 0.001);
-						geometries->push_back(std::make_pair(elem->id(), compound));
+						geometries->push_back(std::make_pair(std::pair<void*, int>(ifc_file, elem->id()), compound));
 					}
 				}
 
@@ -971,7 +971,7 @@ namespace {
 
 				json_logger::message(
 					json_logger::LOG_DEBUG,
-					std::string("#") + std::to_string(pair.first) + ": " + std::to_string(x->count()) + "/" + std::to_string(vs->count())
+					std::string("#") + std::to_string(pair.first.second) + ": " + std::to_string(x->count()) + "/" + std::to_string(vs->count())
 				);
 
 				// std::cout << "#" << pair.first << std::endl;
@@ -1102,11 +1102,6 @@ class op_export_elements : public voxel_operation {
 	}
 	symbol_value invoke(const scope_map& scope) const {
 		const filtered_files_t& ifc_files = scope.get_value<filtered_files_t>("input");
-		if (ifc_files.files.size() != 1) {
-			throw std::runtime_error("Only single file inputs supported for this operation");
-		}
-		auto f0 = ifc_files.files[0];
-
 		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input_voxels");
 		geometry_collection_t* surfaces = scope.get_value<geometry_collection_t*>("input_surfaces");
 		const std::string output_path = scope.get_value<std::string>("output_path");
@@ -1118,7 +1113,7 @@ class op_export_elements : public voxel_operation {
 		json << "[\n";
 		int n = 0;
 
-		revoxelize_and_check_overlap(voxels, *surfaces, individual_faces, factor, [&f0, &json, &n, &individual_faces, &face_count](int iden, const TopoDS_Compound& face_subset) {
+		revoxelize_and_check_overlap(voxels, *surfaces, individual_faces, factor, [&json, &n, &individual_faces, &face_count](std::pair<void*, int> iden, const TopoDS_Compound& face_subset) {
 			bool include = !individual_faces;
 			if (individual_faces) {
 				TopExp_Explorer exp(face_subset, TopAbs_FACE);
@@ -1133,11 +1128,11 @@ class op_export_elements : public voxel_operation {
 				}
 			}
 			if (include) {
-				std::string guid = *((IfcUtil::IfcBaseEntity*)f0->instance_by_id(iden))->get("GlobalId");
+				std::string guid = *((IfcUtil::IfcBaseEntity*)((IfcParse::IfcFile*)iden.first)->instance_by_id(iden.second))->get("GlobalId");
 				if (n++) {
 					json << ",\n";
 				}
-				json << "{\"id\":" << iden << ",\"guid\":\"" << guid << "\"}";
+				json << "{\"id\":" << iden.second << ",\"guid\":\"" << guid << "\"}";
 			}
 		}, [&output_path](const TopoDS_Compound& face_subset_all_elem) {
 		});
@@ -1172,7 +1167,7 @@ class op_export_ifc : public voxel_operation  {
 		geometry_collection_t* surfaces = scope.get_value<geometry_collection_t*>("input_surfaces");
 		const std::string output_path = scope.get_value<std::string>("output_path");
 
-		revoxelize_and_check_overlap(voxels, *surfaces, true, 2, [&f0, &new_file](int iden, const TopoDS_Compound& face_subset) {
+		revoxelize_and_check_overlap(voxels, *surfaces, true, 2, [&f0, &new_file](std::pair<void*, int> iden, const TopoDS_Compound& face_subset) {
 			TopExp_Explorer exp(face_subset, TopAbs_FACE);
 			int num_faces = 0;
 			for (; exp.More(); exp.Next()) {
@@ -1181,7 +1176,7 @@ class op_export_ifc : public voxel_operation  {
 
 			// @todo arbitrary value alert
 			if (num_faces >= 1) {
-				auto inst = f0->instance_by_id(iden);
+				auto inst = f0->instance_by_id(iden.second);
 				new_file.addEntity(inst);
 				auto refs = f0->traverse(inst);
 				for (auto& r : *refs) {
@@ -1236,8 +1231,8 @@ public:
 		geometry_collection_t* surfaces = scope.get_value<geometry_collection_t*>("input_surfaces");
 		const std::string output_path = scope.get_value<std::string>("output_path");
 
-		revoxelize_and_check_overlap(voxels, *surfaces, true, 2, [&output_path](int iden, const TopoDS_Compound& face_subset) {
-			std::string fn = output_path + DIRSEP + std::to_string(iden) + ".brep";
+		revoxelize_and_check_overlap(voxels, *surfaces, true, 2, [&output_path](std::pair<void*, int> iden, const TopoDS_Compound& face_subset) {
+			std::string fn = output_path + DIRSEP + std::to_string(iden.second) + ".brep";
 			std::ofstream fs(fn.c_str());
 			BRepTools::Write(face_subset, fs);
 		}, [&output_path](const TopoDS_Compound& face_subset_all_elem) {
@@ -1387,7 +1382,7 @@ public:
 
 		BRepMesh_IncrementalMesh(C, 0.001);
 		
-		geometry_collection_t* single = new geometry_collection_t{ { 0, C} };
+		geometry_collection_t* single = new geometry_collection_t{ { {nullptr, 0}, C} };
 		return single;
 	}
 };

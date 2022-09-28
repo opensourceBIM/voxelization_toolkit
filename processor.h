@@ -31,7 +31,7 @@ typedef IfcGeom::BRepElement<double> elem_t;
 #endif
 
 typedef TopoDS_Shape geometry_t;
-typedef std::vector<std::pair<int, TopoDS_Compound > > geometry_collection_t;
+typedef std::vector<std::pair<std::pair<void*, int>, TopoDS_Compound > > geometry_collection_t;
 
 class voxelization_mode {
 public:
@@ -221,12 +221,12 @@ public:
 						throw std::runtime_error("Unable to assign product ids to this voxel value type");
 					}
 					auto input = (regular_voxel_storage*)to_write;
-					uint32_t v = it->first;
+					uint32_t v = it->first.second;
 					for (auto& ijk : *input) {
 						voxels_->Set(ijk, &v);
 					}
 				} else {
-					output.intermediate_result(it->first, voxels_, voxels_temp_);
+					output.intermediate_result(it->first.second, voxels_, voxels_temp_);
 				}
 				
 				if (use_copy_) {
