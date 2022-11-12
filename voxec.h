@@ -259,18 +259,21 @@ public:
 				auto projects = f->instances_by_type("IfcProject");
 				// @nb: a copy has to be made, because instances_by_type() returns a reference
 				//      from the live map of the file which is updated upon removeEntity()
-				std::vector<IfcUtil::IfcBaseClass*> projects_copy(projects->begin(), projects->end());
-				if (projects->size() > 1) {
-					for (auto it = projects_copy.begin() + 1; it != projects_copy.end(); ++it) {
-						auto inverses = f->getInverse((*it)->data().id(), nullptr, -1);
-						
-						f->removeEntity(*it);
 
-						for (auto& inv : *inverses) {
-							if (inv->declaration().name() == "IFCRELAGGREGATES") {
-								auto attr = new IfcWrite::IfcWriteArgument;
-								attr->set(projects_copy[0]);
-								inv->data().setArgument(4, attr);
+				if (projects) {
+					std::vector<IfcUtil::IfcBaseClass*> projects_copy(projects->begin(), projects->end());
+					if (projects->size() > 1) {
+						for (auto it = projects_copy.begin() + 1; it != projects_copy.end(); ++it) {
+							auto inverses = f->getInverse((*it)->data().id(), nullptr, -1);
+
+							f->removeEntity(*it);
+
+							for (auto& inv : *inverses) {
+								if (inv->declaration().name() == "IFCRELAGGREGATES") {
+									auto attr = new IfcWrite::IfcWriteArgument;
+									attr->set(projects_copy[0]);
+									inv->data().setArgument(4, attr);
+								}
 							}
 						}
 					}
