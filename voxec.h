@@ -74,6 +74,10 @@ typedef boost::variant<boost::blank, filtered_files_t, geometry_collection_t*, a
 
 class voxel_operation;
 
+class assertion_error : public std::runtime_error {
+	using std::runtime_error::runtime_error;
+};
+
 class scope_map : public std::map<std::string, symbol_value> {
 protected:
 	template <typename T>
@@ -1547,6 +1551,44 @@ public:
 		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input");
 		function_arg_value_type var = (int) voxels->count();
 		return var;
+	}
+};
+
+
+class op_free: public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" } };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		abstract_voxel_storage* voxels = scope.get_value<abstract_voxel_storage*>("input");
+		delete voxels;
+		symbol_value v;
+		return v;
+	}
+};
+
+class op_assert : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels|integer" } };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		try {
+			auto voxels = scope.get_value<abstract_voxel_storage*>("input");
+			if (voxels->count() == 0) {
+				throw assertion_error("Failed assert");
+			}
+		} catch (scope_map::value_error&) {
+			auto v = scope.get_value<int>("input");
+			if (v == 0) {
+				throw assertion_error("Failed assert");
+			}
+		}
+		symbol_value v;
+		return v;
 	}
 };
 

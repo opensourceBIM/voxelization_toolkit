@@ -67,6 +67,8 @@ voxel_operation_map::map_t& voxel_operation_map::map() {
 		m.insert(std::make_pair(std::string("normal_estimate"), &instantiate<op_normal_estimate>));
 		m.insert(std::make_pair(std::string("segment"), &instantiate<op_segment>));
 		m.insert(std::make_pair(std::string("keep_neighbours"), &instantiate<op_keep_neighbours>));
+		m.insert(std::make_pair(std::string("free"), &instantiate<op_free>));
+		m.insert(std::make_pair(std::string("assert"), &instantiate<op_assert>));
 
 		initialized = true;
 	}
