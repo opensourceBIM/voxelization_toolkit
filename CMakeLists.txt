@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 2.8.11)
 project (voxel)
 
 OPTION(IFC_SUPPORT "Build Volization Toolkit with IFC support (requires IfcOpenShell/master)." ON)
-OPTION(USE_STATIC_MSVC_RUNTIME "Link to the static runtime on MSVC." ON)
+OPTION(USE_STATIC_MSVC_RUNTIME "Link to the static runtime on MSVC." OFF)
 OPTION(ENABLE_TESTS "Enable tests." ON)
 OPTION(USE_BUILD_SCRIPT_OUTPUT "Use the ifcopenshell nix/build-all.py or win/build-all.cmd build script output to find dependencies." ON)
 
@@ -55,7 +55,7 @@ if (USE_BUILD_SCRIPT_OUTPUT)
 			file(TO_CMAKE_PATH "${OCC_LIBRARY_DIR}" OCC_LIBRARY_DIR)
 		endif()
     
-		set(Boost_USE_STATIC_LIBS   ON)
+		# set(Boost_USE_STATIC_LIBS   ON)
 		set(Boost_USE_MULTITHREADED ON)
 
 		if(USE_STATIC_MSVC_RUNTIME)
