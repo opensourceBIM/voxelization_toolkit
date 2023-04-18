@@ -528,8 +528,9 @@ public:
 	regular_voxel_storage* output;
 	bool start_outside;
 	bool invert;
+	bool subtract_input;
 
-	traversal_voxel_filler() : output(nullptr), start_outside(false), invert(true) {}
+	traversal_voxel_filler() : output(nullptr), start_outside(false), invert(true), subtract_input(true) {}
 
 	regular_voxel_storage* operator()(regular_voxel_storage* storage) {
 		if (storage->count() == 0) {
@@ -583,8 +584,10 @@ public:
 
 			regular_voxel_storage* inverted = (regular_voxel_storage*) output->inverted();
 			
-			// Subtract original to detect if we have an empty volume
-			inverted->boolean_subtraction_inplace(storage);
+			if (subtract_input) {
+				// Subtract original to detect if we have an empty volume
+				inverted->boolean_subtraction_inplace(storage);
+			}
 
 			/*
 			// Empty result should not be an issue
@@ -626,6 +629,21 @@ public:
 	regular_voxel_storage * operator()(regular_voxel_storage* storage) {
 		traversal_voxel_filler filler;
 		filler.start_outside = true;
+		// @todo why were these set to none?
+		// filler.progress_callback = boost::none;
+		return filler(storage);
+	}
+};
+
+
+class traversal_voxel_filler_inverse_with_input : public post_process {
+public:
+	static const bool UNION_INPUT = false;
+
+	regular_voxel_storage * operator()(regular_voxel_storage* storage) {
+		traversal_voxel_filler filler;
+		filler.start_outside = true;
+		filler.subtract_input = false;
 		// @todo why were these set to none?
 		// filler.progress_callback = boost::none;
 		return filler(storage);

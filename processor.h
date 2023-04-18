@@ -204,30 +204,28 @@ public:
 		for (geometry_collection_t::const_iterator it = a; it < b; ++it) {
 			abstract_voxel_storage* to_write = volume.y ? voxels_temp_ : voxels_;
 
-			if (volume.y) {
-				voxelizer voxeliser(it->second, (regular_voxel_storage*) to_write, !use_scanline_, !use_scanline_);
-				voxeliser.epsilon() = 1e-9;
-				voxeliser.Convert();
+			voxelizer voxeliser(it->second, (regular_voxel_storage*)to_write, !use_scanline_, !use_scanline_);
+			voxeliser.epsilon() = 1e-9;
+			voxeliser.Convert();
 
-				auto filled = traversal_voxel_filler_inverse()((regular_voxel_storage*)to_write);
-				// @todo this is not very efficient as the above does exactly the inverse subtraction
-				to_write->boolean_union_inplace(filled);
-				delete filled;
+			if (volume.y) {
+				auto filled = traversal_voxel_filler_inverse_with_input()((regular_voxel_storage*)to_write);
 
 				if (volume.value == PRODUCT_ID) {
-					int n = voxels_->value_bits();
 					// @todo this still needs to be generalized
-					if (n != 32) {
+					if (voxels_->value_bits() != 32) {
 						throw std::runtime_error("Unable to assign product ids to this voxel value type");
 					}
-					auto input = (regular_voxel_storage*)to_write;
+
 					uint32_t v = it->first.second;
-					for (auto& ijk : *input) {
+					for (auto& ijk : (*(regular_voxel_storage*)filled)) {
 						voxels_->Set(ijk, &v);
 					}
 				} else {
 					output.intermediate_result(it->first.second, voxels_, voxels_temp_);
 				}
+
+				delete filled;
 				
 				if (use_copy_) {
 					auto tmp = voxels_temp_->empty_copy();
@@ -237,10 +235,6 @@ public:
 					delete voxels_temp_;
 					voxels_temp_ = factory_.create(x1_, y1_, z1_, d_, nx_, ny_, nz_);
 				}
-			} else {
-				voxelizer voxeliser(it->second, (regular_voxel_storage*) to_write, !use_scanline_, !use_scanline_);
-				voxeliser.epsilon() = 1e-9;
-				voxeliser.Convert();
 			}
 
 			n++;
