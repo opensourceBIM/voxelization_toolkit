@@ -617,13 +617,20 @@ public:
 
 	void boolean_union_inplace(const abstract_voxel_storage* other_) {
 		const continuous_voxel_storage<T>* other = (const continuous_voxel_storage<T>*) other_;
-		for (size_t i = 0; i < size(); ++i) {
-			if (T::size_in_bits < 8U) {
-				data_[i] |= other->data_[i];
-			} else if (other->data_[i]) {
-				data_[i] = other->data_[i];
+		if (this->value_bits() == other_->value_bits()) {
+			for (size_t i = 0; i < size(); ++i) {
+				if (T::size_in_bits < 8U) {
+					data_[i] |= other->data_[i];
+				} else if (other->data_[i]) {
+					data_[i] = other->data_[i];
+				}
 			}
+		} else if (this->value_bits() == 32 && other_->value_bits() == 1) {
+			throw std::runtime_error("Not implemented");
+		} else {
+			throw std::runtime_error("Not implemented");
 		}
+		
 		calculate_count_();
 
 		const auto& other_bounds = other_->bounds();
