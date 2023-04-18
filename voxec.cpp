@@ -241,7 +241,7 @@ void map_arguments(const std::vector<std::string> parameters, scope_map& context
 	}
 }
 
-void execute_statements(scope_map& context, const std::map<std::string, function_def_type>& functions, const std::vector<statement_type>& statements, bool silent, std::unique_ptr<application_progress>& ap, std::function<void(float)> apfn, std::string prefix="") {
+void execute_statements(scope_map& context, const std::map<std::string, function_def_type>& functions, const std::vector<statement_type>& statements, bool silent, std::unique_ptr<application_progress>& ap, std::function<void(float)> apfn, std::string prefix="", bool no_vox=false, bool with_pointcloud=false) {
 	size_t n = 0;
 
 	long HAS_VOXELS = boost::mpl::distance<
@@ -293,9 +293,16 @@ void execute_statements(scope_map& context, const std::map<std::string, function
 
 		if (context[st.assignee()].which() == HAS_VOXELS) {
 			auto voxels = boost::get<abstract_voxel_storage*>(context[st.assignee()]);
-			voxel_writer w;
-			w.SetVoxels(voxels);
-			w.Write(prefix + boost::lexical_cast<std::string>(n) + ".vox");
+			
+			if (!no_vox) {
+				voxel_writer w;
+				w.SetVoxels(voxels);
+				w.Write(prefix + boost::lexical_cast<std::string>(n) + ".vox");
+			}
+
+			if (with_pointcloud) {
+				export_csv_or_obj(1, (regular_voxel_storage*)voxels, st.assignee() + ".obj");
+			}
 
 			/*
 			// @nb automatic meshing of last operand output no longer supported
@@ -338,7 +345,7 @@ void execute_statements(scope_map& context, const std::map<std::string, function
 	}
 }
 
-scope_map run(const std::vector<statement_or_function_def>& statements_and_functions, double size, size_t threads, size_t chunk_size, bool with_mesh, bool with_progress_on_cout) {
+scope_map run(const std::vector<statement_or_function_def>& statements_and_functions, double size, size_t threads, size_t chunk_size, bool with_mesh, bool with_progress_on_cout, bool no_vox, bool with_pointcloud) {
 	scope_map context;
 
 	std::unique_ptr<progress_bar> pb;
@@ -383,7 +390,7 @@ scope_map run(const std::vector<statement_or_function_def>& statements_and_funct
 	//       functions should probably just be stored in scope_map as first-class citizens?
 	context.functions = &functions;
 
-	execute_statements(context, functions, statements, with_progress_on_cout, ap, apfn);
+	execute_statements(context, functions, statements, with_progress_on_cout, ap, apfn, "", no_vox, with_pointcloud);
 
 	return context;
 }

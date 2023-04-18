@@ -261,10 +261,10 @@ public:
 				}
 
 				auto projects = f->instances_by_type("IfcProject");
-				// @nb: a copy has to be made, because instances_by_type() returns a reference
-				//      from the live map of the file which is updated upon removeEntity()
-
+				
 				if (projects) {
+					// @nb: a copy has to be made, because instances_by_type() returns a reference
+					//      from the live map of the file which is updated upon removeEntity()
 					std::vector<IfcUtil::IfcBaseClass*> projects_copy(projects->begin(), projects->end());
 					if (projects->size() > 1) {
 						for (auto it = projects_copy.begin() + 1; it != projects_copy.end(); ++it) {
@@ -600,7 +600,7 @@ namespace {
 
 			chunked_voxel_storage<voxel_uint32_t>* storage = new chunked_voxel_storage<voxel_uint32_t>(x1, y1, z1, vsize, nx, ny, nz, chunksize);
 
-			if (threads) {
+			if (threads && *threads != 1) {
 				progress_writer progress("voxelize", silent);
 				threaded_processor p(storage, *threads, progress);
 				p.process(surfaces->begin(), surfaces->end(), VOLUME_PRODUCT_ID(), output(MERGED()));
@@ -615,7 +615,7 @@ namespace {
 			}			
 
 		} else {
-			if (threads) {
+			if (threads && *threads != 1) {
 				progress_writer progress("voxelize", silent);
 				threaded_processor p(x1, y1, z1, vsize, nx, ny, nz, chunksize, *threads, progress);
 				p.process(surfaces->begin(), surfaces->end(), *method, output(MERGED()));
@@ -2268,16 +2268,8 @@ public:
 	}
 };
 
-template <int mode=0>
-class op_export_csv : public voxel_operation {
-public:
-	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "filename", "string"} };
-		return nm_;
-	}
-	symbol_value invoke(const scope_map& scope) const {
-		auto voxels = (regular_voxel_storage*) scope.get_value<abstract_voxel_storage*>("input");
-		auto filename = scope.get_value<std::string>("filename");
+namespace {
+	void export_csv_or_obj(int mode, regular_voxel_storage* voxels, const std::string& filename) {
 		std::ofstream ofs(filename.c_str());
 
 		bool use_value = mode == 0 && (voxels->value_bits() == 32 || voxels->value_bits() == 64);
@@ -2294,7 +2286,7 @@ public:
 
 		for (auto ijk : *voxels) {
 			if (use_value) {
-				voxels->Get(ijk, voxels->value_bits() == 32 ? (void*)&v : (void*)&v2 );
+				voxels->Get(ijk, voxels->value_bits() == 32 ? (void*)&v : (void*)&v2);
 				if (v == 0) {
 					// @todo why is this needed?
 					continue;
@@ -2302,12 +2294,12 @@ public:
 			}
 
 			auto xyz = (ijk.as<long>() + left * szl).as<double>() * sz;
-			
+
 			ofs << prefix
 				<< xyz.get<0>() << sep
 				<< xyz.get<1>() << sep
 				<< xyz.get<2>();
-			
+
 			if (use_value) {
 				if (voxels->value_bits() == 32) {
 					ofs << sep << v;
@@ -2322,6 +2314,21 @@ public:
 
 			ofs << "\n";
 		}
+	}
+}
+
+template <int mode=0>
+class op_export_csv : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "filename", "string"} };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		auto voxels = (regular_voxel_storage*) scope.get_value<abstract_voxel_storage*>("input");
+		auto filename = scope.get_value<std::string>("filename");
+		
+		export_csv_or_obj(mode, voxels, filename);
 
 		symbol_value v_null;
 		return v_null;
@@ -2780,12 +2787,18 @@ public:
 
 		auto r = op->invoke(function_value_symbols);
 
+		if (statement_.call().name() == "free") {
+			// @todo prevent double free, can this implementation be a bit better?
+			// currently the call evaluation doesn't seem to have access to global scope
+			context.erase(boost::get<std::string>(statement_.call().args().front().value()));
+		}
+
 		delete op;
 
 		return r;
 	}
 };
 
-scope_map run(const std::vector<statement_or_function_def>& statements, double size, size_t threads = 0, size_t chunk_size = 128, bool with_mesh = false, bool with_progress_on_cout = false);
+scope_map run(const std::vector<statement_or_function_def>& statements, double size, size_t threads = 0, size_t chunk_size = 128, bool with_mesh = false, bool with_progress_on_cout = false, bool no_vox = false, bool with_point_cloud = false);
 
 #endif

@@ -23,6 +23,8 @@ int main(int argc, char** argv) {
 		("chunk,c", po::value<size_t>(), "chunk size in number of voxels")
 		("mmap,m", "use memory-mapped files instead of pure RAM")
 		("mesh", "emit obj mesh for the last instruction")
+		("with-pointcloud", "emit point cloud for every voxel grid variable")
+		("no-vox", "do not write binary dumps")
 		("help,h", "emit usage information and exit")
 		("input-file", po::value<std::string>(), "input IFC file")
 		("output-file", po::value<std::string>(), "output voxel file");
@@ -97,6 +99,8 @@ int main(int argc, char** argv) {
 	const std::string input_filename = vmap["input-file"].as<std::string>();
 	const bool with_mesh = vmap.count("mesh") != 0;
 	const bool quiet = vmap.count("quiet") != 0;
+	const bool no_vox = vmap.count("no-vox") != 0;
+	const bool with_pointcloud = vmap.count("with-pointcloud") != 0;
 
 	if (!quiet) {
 		json_logger::register_output(json_logger::FMT_TEXT, &std::cerr);
@@ -131,7 +135,7 @@ int main(int argc, char** argv) {
 	boost::optional<std::string> error;
 
 	try {
-		run(tree, d, threads.get_value_or(1), chunk.get_value_or(128), with_mesh, quiet);
+		run(tree, d, threads.get_value_or(1), chunk.get_value_or(128), with_mesh, quiet, no_vox, with_pointcloud);
 	} catch (const std::runtime_error& e) {
 		error = std::string(e.what());
 	} catch (const Standard_Failure& e) {
