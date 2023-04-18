@@ -825,36 +825,107 @@ namespace {
 	}
 #else
 	template <typename Fn>
-	void group_by(regular_voxel_storage* groups, abstract_voxel_storage* voxels, Fn fn, bool use_bits=true) {
+	void group_by(regular_voxel_storage* groups, abstract_voxel_storage* voxels, Fn fn, std::map<uint32_t, size_t>& counts, bool use_bits=true, bool conserve_memory=true, bool only_counts=true) {
 
 		uint32_t v;
 		
+		// conserve_memory=false
 		std::map<uint32_t, abstract_voxel_storage*> map;
+		
+		// conserve_memory=true
+		uint32_t target;
+		std::set<uint32_t> vs;
+		std::set<uint32_t>::const_iterator vs_it;
+		abstract_voxel_storage* single;
+
+		{
+			auto acvs_voxels = dynamic_cast<abstract_chunked_voxel_storage*>(voxels);
+			auto acvs_groups = dynamic_cast<abstract_chunked_voxel_storage*>(groups);
+
+			if (!acvs_voxels || !acvs_groups) {
+				throw std::runtime_error("Group operations are not supported on non-chunked storage");
+			}
+
+			if (!(acvs_voxels->grid_offset() == acvs_groups->grid_offset()).all()) {
+				throw std::runtime_error("Group operations on unaligned voxel grids are not supported");
+			}
+		}
+
+		if (conserve_memory) {
+			for (auto& ijk : *(regular_voxel_storage*)voxels) {
+				groups->Get(ijk, &v);
+				vs.insert(v);
+			}
+			vs_it = vs.begin();
+		} 
+		
+	repeat:
+
+		if (conserve_memory) {
+			if (vs_it == vs.end()) {
+				return;
+			}
+
+			target = *vs_it;
+
+			if (use_bits) {
+				static bit_t fmt;
+				single = voxels->empty_copy_as(&fmt);
+			} else {
+				single = voxels->empty_copy();
+			}
+		}
 
 		// @todo use regions for multi threading
 		for (auto& ijk : *(regular_voxel_storage*)voxels) {
 			groups->Get(ijk, &v);
-			if (v == 0) {
-				continue;
-			}
-			abstract_voxel_storage* r;
-			auto it = map.find(v);
-			if (it == map.end()) {
-				if (use_bits) {
-					static bit_t fmt;
-					map.insert({ v, r = voxels->empty_copy_as(&fmt) });
-				} else {
-					map.insert({ v, r = voxels->empty_copy() });
+
+			if (conserve_memory) {
+				if (v != target) {
+					continue;
 				}
 			} else {
-				r = it->second;
+				if (v == 0) {
+					continue;
+				}
 			}
+
+			if (only_counts) {
+				counts[v] ++;
+				continue;
+			}
+
+			abstract_voxel_storage* r;
+
+			if (conserve_memory) {
+				r = single;
+			} else {
+				auto it = map.find(v);
+				if (it == map.end()) {
+					if (use_bits) {
+						static bit_t fmt;
+						map.insert({ v, r = voxels->empty_copy_as(&fmt) });
+					} else {
+						map.insert({ v, r = voxels->empty_copy() });
+					}
+				} else {
+					r = it->second;
+				}
+			}
+
 			if (use_bits) {
 				r->Set(ijk);
 			} else {
 				voxels->Get(ijk, &v);
 				r->Set(ijk, &v);
 			}
+		}
+
+		if (conserve_memory) {
+			fn(target, single);
+			delete single;
+			vs_it++;
+			goto repeat;
 		}
 
 		for (auto& r : map) {
@@ -870,7 +941,7 @@ namespace {
 class op_describe_group_by : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "output_path", "string" }, { true, "input", "voxels" }, { true, "groups", "voxels" }, { false, "use_bits", "integer" } };
+		static std::vector<argument_spec> nm_ = { { true, "output_path", "string" }, { true, "input", "voxels" }, { true, "groups", "voxels" }, { false, "use_bits", "integer" }, { false, "conserve_memory", "integer" }, { false, "only_counts", "integer" } };
 		return nm_;
 	}
 	symbol_value invoke(const scope_map& scope) const {
@@ -887,6 +958,10 @@ public:
 		}
 
 		bool use_bits = scope.get_value_or<int>("use_bits", 1) == 1;
+		bool conserve_memory = scope.get_value_or<int>("conserve_memory", 0) == 1;
+		bool only_counts = scope.get_value_or<int>("only_counts", 0) == 1;
+
+		std::map<uint32_t, size_t> counts;
 
 		group_by(groups, voxels, [&ofs, &first](uint32_t id, abstract_voxel_storage* c) {
 			if (!first) {
@@ -895,17 +970,33 @@ public:
 			auto info = dump_info(c);
 			info["id"] = static_cast<long>(id);
 			ofs << json_logger::to_json_string(info);
-
-			delete c;
-
 			first = false;
+			// @nb `c` is deleted automatically after this function body exits
+			// @todo use unique_ptr&&
 		}
 #ifdef OLD_GROUP_BY
 		,scope.get_value_or<int>("THREADS", 1)
 #else
+		, counts
 		, use_bits
+		, conserve_memory
+		, only_counts
 #endif
 		);
+
+		if (only_counts) {
+			for (auto& p : counts) {
+				if (!first) {
+					ofs << ",";
+				}
+				json_logger::meta_data info = {
+					{"id", (long)p.first},
+					{"count", (long)p.second}
+				};
+				ofs << json_logger::to_json_string(info);
+				first = false;
+			}
+		}
 
 		ofs << "]";
 
@@ -2071,12 +2162,15 @@ public:
 
 		if (groups) {
 			obj_export_helper helper(ofs);
+			std::map<uint32_t, size_t> counts;
 			group_by(groups, voxels, [&helper, &ofs](uint32_t id, abstract_voxel_storage* c) {
 				ofs << "g id-" << id << "\n";
 				((regular_voxel_storage*)c)->obj_export(helper, false, false);
 			}
 #ifdef OLD_GROUP_BY
 			, scope.get_value_or<int>("THREADS", 1)
+#else
+			, counts
 #endif
 			);
 		} else {
