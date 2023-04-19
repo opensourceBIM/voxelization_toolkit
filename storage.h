@@ -454,7 +454,7 @@ public:
 		} else {
 			data_ = new typename T::storage_type[dimx_*dimy_*((T::size_in_bits == 1) ? dimz_bytes_ : dimz_)];
 			// Not entirely understood, but this was necessary to initialize the normal_and_curvature data to zeros
-			memset(data_, 0, size() * ((T::size_in_bits == 1) ? 1 : sizeof(T::storage_type)));
+			memset(data_, 0, size() * ((T::size_in_bits == 1) ? 1 : sizeof(typename T::storage_type)));
 			mapped_ = false;
 		}
 	}
@@ -487,7 +487,7 @@ public:
 
 	abstract_voxel_storage* copy(void* location = nullptr) const {
 		continuous_voxel_storage* c = new continuous_voxel_storage(ox_, oy_, oz_, d_, dimx_, dimy_, dimz_, location);
-		memcpy(c->data_, data_, size() * ((T::size_in_bits == 1) ? 1 : sizeof(T::storage_type)));
+		memcpy(c->data_, data_, size() * ((T::size_in_bits == 1) ? 1 : sizeof(typename T::storage_type)));
 		c->bounds_ = bounds_;
 		c->count_ = count_;
 		return c;
