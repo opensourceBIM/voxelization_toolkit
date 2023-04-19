@@ -60,6 +60,12 @@ struct filtered_files_t {};
 #include <boost/tokenizer.hpp>
 #include <boost/range/iterator_range.hpp>
 
+#ifdef WIN32
+#define DIRSEP "\\"
+#else
+#define DIRSEP "/"
+#endif
+
 size_t get_padding();
 void set_padding(size_t);
 
