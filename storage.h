@@ -2254,6 +2254,9 @@ namespace std {
 	struct iterator_traits<set_voxel_iterator> {
 		typedef forward_iterator_tag iterator_category;
 		typedef std::ptrdiff_t difference_type;
+		typedef vec_n<3, size_t> value_type;
+		typedef vec_n<3, size_t>& reference;
+		typedef vec_n<3, size_t>* pointer;
 	};
 }
 
