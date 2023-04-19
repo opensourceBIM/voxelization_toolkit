@@ -1,22 +1,14 @@
 #ifndef VOXEC_H
 #define VOXEC_H
 
-#include "voxelfile.h"
-#include "processor.h"
-#include "storage.h"
-#include "offset.h"
-#include "fill_gaps.h"
-#include "traversal.h"
-#include "json_logger.h"
-
 #ifdef WITH_IFC
-#include <ifcparse/IfcFile.h>
 #ifdef IFCOPENSHELL_05
 #include <ifcgeom/IfcGeomIterator.h>
 #else
 #include <ifcgeom_schema_agnostic/IfcGeomIterator.h>
 #endif
 
+#include <ifcparse/IfcFile.h>
 #include <boost/filesystem.hpp>
 
 #include <Eigen/Dense>
@@ -39,6 +31,14 @@ namespace IfcParse {
 struct filtered_files_t {};
 #endif
 
+#include "voxelfile.h"
+#include "processor.h"
+#include "storage.h"
+#include "offset.h"
+#include "fill_gaps.h"
+#include "traversal.h"
+#include "json_logger.h"
+
 #include <Bnd_Box.hxx>
 #include <BRepBndLib.hxx>
 #include <BRep_Builder.hxx>
@@ -59,13 +59,6 @@ struct filtered_files_t {};
 #include <boost/variant/apply_visitor.hpp>
 #include <boost/tokenizer.hpp>
 #include <boost/range/iterator_range.hpp>
-
-
-#ifdef WIN32
-#define DIRSEP "\\"
-#else
-#define DIRSEP "/"
-#endif
 
 size_t get_padding();
 void set_padding(size_t);
