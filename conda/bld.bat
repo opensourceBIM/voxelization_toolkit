@@ -20,6 +20,6 @@ cmake -G "Visual Studio 17 2022" -A x64 ^
 if errorlevel 1 exit 1
 
 :: Build and install
-cmake --build . -- -j 2 install
+cmake --build . --target INSTALL --config Release
 
 if errorlevel 1 exit 1
