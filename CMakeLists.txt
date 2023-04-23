@@ -136,7 +136,7 @@ if (IFC_SUPPORT)
 			add_definitions("-DIFCOPENSHELL_07")
 
 			if(NOT SCHEMA_VERSIONS)
-				set(SCHEMA_VERSIONS "2x3" "4" "4x1" "4x2" "4x3_rc1" "4x3_rc2" "4x3_rc3" "4x3_rc4" "4x3")
+				set(SCHEMA_VERSIONS "2x3" "4" "4x1" "4x2" "4x3_rc1" "4x3_rc2" "4x3_rc3" "4x3_rc4" "4x3" "4x3_tc1" "4x3_add1")
 			endif()
 			string(REPLACE ";" ")(" schema_version_seq "(${SCHEMA_VERSIONS})")
 			ADD_DEFINITIONS(-DSCHEMA_SEQ=${schema_version_seq})
@@ -151,6 +151,7 @@ if (IFC_SUPPORT)
 		set(IFC_LIBRARY_NAMES IfcGeom IfcGeom_ifc2x3 IfcGeom_ifc4 IfcGeom_ifc4x1
 		                      IfcGeom_ifc4x2 IfcGeom_ifc4x3_rc1 IfcGeom_ifc4x3_rc2
 		                      IfcGeom_ifc4x3_rc3 IfcGeom_ifc4x3_rc4 IfcGeom_ifc4x3
+		                      IfcGeom_ifc4x3_tc1 IfcGeom_ifc4x3_add1
 		                      IfcParse)
 	endif()
 endif()
