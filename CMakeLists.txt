@@ -121,41 +121,6 @@ endif()
 
 set(BOOST_COMPONENTS regex program_options iostreams system filesystem)
 
-if (IFC_SUPPORT)
-	# Find IfcOpenShell version, v0.6.0 does not have the IfcSchema namespace anymore
-	file(READ "${IFC_INCLUDE_DIR}/ifcparse/IfcParse.h" header)
-	string(REGEX MATCH "#define IFCOPENSHELL_VERSION \"[0-9a-zA-Z\\.\\-]+\"" ifcopenshell_version "${header}")
-	string(REGEX MATCH "[0-9]\\.[0-9]" ifcopenshell_major_version "${ifcopenshell_version}")
-	message(STATUS "IfcOpenShell version ${ifcopenshell_major_version}")
-
-	if (${ifcopenshell_major_version} STREQUAL "0.5")
-		set(IFC_LIBRARY_NAMES IfcGeom IfcParse)
-		add_definitions("-DIFCOPENSHELL_05")
-	else()
-		if(${ifcopenshell_major_version} STREQUAL "0.7")
-			add_definitions("-DIFCOPENSHELL_07")
-
-			if(NOT SCHEMA_VERSIONS)
-				set(SCHEMA_VERSIONS "2x3" "4" "4x1" "4x2" "4x3_rc1" "4x3_rc2" "4x3_rc3" "4x3_rc4" "4x3" "4x3_tc1" "4x3_add1")
-			endif()
-			string(REPLACE ";" ")(" schema_version_seq "(${SCHEMA_VERSIONS})")
-			ADD_DEFINITIONS(-DSCHEMA_SEQ=${schema_version_seq})
-
-			IF(MSVC)
-				# warning due to virtual inheritance
-				ADD_DEFINITIONS(-wd4250)
-				# warning due to select definitions in the schema being redundant
-				ADD_DEFINITIONS(-wd4584)
-			endif()
-		endif()
-		set(IFC_LIBRARY_NAMES IfcGeom IfcGeom_ifc2x3 IfcGeom_ifc4 IfcGeom_ifc4x1
-		                      IfcGeom_ifc4x2 IfcGeom_ifc4x3_rc1 IfcGeom_ifc4x3_rc2
-		                      IfcGeom_ifc4x3_rc3 IfcGeom_ifc4x3_rc4 IfcGeom_ifc4x3
-		                      IfcGeom_ifc4x3_tc1 IfcGeom_ifc4x3_add1
-		                      IfcParse)
-	endif()
-endif()
-
 if (UNIX)
 	set(IFC_LIBRARY_NAMES ${IFC_LIBRARY_NAMES} ${IFC_LIBRARY_NAMES})
 endif()
@@ -187,6 +152,50 @@ if(IFC_SUPPORT AND USE_BUILD_SCRIPT_OUTPUT)
 			set(ICU_INCLUDE_DIR  ${IFCOPENSHELL_ROOT}/deps-vs${MSVC_YEAR}-x86-installed/icu/include)
 			string(REGEX REPLACE "([^;]+)" "${ICU_LIBRARY_DIR}/\\1.lib" ICU_LIBRARIES "${ICU_LIBRARY_NAMES}")
 		endif()
+	endif()
+endif()
+
+if (IFC_SUPPORT)
+	# Find IfcOpenShell version, v0.6.0 does not have the IfcSchema namespace anymore
+	file(READ "${IFC_INCLUDE_DIR}/ifcparse/IfcParse.h" header)
+	string(REGEX MATCH "#define IFCOPENSHELL_VERSION \"[0-9a-zA-Z\\.\\-]+\"" ifcopenshell_version "${header}")
+	string(REGEX MATCH "[0-9]\\.[0-9]" ifcopenshell_major_version "${ifcopenshell_version}")
+	message(STATUS "IfcOpenShell version ${ifcopenshell_major_version}")
+
+	if (${ifcopenshell_major_version} STREQUAL "0.5")
+		set(IFC_LIBRARY_NAMES IfcGeom IfcParse)
+		add_definitions("-DIFCOPENSHELL_05")
+	else()
+		file(GLOB geomlibfiles ${IFC_LIBRARY_DIR}/IfcGeom_*)
+		foreach(file ${geomlibfiles})
+			get_filename_component(file_we ${file} NAME_WE)
+			string(REPLACE "IfcGeom_ifc" "" schema_name ${file_we})
+			list(APPEND SCHEMA_VERSIONS ${schema_name})
+		endforeach()
+
+		if(${ifcopenshell_major_version} STREQUAL "0.7")
+			add_definitions("-DIFCOPENSHELL_07")
+
+			message(STATUS "ver ${ifcopenshell_major_version}")
+
+			string(REPLACE ";" ")(" schema_version_seq "(${SCHEMA_VERSIONS})")
+			ADD_DEFINITIONS(-DSCHEMA_SEQ=${schema_version_seq})
+
+			message(STATUS "seq ${schema_version_seq}")
+
+			IF(MSVC)
+				# warning due to virtual inheritance
+				ADD_DEFINITIONS(-wd4250)
+				# warning due to select definitions in the schema being redundant
+				ADD_DEFINITIONS(-wd4584)
+			endif()
+		endif()
+
+		list(APPEND IFC_LIBRARY_NAMES IfcGeom)
+		foreach(schema_name ${SCHEMA_VERSIONS})
+			list(APPEND IFC_LIBRARY_NAMES IfcGeom_ifc${schema_name})
+		endforeach()
+		list(APPEND IFC_LIBRARY_NAMES IfcParse)
 	endif()
 endif()
 
