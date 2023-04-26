@@ -121,10 +121,6 @@ endif()
 
 set(BOOST_COMPONENTS regex program_options iostreams system filesystem)
 
-if (UNIX)
-	set(IFC_LIBRARY_NAMES ${IFC_LIBRARY_NAMES} ${IFC_LIBRARY_NAMES})
-endif()
-
 if(IFC_SUPPORT AND USE_BUILD_SCRIPT_OUTPUT)
 	set(BOOST_COMPONENTS ${BOOST_COMPONENTS} filesystem)
 	if(UNIX)
@@ -193,6 +189,10 @@ if (IFC_SUPPORT)
 		endforeach()
 		list(APPEND IFC_LIBRARY_NAMES IfcParse)
 	endif()
+endif()
+
+if (UNIX)
+	set(IFC_LIBRARY_NAMES ${IFC_LIBRARY_NAMES} ${IFC_LIBRARY_NAMES})
 endif()
 
 foreach(libname ${IFC_LIBRARY_NAMES})
