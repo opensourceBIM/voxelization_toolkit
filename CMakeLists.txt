@@ -166,22 +166,18 @@ if (IFC_SUPPORT)
 		set(IFC_LIBRARY_NAMES IfcGeom IfcParse)
 		add_definitions("-DIFCOPENSHELL_05")
 	else()
-		file(GLOB geomlibfiles ${IFC_LIBRARY_DIR}/IfcGeom_*)
+		file(GLOB geomlibfiles ${IFC_LIBRARY_DIR}/${CMAKE_SHARED_LIBRARY_PREFIX}IfcGeom_*)
 		foreach(file ${geomlibfiles})
 			get_filename_component(file_we ${file} NAME_WE)
-			string(REPLACE "IfcGeom_ifc" "" schema_name ${file_we})
+			string(REPLACE "${CMAKE_SHARED_LIBRARY_PREFIX}IfcGeom_ifc" "" schema_name ${file_we})
 			list(APPEND SCHEMA_VERSIONS ${schema_name})
 		endforeach()
 
 		if(${ifcopenshell_major_version} STREQUAL "0.7")
 			add_definitions("-DIFCOPENSHELL_07")
 
-			message(STATUS "ver ${ifcopenshell_major_version}")
-
 			string(REPLACE ";" ")(" schema_version_seq "(${SCHEMA_VERSIONS})")
 			ADD_DEFINITIONS(-DSCHEMA_SEQ=${schema_version_seq})
-
-			message(STATUS "seq ${schema_version_seq}")
 
 			IF(MSVC)
 				# warning due to virtual inheritance
