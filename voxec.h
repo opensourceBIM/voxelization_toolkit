@@ -828,7 +828,7 @@ namespace {
 	}
 #else
 	template <typename Fn>
-	void group_by(regular_voxel_storage* groups, abstract_voxel_storage* voxels, Fn fn, std::map<uint32_t, size_t>& counts, bool use_bits=true, bool conserve_memory=true, bool only_counts=true) {
+	void group_by(regular_voxel_storage* groups, abstract_voxel_storage* voxels, Fn fn, std::map<uint32_t, size_t>& counts, bool use_bits=true, bool conserve_memory=true, bool only_counts=false) {
 
 		uint32_t v;
 		
