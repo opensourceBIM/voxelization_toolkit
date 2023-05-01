@@ -278,7 +278,9 @@ void execute_statements(scope_map& context, const std::map<std::string, function
 				silent,
 				ap_unused,
 				[](float) {},
-				boost::lexical_cast<std::string>(n) + "."
+				boost::lexical_cast<std::string>(n) + ".",
+				no_vox,
+				with_pointcloud
 			);
 			if (context_copy.find(fnit->second.result_identifier()) == context_copy.end()) {
 				throw scope_map::not_in_scope("Undefined variable " + fnit->second.result_identifier());
