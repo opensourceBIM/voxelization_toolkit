@@ -1781,6 +1781,19 @@ public:
 		regular_voxel_storage* voxels = (regular_voxel_storage*) scope.get_value<abstract_voxel_storage*>("input");
 		regular_voxel_storage* seed = (regular_voxel_storage*) scope.get_value<abstract_voxel_storage*>("seed");
 
+		{
+			auto acvs_voxels = dynamic_cast<abstract_chunked_voxel_storage*>(voxels);
+			auto acvs_seed = dynamic_cast<abstract_chunked_voxel_storage*>(seed);
+
+			if (!acvs_voxels || !acvs_seed) {
+				throw std::runtime_error("Traversal operations are not supported on non-chunked storage");
+			}
+
+			if (!(acvs_voxels->grid_offset() == acvs_seed->grid_offset()).all()) {
+				throw std::runtime_error("Traversal operations on unaligned voxel grids are not supported");
+			}
+		}
+
 		boost::optional<double> max_depth;
 		try {
 			max_depth = scope.get_length("depth");
