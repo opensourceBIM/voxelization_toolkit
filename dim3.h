@@ -412,6 +412,11 @@ public:
 		return reduce_<>(std::plus<T>());
 	}
 
+	T norm2() const {
+		// `a` is initialized to 0 initially
+		return std::sqrt(reduce_<>([](T a, T b) { return a + b * b; }));
+	}
+
 	template <typename U = T, typename std::enable_if<std::is_integral<U>::value, int>::type = 0>
 	self_type ceil_div(T t) const {
 		vec_n<N, T> r;

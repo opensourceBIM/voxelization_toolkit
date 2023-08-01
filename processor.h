@@ -113,7 +113,7 @@ public:
 		}
 	}
 
-	void intermediate_result(int i, abstract_voxel_storage*& a, abstract_voxel_storage*& b) const {
+	void intermediate_result(int i, abstract_voxel_storage* a, abstract_voxel_storage* b) const {
 		if (mode == 1) {
 			a->boolean_union_inplace(b);
 		} else if (mode == 2 || mode == 3) {
@@ -218,11 +218,11 @@ public:
 					}
 
 					uint32_t v = it->first.second;
-					for (auto& ijk : (*(regular_voxel_storage*)filled)) {
+					for (auto& ijk : *filled) {
 						voxels_->Set(ijk, &v);
 					}
 				} else {
-					output.intermediate_result(it->first.second, voxels_, voxels_temp_);
+					output.intermediate_result(it->first.second, voxels_, filled);
 				}
 
 				delete filled;

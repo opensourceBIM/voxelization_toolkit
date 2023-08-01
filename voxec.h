@@ -2201,7 +2201,7 @@ public:
 class op_mesh : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "filename", "string"}, {false, "use_value", "integer"}, {false, "with_components", "integer"}, { false, "groups", "voxels" } };
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "filename", "string"}, {false, "use_value", "integer"}, {false, "with_components", "integer"}, { false, "groups", "voxels" }, { false, "with_vertex_normals", "integer" } };
 		return nm_;
 	}
 	symbol_value invoke(const scope_map& scope) const {
@@ -2209,6 +2209,7 @@ public:
 		auto use_value = scope.get_value_or<int>("use_value", -1);
 		auto with_components = scope.get_value_or<int>("with_components", -1);
 		auto filename = scope.get_value<std::string>("filename");
+		auto with_vertex_normals = scope.get_value_or<int>("with_vertex_normals", -1) == 1;
 
 		auto groups = (regular_voxel_storage*) scope.get_value_or<abstract_voxel_storage*>("groups", nullptr);
 
@@ -2230,9 +2231,9 @@ public:
 		} else {
 
 			if (voxels->value_bits() == 1) {
-				((regular_voxel_storage*)voxels)->obj_export(ofs, with_components != 0);
+				((regular_voxel_storage*)voxels)->obj_export(ofs, with_components != 0, false, with_vertex_normals);
 			} else {
-				((regular_voxel_storage*)voxels)->obj_export(ofs, with_components != 0 && use_value != 1, use_value == 1);
+				((regular_voxel_storage*)voxels)->obj_export(ofs, with_components != 0 && use_value != 1, use_value == 1, with_vertex_normals);
 			}
 		}
 		symbol_value v;

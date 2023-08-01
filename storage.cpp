@@ -65,16 +65,17 @@ void* set_voxel_iterator::neighbour_value(const vec_n<3, long>& d, void* val) co
 	return val;
 }
 
-void regular_voxel_storage::obj_export(std::ostream& fs, bool with_components, bool use_value) {
+void regular_voxel_storage::obj_export(std::ostream& fs, bool with_components, bool use_value, bool with_vertex_normals) {
 	obj_export_helper helper(fs);
-	obj_export(helper, with_components, use_value);
+	obj_export(helper, with_components, use_value, with_vertex_normals);
 }
 
-void regular_voxel_storage::obj_export(obj_export_helper& obj, bool with_components, bool use_value) {
+void regular_voxel_storage::obj_export(obj_export_helper& obj, bool with_components, bool use_value, bool with_vertex_normals) {
 	std::ostream& fs = *obj.stream;
 
 	// Take care to only emit normals once, even though it does not really affect file integrity
-	if (!obj.normals_emitted) {
+	// When computing (averaged) vertex normals we emit them on the fly.
+	if (!obj.normals_emitted && !with_vertex_normals) {
 		fs << "vn  1  0  0\n";
 		fs << "vn -1  0  0\n";
 		fs << "vn  0  1  0\n";
@@ -87,9 +88,9 @@ void regular_voxel_storage::obj_export(obj_export_helper& obj, bool with_compone
 	
 	if (with_components && !use_value) {
 		size_t counter = 0;
-		connected_components(this, [&obj, &fs, &counter](regular_voxel_storage* component) {
+		connected_components(this, [&obj, &fs, &counter, use_value, with_vertex_normals](regular_voxel_storage* component) {
 			fs << "g component" << (counter++) << "\n";
-			component->obj_export(obj, false);
+			component->obj_export(obj, false, use_value, with_vertex_normals);
 		});
 		return;
 	}
@@ -104,13 +105,25 @@ void regular_voxel_storage::obj_export(obj_export_helper& obj, bool with_compone
 	char V0[8];
 	char V1[8];
 
+	// A map of verte coords (size_t, size_t, size_t) to 0-based index in the OBJ stream
 	std::map< std::array<size_t, 3>, size_t > vertex_map;
+	// Only in use when use_value=true
 	std::map< std::array<long long, 2>, std::vector< std::pair<std::array<size_t, 3>, size_t> > > triangles;
+	// Only in use when with_vertex_normals=true
+	std::vector <std::pair<size_t, vec_n<3, long>>> vertex_normals;
 
 	const double d = voxel_size();
 	auto end_ = end();
 	for (auto it = begin(); it != end_; ++it) {
 		it.value(V1);
+
+		// Loop over 6 directions and store in `n`:
+		//    - (+1, 0, 0)
+		//    - (-1, 0, 0)
+		//    - (0, +1, 0)
+		//    - (0, -1, 0)
+		//    - (0, 0, +1)
+		//    - (0, 0, -1)
 		for (size_t f = 0; f < 6; ++f) {
 			vec_n<3, long> n;
 			size_t normal = f / 2;
@@ -123,6 +136,7 @@ void regular_voxel_storage::obj_export(obj_export_helper& obj, bool with_compone
 					break;
 				}
 			}
+
 			if (use_value 
 				? (
 					!equal_pointed_to(value_bits() / 8, it.neighbour_value(n, V0), V1) &&
@@ -150,6 +164,16 @@ void regular_voxel_storage::obj_export(obj_export_helper& obj, bool with_compone
 							fs << " " << (v[i] * d + origin().get(i));
 						}
 						fs << "\n";
+						
+						if (with_vertex_normals) {
+							vertex_normals.emplace_back();
+						}
+					}
+
+					if (with_vertex_normals) {
+						auto vi = inserted.first->second - nv;
+						vertex_normals[vi].first++;
+						vertex_normals[vi].second += n;
 					}
 				}
 				static std::array< std::array<int, 3>, 2 > indices = {{
@@ -160,7 +184,8 @@ void regular_voxel_storage::obj_export(obj_export_helper& obj, bool with_compone
 					for (auto& i : indices) {
 						fs << "f";
 						for (auto& j : i) {
-							fs << " " << vertex_map.find(vs[j])->second << "//" << (f+1);
+							auto vi = vertex_map.find(vs[j])->second;
+							fs << " " << vi << "//" << (with_vertex_normals ? vi : (f+1));
 						}
 						fs << "\n";
 					}
@@ -186,6 +211,18 @@ void regular_voxel_storage::obj_export(obj_export_helper& obj, bool with_compone
 		}
 		n++;
 		*/
+	}
+
+	for (auto& vn : vertex_normals) {
+		fs << "vn";
+		// @todo dividing by number of associated facets is not really
+		// nessary as we take norm2 anyway?
+		auto vnf = vn.second.as<float>() / vn.first;
+		auto vnf_normalized = vnf / vnf.norm2();
+		for (int i = 0; i < 3; ++i) {
+			fs << " " << vnf_normalized.get(i);
+		}
+		fs << "\n";
 	}
 
 	for (const auto& p : triangles) {

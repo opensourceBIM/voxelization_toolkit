@@ -365,8 +365,8 @@ public:
 
 	const vec_n<3, double>& origin() const { return origin_; }
 
-	void obj_export(std::ostream& fs, bool with_components = true, bool use_value = false);
-	void obj_export(obj_export_helper& fs, bool with_components = true, bool use_value = false);
+	void obj_export(std::ostream& fs, bool with_components = true, bool use_value = false, bool with_vertex_normals = false);
+	void obj_export(obj_export_helper& fs, bool with_components = true, bool use_value = false, bool with_vertex_normals = false);
 };
 
 template<typename U>
