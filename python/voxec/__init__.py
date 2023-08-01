@@ -8,7 +8,11 @@ import tempfile
 import threading
 import time
 
-VOXEC = shutil.which("voxec")
+from dataclasses import dataclass
+
+import numpy as np
+
+VOXEC = shutil.which("voxec") or shutil.which("voxec.exe")
 assert VOXEC
 
 def draw_points(arr, fn, colors, factor=1., label=None, vec=None):
@@ -58,6 +62,68 @@ class get_csv(voxel_post_process):
         import pandas as pd
         return pd.read_csv(os.path.join(cwd, self.filename), delimiter=',').values
 
+class get_output(voxel_post_process):
+    def __init__(self, filename):
+        self.filename = filename
+
+    def __call__(self, cwd):
+        return os.path.join(cwd, self.filename)
+
+@dataclass
+class obj_data:
+    name : str
+    vertex_positions : np.ndarray
+    vertex_normals : np.ndarray
+    face_indices : np.ndarray
+
+def read_voxec_obj(fn : str) -> obj_data:
+    """Note that there are many assumptions in this read function
+    on how the OBJ file is structured that may be very specific
+    to how voxec omits OBJ data.
+
+    Args:
+        fn (str): file path
+
+    Yields:
+        obj_data: Parsed data of individual OBJ `g` groups
+    """
+    
+    init = lambda: ([], [], [])
+    concat = lambda vs: np.concatenate([v.reshape((1, -1)) for v in vs], axis=0) if vs else None
+
+    def safe_float(v):
+        try: return float(v)
+        except: return 0.
+
+    accums = init()
+    name = None
+
+    with open(fn) as f:
+        for l in f:
+            if l.startswith("g "):
+                if any(accums):
+                    yield obj_data(name, *map(concat, accums))
+                    accums = init()
+                name = l[2:].strip()
+            elif l.startswith("f "):
+                idxs = l.split(" ")[1:]
+                vidx, nidx = zip(*(s.strip().split("//") for s in idxs))
+                assert vidx == nidx
+                accums[2].append(np.array(tuple(map(int, vidx))))
+            elif l[0] == 'v':
+                array_idx = 1 if l[1] == 'n' else 0
+                accums[array_idx].append(np.array(tuple(map(safe_float, l.split(" ")[1:]))))
+    if any(accums):
+        yield obj_data(name, *map(concat, accums))
+        accums = init()
+
+class get_obj(voxel_post_process):
+    def __init__(self, filename):
+        self.filename = filename
+
+    def __call__(self, cwd):
+        return list(read_voxec_obj(os.path.join(cwd, self.filename)))
+
 def run(command, ifc_files, *ops, keep_dir=False, **kwargs):
     def make_args(d):
         for kv in d.items():
@@ -79,6 +145,8 @@ def run(command, ifc_files, *ops, keep_dir=False, **kwargs):
         with open(os.path.join(cwd, "voxelfile.txt"), "w") as f:
             f.write(command)
 
+        if isinstance(ifc_files, str):
+            ifc_files = [ifc_files]
         for i, fn in enumerate(ifc_files):
             if isinstance(fn, str):
                 shutil.copyfile(fn, os.path.join(cwd, os.path.basename(fn)))
@@ -93,7 +161,7 @@ def run(command, ifc_files, *ops, keep_dir=False, **kwargs):
             nonlocal rc, completed
             rc = subprocess.call([
                 VOXEC, 
-                "-q", "--log-file", "log.json",
+                "-q", "--no-vox", "--log-file", "log.json",
                 "voxelfile.txt",
                 *make_args(kwargs)
             ], cwd=cwd, stdout=subprocess.PIPE)
