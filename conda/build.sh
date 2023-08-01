@@ -18,6 +18,6 @@ cmake -G Ninja \
  -DOCC_LIBRARY_DIR=$PREFIX/lib \
  .
 
-ninja
+ninja -j2
 
 ninja install
