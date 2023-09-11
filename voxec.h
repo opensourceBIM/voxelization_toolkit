@@ -136,6 +136,18 @@ public:
 		}
 	}
 
+	const double get_length_f(const std::string& symbol) const {
+		auto it = find(symbol);
+		if (it == end()) {
+			throw not_in_scope("Undefined variable " + symbol);
+		}
+		try {
+			return get_value_<double>(it->second);
+		} catch (boost::bad_get&) {
+			return std::ceil(get_value_<int>(it->second) * get_value<double>("VOXELSIZE"));
+		}
+	}
+
 	bool has(const std::string& symbol) const {
 		auto it = find(symbol);
 		return it != end();
@@ -2622,6 +2634,34 @@ public:
 		}
 
 		return result;
+	}
+};
+
+class op_set : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "x", "integer|real" }, { true, "y", "integer|real" }, { true, "z", "integer|real" }, { false, "input", "voxels" } };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		auto x = scope.get_length_f("x");
+		auto y = scope.get_length_f("y");
+		auto z = scope.get_length_f("z");
+		abstract_voxel_storage* vs;
+		if (scope.has("input")) {
+			vs = scope.get_value<abstract_voxel_storage*>("input");
+		} else {
+			double vsize = scope.get_value<double>("VOXELSIZE");
+			int cs = scope.get_value<int>("CHUNKSIZE");
+			int t = scope.get_value<int>("THREADS");
+			vs = new chunked_voxel_storage<bit_t>(x - vsize * 8, y - vsize * 8, z - vsize * 8, vsize, 8, 8, 8, cs);
+		}
+		vec_n<3, size_t> ijk;
+		vs->GetVoxelX(x, ijk.get<0>());
+		vs->GetVoxelY(y, ijk.get<1>());
+		vs->GetVoxelZ(z, ijk.get<2>());
+		vs->Set(ijk);
+		return vs;
 	}
 };
 
