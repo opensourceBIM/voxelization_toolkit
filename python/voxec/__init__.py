@@ -117,12 +117,22 @@ def read_voxec_obj(fn : str) -> obj_data:
         yield obj_data(name, *map(concat, accums))
         accums = init()
 
+
 class get_obj(voxel_post_process):
     def __init__(self, filename):
         self.filename = filename
 
     def __call__(self, cwd):
         return list(read_voxec_obj(os.path.join(cwd, self.filename)))
+
+
+class get_filecontent(voxel_post_process):
+    def __init__(self, filename):
+        self.filename = filename
+
+    def __call__(self, cwd):
+        return open(os.path.join(cwd, self.filename), 'r').read()
+
 
 def run(command, ifc_files, *ops, keep_dir=False, **kwargs):
     def make_args(d):
