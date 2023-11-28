@@ -196,9 +196,9 @@ public:
 	virtual void Set(const vec_n<3, size_t>& pos) = 0;
 	virtual void Set(const vec_n<3, size_t>& pos, void*) = 0;
 
-	virtual bool GetVoxelX(double& x, size_t& i) = 0;
-	virtual bool GetVoxelY(double& y, size_t& j) = 0;
-	virtual bool GetVoxelZ(double& z, size_t& k) = 0;
+	virtual bool GetVoxelX(double& x, size_t& i) const = 0;
+	virtual bool GetVoxelY(double& y, size_t& j) const = 0;
+	virtual bool GetVoxelZ(double& z, size_t& k) const = 0;
 
 	virtual bool GetCenter(size_t i, size_t j, size_t k, double& x, double& y, double& z) = 0;
 
@@ -335,17 +335,17 @@ public:
 		, origin_(ox_, oy_, oz_)
 	{}
 
-	bool GetVoxelX(double& x, size_t& i) {
+	bool GetVoxelX(double& x, size_t& i) const {
 		i = (size_t)std::floor((x - ox_) / d_);
 		return true;
 	}
 
-	bool GetVoxelY(double& y, size_t& j) {
+	bool GetVoxelY(double& y, size_t& j) const {
 		j = (size_t)std::floor((y - oy_) / d_);
 		return true;
 	}
 
-	bool GetVoxelZ(double& z, size_t& k) {
+	bool GetVoxelZ(double& z, size_t& k) const {
 		k = (size_t)std::floor((z - oz_) / d_);
 		return true;
 	}
@@ -1029,6 +1029,7 @@ public:
 	}
 };
 
+#ifndef SWIG
 template <typename T, size_t N>
 class multi_dim_array {
 private:
@@ -1142,6 +1143,8 @@ public:
 #include <boost/iostreams/device/mapped_file.hpp>
 
 namespace io = boost::iostreams;
+
+#endif
 
 class abstract_chunked_voxel_storage : public regular_voxel_storage {
 protected:

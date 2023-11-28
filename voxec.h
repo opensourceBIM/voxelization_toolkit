@@ -77,20 +77,34 @@ class assertion_error : public std::runtime_error {
 	using std::runtime_error::runtime_error;
 };
 
-class scope_map : public std::map<std::string, symbol_value> {
-protected:
+namespace {
 	template <typename T>
 	typename std::enable_if<boost::mpl::contains<symbol_value::types, T>::type::value, const T&>::type
-		get_value_(const symbol_value& v) const {
+		get_value_(const symbol_value& v) {
 		return boost::get<T>(v);
 	}
 
 	template <typename T>
 	typename std::enable_if<boost::mpl::contains<function_arg_value_type::types, T>::type::value, const T&>::type
-		get_value_(const symbol_value& v) const {
+		get_value_(const symbol_value& v) {
 		return boost::get<T>(boost::get<function_arg_value_type>(v));
 	}
 
+	template <typename T>
+	typename std::enable_if<boost::mpl::contains<symbol_value::types, T>::type::value, const T*>::type
+		get_value_opt_(const symbol_value& v) {
+		return boost::get<T>(&v);
+	}
+
+	template <typename T>
+	typename std::enable_if<boost::mpl::contains<function_arg_value_type::types, T>::type::value, const T*>::type
+		get_value_opt_(const symbol_value& v) {
+		// @todo?
+		return boost::get<T>(boost::get<function_arg_value_type>(&v));
+	}
+}
+
+class scope_map : public std::map<std::string, symbol_value> {
 public:
 	const std::map<std::string, function_def_type>* functions;
 

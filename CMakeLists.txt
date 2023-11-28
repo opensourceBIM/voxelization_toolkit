@@ -5,6 +5,7 @@ OPTION(IFC_SUPPORT "Build Volization Toolkit with IFC support (requires IfcOpenS
 OPTION(USE_STATIC_MSVC_RUNTIME "Link to the static runtime on MSVC." OFF)
 OPTION(ENABLE_TESTS "Enable tests." ON)
 OPTION(USE_BUILD_SCRIPT_OUTPUT "Use the ifcopenshell nix/build-all.py or win/build-all.cmd build script output to find dependencies." ON)
+OPTION(ENABLE_PYTHON_WRAPPER "Enable Python wrapper." OFF)
 
 include(CTest)
 
@@ -19,9 +20,10 @@ set(OCC_LIBRARY_NAMES TKernel TKMath TKBRep TKGeomBase TKGeomAlgo TKG3d TKG2d TK
                       
 if(IFC_SUPPORT)
 add_definitions(-DWITH_IFC)
+set(SWIG_DEFINES ${SWIG_DEFINES} -DWITH_IFC)
 endif()
 
-if (USE_BUILD_SCRIPT_OUTPUT) 
+if (USE_BUILD_SCRIPT_OUTPUT)
 	if(UNIX)
 		set(IFCOPENSHELL_INSTALL ${IFCOPENSHELL_ROOT}/build/Linux/x86_64/install)
     
@@ -120,9 +122,9 @@ else()
 endif()
 
 set(BOOST_COMPONENTS regex program_options iostreams system filesystem)
+# add_definitions(-DBOOST_ALL_NO_LIB)
 
 if(IFC_SUPPORT AND USE_BUILD_SCRIPT_OUTPUT)
-	set(BOOST_COMPONENTS ${BOOST_COMPONENTS} filesystem)
 	if(UNIX)
 		set(BOOST_ROOT       ${IFCOPENSHELL_INSTALL}/boost-1.71.0)
     
@@ -161,6 +163,7 @@ if (IFC_SUPPORT)
 	if (${ifcopenshell_major_version} STREQUAL "0.5")
 		set(IFC_LIBRARY_NAMES IfcGeom IfcParse)
 		add_definitions("-DIFCOPENSHELL_05")
+		set(SWIG_DEFINES ${SWIG_DEFINES} -DIFCOPENSHELL_05)
 	else()
 		file(GLOB geomlibfiles ${IFC_LIBRARY_DIR}/${CMAKE_SHARED_LIBRARY_PREFIX}IfcGeom_*)
 		foreach(file ${geomlibfiles})
@@ -171,9 +174,11 @@ if (IFC_SUPPORT)
 
 		if(${ifcopenshell_major_version} STREQUAL "0.7")
 			add_definitions("-DIFCOPENSHELL_07")
+			set(SWIG_DEFINES ${SWIG_DEFINES} -DIFCOPENSHELL_07)
 
 			string(REPLACE ";" ")(" schema_version_seq "(${SCHEMA_VERSIONS})")
 			ADD_DEFINITIONS(-DSCHEMA_SEQ=${schema_version_seq})
+			set(SWIG_DEFINES ${SWIG_DEFINES} -DSCHEMA_SEQ=${schema_version_seq})
 
 			IF(MSVC)
 				# warning due to virtual inheritance
@@ -213,7 +218,6 @@ message(STATUS "Boost libraries found in ${Boost_LIBRARY_DIRS}")
 include_directories(${IFC_INCLUDE_DIR} ${OCC_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/eigen)
 link_directories(${Boost_LIBRARY_DIRS})
 
-include_directories(${INCLUDE_DIRECTORIES} ${OCC_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${IFC_INCLUDE_DIR})
 if (NOT MSVC)
 	include(CheckCXXCompilerFlag)
 	CHECK_CXX_COMPILER_FLAG("-std=c++14" COMPILER_SUPPORTS_CXX11)
@@ -267,6 +271,32 @@ set(LIBVOXEC_HEADER_FILES voxelfile.h voxec.h)
 set(LIBVOXEC_SOURCE_FILES voxec.cpp)
 add_library(libvoxec STATIC ${LIBVOXEC_HEADER_FILES} ${LIBVOXEC_SOURCE_FILES})
 target_link_libraries(libvoxec libvoxel)
+
+if (ENABLE_PYTHON_WRAPPER)
+FIND_PACKAGE(SWIG)
+IF(NOT SWIG_FOUND)
+	MESSAGE(FATAL_ERROR "ENABLE_PYTHON_WRAPPER enabled, but unable to find SWIG. Disable ENABLE_PYTHON_WRAPPER or fix SWIG paths to proceed.")
+ENDIF()
+INCLUDE(${SWIG_USE_FILE})
+FIND_PACKAGE(PythonLibs)
+IF(NOT PYTHONLIBS_FOUND OR "$PYTHON_INCLUDE_DIRS}" STREQUAL "")
+	MESSAGE(FATAL_ERROR "ENABLE_PYTHON_WRAPPER enabled, but unable to find Python lib or header. Disable ENABLE_PYTHON_WRAPPER or fix Python paths to proceed.")
+ENDIF()
+
+INCLUDE_DIRECTORIES(${PYTHON_INCLUDE_DIRS})
+INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
+
+SET(CMAKE_SWIG_FLAGS ${SWIG_DEFINES})
+SET_SOURCE_FILES_PROPERTIES(wrap/wrapper.i PROPERTIES CPLUSPLUS ON)
+swig_add_library(voxec LANGUAGE python SOURCES wrap/wrapper.i)
+if("$ENV{LDFLAGS}" MATCHES ".undefined.suppress")
+# On osx there is some state in the python dylib. With `-Wl,undefined,suppress` we can ignore the missing symbols at compile time.
+SWIG_LINK_LIBRARIES(voxec libvoxec)
+else()
+SWIG_LINK_LIBRARIES(voxec libvoxec ${PYTHON_LIBRARIES})
+endif()
+
+endif()
 
 if (ENABLE_TESTS)
 file(GLOB test_filenames tests/*.cpp)
