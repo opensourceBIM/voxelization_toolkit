@@ -29,11 +29,18 @@
 	}
 }
 
+%typemap(out) std::vector<abstract_voxel_storage*> {
+    $result = PyTuple_New($1.size());
+	for (unsigned i = 0; i < $1.size(); ++i) {
+		PyTuple_SetItem($result, i, SWIG_NewPointerObj(SWIG_as_voidptr(((std::vector<abstract_voxel_storage*>&)result)[i]), SWIGTYPE_p_abstract_voxel_storage, 0));
+	}
+}
+
 %extend abstract_voxel_storage {
 	std::vector<abstract_voxel_storage*> components() const {
 		std::vector<abstract_voxel_storage*> comps;
 		connected_components((regular_voxel_storage*)$self, [&comps](regular_voxel_storage* c) {
-			comps.push_back(c);
+			comps.push_back(c->copy());
 		});
 		return comps;
 	}
