@@ -178,7 +178,7 @@ if (IFC_SUPPORT)
 
 			string(REPLACE ";" ")(" schema_version_seq "(${SCHEMA_VERSIONS})")
 			ADD_DEFINITIONS(-DSCHEMA_SEQ=${schema_version_seq})
-			set(SWIG_DEFINES ${SWIG_DEFINES} -DSCHEMA_SEQ=${schema_version_seq})
+			# set(SWIG_DEFINES ${SWIG_DEFINES} -DSCHEMA_SEQ=${schema_version_seq})
 
 			IF(MSVC)
 				# warning due to virtual inheritance
