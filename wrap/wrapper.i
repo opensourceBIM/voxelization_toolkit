@@ -91,6 +91,10 @@
 	}
 }
 
+%newobject abstract_voxel_storage::boolean_union;
+%newobject abstract_voxel_storage::boolean_subtraction;
+%newobject abstract_voxel_storage::boolean_intersection;
+
 %include "storage.h"
 
 %{
@@ -152,7 +156,7 @@ void populate_scope(scope_map& scope, const argument_spec& spec, PyObject* obj) 
     } else if (const std::string* val = get_value_opt_<std::string>($1)) {
         $result = PyUnicode_FromString(val->c_str());
     } else if (abstract_voxel_storage*const* val = get_value_opt_<abstract_voxel_storage*>($1)) {
-		$result = SWIG_NewPointerObj(SWIG_as_voidptr(*val), SWIGTYPE_p_abstract_voxel_storage, 0);
+		$result = SWIG_NewPointerObj(SWIG_as_voidptr(*val), SWIGTYPE_p_abstract_voxel_storage, SWIG_POINTER_OWN);
 	} else {
         PyErr_SetString(PyExc_TypeError, "Unsupported type for symbol_value");
         SWIG_fail;
