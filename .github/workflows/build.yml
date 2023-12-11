@@ -43,7 +43,7 @@ jobs:
           sudo mv -v MacOSX10.13.sdk /opt/ && \
           ls /opt/
       - uses: seanmiddleditch/gha-setup-ninja@master
-      - uses: conda-incubator/setup-miniconda@v2  # https://github.com/conda-incubator/setup-miniconda
+      - uses: conda-incubator/setup-miniconda@v3  # https://github.com/conda-incubator/setup-miniconda
         with:
           activate-environment: conda-build
           python-version: ${{ matrix.pyver.distver }}
