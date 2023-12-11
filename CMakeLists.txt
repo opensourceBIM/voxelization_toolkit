@@ -301,10 +301,10 @@ if (ENABLE_PYTHON_WRAPPER)
 		SWIG_LINK_LIBRARIES(voxec libvoxec ${Python_LIBRARIES})
 	endif()
 
-    INSTALL(FILES "${CMAKE_BINARY_DIR}/voxec.py"
-            DESTINATION "${Python_SITEARCH}/")
+    INSTALL(FILES "${CMAKE_BINARY_DIR}/voxec.py" "${CMAKE_CURRENT_SOURCE_DIR}/module/__init__.py"
+            DESTINATION "${Python_SITEARCH}/voxec/")
     INSTALL(TARGETS _voxec
-            DESTINATION "${Python_SITEARCH}/")
+            DESTINATION "${Python_SITEARCH}/voxec/")
 endif()
 
 if (ENABLE_TESTS)
