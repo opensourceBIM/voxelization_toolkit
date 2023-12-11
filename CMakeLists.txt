@@ -277,29 +277,38 @@ add_library(libvoxec STATIC ${LIBVOXEC_HEADER_FILES} ${LIBVOXEC_SOURCE_FILES})
 target_link_libraries(libvoxec libvoxel)
 
 if (ENABLE_PYTHON_WRAPPER)
-FIND_PACKAGE(SWIG)
-IF(NOT SWIG_FOUND)
-	MESSAGE(FATAL_ERROR "ENABLE_PYTHON_WRAPPER enabled, but unable to find SWIG. Disable ENABLE_PYTHON_WRAPPER or fix SWIG paths to proceed.")
-ENDIF()
-INCLUDE(${SWIG_USE_FILE})
-FIND_PACKAGE(PythonLibs)
-IF(NOT PYTHONLIBS_FOUND OR "$PYTHON_INCLUDE_DIRS}" STREQUAL "")
-	MESSAGE(FATAL_ERROR "ENABLE_PYTHON_WRAPPER enabled, but unable to find Python lib or header. Disable ENABLE_PYTHON_WRAPPER or fix Python paths to proceed.")
-ENDIF()
-
-INCLUDE_DIRECTORIES(${PYTHON_INCLUDE_DIRS})
-INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
-
-SET(CMAKE_SWIG_FLAGS ${SWIG_DEFINES})
-SET_SOURCE_FILES_PROPERTIES(wrap/wrapper.i PROPERTIES CPLUSPLUS ON)
-swig_add_library(voxec LANGUAGE python SOURCES wrap/wrapper.i)
-if("$ENV{LDFLAGS}" MATCHES ".undefined.suppress")
-# On osx there is some state in the python dylib. With `-Wl,undefined,suppress` we can ignore the missing symbols at compile time.
-SWIG_LINK_LIBRARIES(voxec libvoxec)
-else()
-SWIG_LINK_LIBRARIES(voxec libvoxec ${PYTHON_LIBRARIES})
-endif()
-
+	FIND_PACKAGE(SWIG)
+	IF(NOT SWIG_FOUND)
+		MESSAGE(FATAL_ERROR "ENABLE_PYTHON_WRAPPER enabled, but unable to find SWIG. Disable ENABLE_PYTHON_WRAPPER or fix SWIG paths to proceed.")
+	ENDIF()
+	INCLUDE(${SWIG_USE_FILE})
+	FIND_PACKAGE(PythonLibs)
+	IF(NOT PYTHONLIBS_FOUND OR "$PYTHON_INCLUDE_DIRS}" STREQUAL "")
+		MESSAGE(FATAL_ERROR "ENABLE_PYTHON_WRAPPER enabled, but unable to find Python lib or header. Disable ENABLE_PYTHON_WRAPPER or fix Python paths to proceed.")
+	ENDIF()
+	
+	INCLUDE_DIRECTORIES(${PYTHON_INCLUDE_DIRS})
+	INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
+	
+	SET(CMAKE_SWIG_FLAGS ${SWIG_DEFINES})
+	SET_SOURCE_FILES_PROPERTIES(wrap/wrapper.i PROPERTIES CPLUSPLUS ON)
+	swig_add_library(voxec LANGUAGE python SOURCES wrap/wrapper.i)
+	if("$ENV{LDFLAGS}" MATCHES ".undefined.suppress")
+		# On osx there is some state in the python dylib. With `-Wl,undefined,suppress` we can ignore the missing symbols at compile time.
+		SWIG_LINK_LIBRARIES(voxec libvoxec)
+	else()
+		SWIG_LINK_LIBRARIES(voxec libvoxec ${PYTHON_LIBRARIES})
+	endif()
+	
+	FIND_PACKAGE(PythonInterp)
+	EXECUTE_PROCESS(
+        COMMAND ${PYTHON_EXECUTABLE} -c "import sys; import sysconfig; sys.stdout.write(sysconfig.get_path('platlib'))"
+        OUTPUT_VARIABLE python_package_dir
+    )
+    INSTALL(FILES "${CMAKE_BINARY_DIR}/voxec.py"
+            DESTINATION "${python_package_dir}/")
+    INSTALL(TARGETS _voxec
+            DESTINATION "${python_package_dir}/")
 endif()
 
 if (ENABLE_TESTS)
@@ -323,4 +332,5 @@ install(TARGETS voxec libvoxel libvoxec
     RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
     LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
     ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
+
 install(FILES ${LIBVOXELIZER_HEADER_FILES} ${LIBVOXEC_HEADER_FILES} DESTINATION ${CMAKE_INSTALL_PREFIX}/include/voxel)
