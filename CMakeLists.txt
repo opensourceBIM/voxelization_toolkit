@@ -289,6 +289,7 @@ if (ENABLE_PYTHON_WRAPPER)
 	
 	INCLUDE_DIRECTORIES(${Python_INCLUDE_DIRS})
 	INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
+	link_directories(${Python_LIBRARY_DIRS})
 	
 	SET(CMAKE_SWIG_FLAGS ${SWIG_DEFINES})
 	SET_SOURCE_FILES_PROPERTIES(wrap/wrapper.i PROPERTIES CPLUSPLUS ON)
@@ -297,7 +298,7 @@ if (ENABLE_PYTHON_WRAPPER)
 		# On osx there is some state in the python dylib. With `-Wl,undefined,suppress` we can ignore the missing symbols at compile time.
 		SWIG_LINK_LIBRARIES(voxec libvoxec)
 	else()
-		SWIG_LINK_LIBRARIES(voxec libvoxec ${PYTHON_LIBRARIES})
+		SWIG_LINK_LIBRARIES(voxec libvoxec ${Python_LIBRARIES})
 	endif()
 
     INSTALL(FILES "${CMAKE_BINARY_DIR}/voxec.py"
