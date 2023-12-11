@@ -367,6 +367,8 @@ public:
 
 	void obj_export(std::ostream& fs, bool with_components = true, bool use_value = false, bool with_vertex_normals = false);
 	void obj_export(obj_export_helper& fs, bool with_components = true, bool use_value = false, bool with_vertex_normals = false);
+
+	virtual ~regular_voxel_storage() {}
 };
 
 template<typename U>
@@ -467,7 +469,7 @@ public:
 		mapped_ = false;
 	}
 
-	~continuous_voxel_storage() {
+	virtual ~continuous_voxel_storage() {
 		if (!mapped_) {
 			delete[] data_;
 		}
@@ -906,6 +908,8 @@ public:
 		}
 		return v;
 	}
+
+	virtual ~planar_voxel_storage() {}
 };
 
 template <typename T>
@@ -1027,6 +1031,8 @@ public:
 			return dimx_ * dimy_ * dimz_;
 		}
 	}
+
+	virtual ~constant_voxel_storage() {}
 };
 
 #ifndef SWIG
@@ -1585,6 +1591,8 @@ public:
 				<< nchunksx_ << ";" << nchunksy_ << ";" << nchunksz_ << std::endl;
 		}
 	}
+
+	virtual ~abstract_chunked_voxel_storage() {}
 };
 
 // @todo why is this not a template class?
@@ -1840,7 +1848,7 @@ public:
 		, chunks_(new abstract_voxel_storage*[total_nchunks_] {0}) 
 	{}
 
-	~chunked_voxel_storage() {
+	virtual ~chunked_voxel_storage() {
 		for (size_t i = 0; i < total_nchunks_; ++i) {
 			delete chunks_[i];
 		}
