@@ -23,7 +23,6 @@ jobs:
       fail-fast: false
       matrix:
         pyver: [
-          { name: py311, distver: '3.11'},
           { name: py312, distver: '3.12'}
         ]
         platform: [
