@@ -32,7 +32,7 @@ jobs:
           { name: macOS, distver: macos-11 }
         ]
     steps:
-      - uses: actions/checkout@v2
+      - uses: actions/checkout@v3
         with:
           submodules: recursive
       - name: Download MacOSX SDK
@@ -42,13 +42,19 @@ jobs:
           tar xf MacOSX10.13.sdk.tar.xz && \
           sudo mv -v MacOSX10.13.sdk /opt/ && \
           ls /opt/
-      - uses: seanmiddleditch/gha-setup-ninja@master
-      - uses: conda-incubator/setup-miniconda@v3  # https://github.com/conda-incubator/setup-miniconda
+      - uses: mamba-org/setup-micromamba@v1 # https://github.com/mamba-org/setup-micromamba
         with:
-          activate-environment: conda-build
-          python-version: ${{ matrix.pyver.distver }}
-          environment-file: conda/environment.yml
+          environment-name: build-env
+          cache-environment: true
+          condarc: |
+            channels:
+              - conda-forge
+            channel_priority: strict
+          create-args: >-
+            python=3.11
+            anaconda-client
+            boa
       - name: build, test and upload ifcopenshell
         run: |
-          conda-build . --python ${{ matrix.pyver.distver }} -c conda-forge --token ${{ secrets.ANACONDA_TOKEN }} --user ifcopenshell
+          conda mambabuild . --python ${{ matrix.pyver.distver }} -c conda-forge --token ${{ secrets.ANACONDA_TOKEN }} --user ifcopenshell
           
