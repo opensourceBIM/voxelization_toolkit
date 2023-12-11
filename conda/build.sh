@@ -17,7 +17,7 @@ cmake -G Ninja \
  -DIFC_LIBRARY_DIR=$PREFIX/lib \
  -DOCC_INCLUDE_DIR=$PREFIX/include/opencascade \
  -DOCC_LIBRARY_DIR=$PREFIX/lib \
- -DPYTHON_EXECUTABLE:FILEPATH=$PYTHON \
+ -DPython_EXECUTABLE:FILEPATH=$PYTHON \
  .
 
 ninja -j2
