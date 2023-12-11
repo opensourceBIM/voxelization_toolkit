@@ -108,8 +108,8 @@ void populate_scope(scope_map& scope, const argument_spec& spec, PyObject* obj) 
 	if (PyFloat_Check(obj) && type_opts.find("real") != type_opts.end()) {
 		auto value = PyFloat_AsDouble(obj);
 		scope[spec.name] = value;
-	} else if (PyLong_Check(obj) && type_opts.find("real") != type_opts.end()) {
-		auto value = PyLong_AsLong(obj);
+	} else if (PyLong_Check(obj) && type_opts.find("integer") != type_opts.end()) {
+		int value = (int) PyLong_AsLong(obj);
 		scope[spec.name] = value;
 	} else if (PyUnicode_Check(obj) && type_opts.find("string") != type_opts.end()) {
 		auto value = std::string(PyUnicode_AsUTF8(obj));
