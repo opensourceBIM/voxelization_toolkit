@@ -282,12 +282,12 @@ if (ENABLE_PYTHON_WRAPPER)
 		MESSAGE(FATAL_ERROR "ENABLE_PYTHON_WRAPPER enabled, but unable to find SWIG. Disable ENABLE_PYTHON_WRAPPER or fix SWIG paths to proceed.")
 	ENDIF()
 	INCLUDE(${SWIG_USE_FILE})
-	FIND_PACKAGE(PythonLibs)
-	IF(NOT PYTHONLIBS_FOUND OR "$PYTHON_INCLUDE_DIRS}" STREQUAL "")
+	find_package(Python COMPONENTS Interpreter Development)
+	IF(NOT Python_FOUND)
 		MESSAGE(FATAL_ERROR "ENABLE_PYTHON_WRAPPER enabled, but unable to find Python lib or header. Disable ENABLE_PYTHON_WRAPPER or fix Python paths to proceed.")
 	ENDIF()
 	
-	INCLUDE_DIRECTORIES(${PYTHON_INCLUDE_DIRS})
+	INCLUDE_DIRECTORIES(${Python_INCLUDE_DIRS})
 	INCLUDE_DIRECTORIES(${CMAKE_CURRENT_SOURCE_DIR})
 	
 	SET(CMAKE_SWIG_FLAGS ${SWIG_DEFINES})
@@ -299,16 +299,11 @@ if (ENABLE_PYTHON_WRAPPER)
 	else()
 		SWIG_LINK_LIBRARIES(voxec libvoxec ${PYTHON_LIBRARIES})
 	endif()
-	
-	FIND_PACKAGE(PythonInterp)
-	EXECUTE_PROCESS(
-        COMMAND ${PYTHON_EXECUTABLE} -c "import sys; import sysconfig; sys.stdout.write(sysconfig.get_path('platlib'))"
-        OUTPUT_VARIABLE python_package_dir
-    )
+
     INSTALL(FILES "${CMAKE_BINARY_DIR}/voxec.py"
-            DESTINATION "${python_package_dir}/")
+            DESTINATION "${Python_SITEARCH}/")
     INSTALL(TARGETS _voxec
-            DESTINATION "${python_package_dir}/")
+            DESTINATION "${Python_SITEARCH}/")
 endif()
 
 if (ENABLE_TESTS)
