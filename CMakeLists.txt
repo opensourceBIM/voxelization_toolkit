@@ -15,6 +15,10 @@ elseif(CMAKE_SIZEOF_VOID_P EQUAL 4)
     set(WIN_ARCH Win32)
 endif()
 
+if(UNIX)
+    add_definitions(-fPIC)
+endif()
+
 set(OCC_LIBRARY_NAMES TKernel TKMath TKBRep TKGeomBase TKGeomAlgo TKG3d TKG2d TKShHealing TKTopAlgo TKMesh TKOffset
                       TKPrim TKBool TKBO TKFillet TKSTEP TKSTEPBase TKSTEPAttr TKXSBase TKSTEP209 TKIGES TKHLR TKFeat)
                       
