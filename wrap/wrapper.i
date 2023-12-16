@@ -157,6 +157,9 @@ void populate_scope(scope_map& scope, const argument_spec& spec, PyObject* obj) 
         $result = PyUnicode_FromString(val->c_str());
     } else if (abstract_voxel_storage*const* val = get_value_opt_<abstract_voxel_storage*>($1)) {
 		$result = SWIG_NewPointerObj(SWIG_as_voidptr(*val), SWIGTYPE_p_abstract_voxel_storage, SWIG_POINTER_OWN);
+	} else if ($1.which() == 0) {
+		Py_INCREF(Py_None);
+		$result = Py_None;
 	} else {
         PyErr_SetString(PyExc_TypeError, "Unsupported type for symbol_value");
         SWIG_fail;
