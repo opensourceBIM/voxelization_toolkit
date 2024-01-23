@@ -64,6 +64,19 @@
 			uint32_t v;
 			$self->Get(ijk, &v);
 			return PyLong_FromLong(v);
+		} else if ($self->value_bits() == sizeof(normal_and_curvature<int16_t>) * 8) {
+			normal_and_curvature_t::storage_type v;
+			$self->Get(ijk, &v);
+			if (!v) {
+				return SWIG_Py_Void();
+			} else {
+				auto vf = v.convert<float>();
+				auto tup = PyTuple_New(4);
+				for (size_t i = 0; i < 4; ++i) {
+					PyTuple_SetItem(tup, i, PyFloat_FromDouble(vf.nxyz_curv[i]));
+				}
+				return tup;
+			}
 		} else {
 			throw std::runtime_error("Unsupported");
 		}

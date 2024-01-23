@@ -2471,6 +2471,9 @@ public:
 
 			Eigen::MatrixXf points = Eigen::Map<Eigen::MatrixXf>(coords.data(), 3, coords.size() / 3).transpose();
 
+			// Eigen::RowVector3f it_as_vec((*it).get(0), (*it).get(1), (*it).get(2));
+			// Eigen::MatrixXf centered = points.rowwise() - it_as_vec;
+			
 			Eigen::MatrixXf centered = points.rowwise() - points.colwise().mean();
 			Eigen::MatrixXf cov = centered.adjoint() * centered;
 			Eigen::SelfAdjointEigenSolver<Eigen::MatrixXf> eig(cov);
