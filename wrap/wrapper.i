@@ -47,7 +47,7 @@
 	PyObject* get(long i, long j, long k) const {
 		auto acvs_voxels = dynamic_cast<abstract_chunked_voxel_storage const*>($self);
 		if (!acvs_voxels) {
-			throw std::runtime_error("Unsupported");
+			throw std::runtime_error("Unsupported storage");
 		}
 		auto ijk_long = (make_vec<long>(i, j, k) - (acvs_voxels->grid_offset() * acvs_voxels->chunk_size()).as<long>());
 		auto ijk = ijk_long.as<size_t>();
@@ -60,6 +60,10 @@
 		}
 		if ($self->value_bits() == 1) {
 			return PyBool_FromLong(self->Get(ijk));
+		} else if ($self->value_bits() == 8) {
+			uint8_t v;
+			$self->Get(ijk, &v);
+			return PyLong_FromLong(v);
 		} else if ($self->value_bits() == 32) {
 			uint32_t v;
 			$self->Get(ijk, &v);
@@ -78,7 +82,7 @@
 				return tup;
 			}
 		} else {
-			throw std::runtime_error("Unsupported");
+			throw std::runtime_error("Unsupported data type, size: " + std::to_string($self->value_bits()));
 		}
 	}
 	PyObject* get(double x, double y, double z) const {
