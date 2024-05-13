@@ -88,6 +88,23 @@
 			throw std::runtime_error("Unsupported data type, size: " + std::to_string($self->value_bits()));
 		}
 	}
+	bool set(long i, long j, long k, PyObject* v) {
+		auto acvs_voxels = dynamic_cast<abstract_chunked_voxel_storage const*>($self);
+		if (!acvs_voxels) {
+			throw std::runtime_error("Unsupported storage");
+		}
+		auto ijk_long = (make_vec<long>(i, j, k) - (acvs_voxels->grid_offset() * acvs_voxels->chunk_size()).as<long>());
+		auto ijk = ijk_long.as<size_t>();
+		if (!(ijk_long > 0).all() || !(ijk < $self->extents()).all()) {
+			return false;
+		}
+		if ($self->value_bits() == 1) {
+			bool b = PyObject_IsTrue(v) == 1;
+			$self->Set(ijk, &b);
+			return true;
+		}
+		return false;
+	}
 	PyObject* get(double x, double y, double z) const {
 		auto acvs_voxels = dynamic_cast<abstract_chunked_voxel_storage const*>($self);
 		if (!acvs_voxels) {
