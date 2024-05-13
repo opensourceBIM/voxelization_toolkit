@@ -563,11 +563,19 @@ public:
 			size_t z8 = z / (8U / T::size_in_bits);
 			uint8_t r = z % (8U / T::size_in_bits);
 			auto& addr = data_[x + y * dimx_ + z8 * dimx_ * dimy_];
-			if (!(addr & (1 << r))) {
-				count_ += 1;
-				addr |= 1 << r;
-				updated = true;
-			}				
+			if (v) {
+				if (!(addr & (1 << r))) {
+					count_ += 1;
+					addr |= 1 << r;
+					updated = true;
+				}
+			} else {
+				if ((addr & (1 << r))) {
+					count_ -= 1;
+					addr &= ~(1u << r);
+					updated = true;
+				}
+			}
 		}
 		if (updated) {
 			bounds_[0].inplace_minimum(make_vec(x, y, z));
