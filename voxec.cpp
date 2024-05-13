@@ -68,6 +68,7 @@ voxel_operation_map::map_t& voxel_operation_map::map() {
 		m.insert(std::make_pair(std::string("dimensionality_estimate"), &instantiate<op_dimensionality_estimate>));
 		m.insert(std::make_pair(std::string("segment"), &instantiate<op_segment>));
 		m.insert(std::make_pair(std::string("keep_neighbours"), &instantiate<op_keep_neighbours>));
+		m.insert(std::make_pair(std::string("count_neighbours"), &instantiate<op_count_neighbours>));
 		m.insert(std::make_pair(std::string("free"), &instantiate<op_free>));
 		m.insert(std::make_pair(std::string("assert"), &instantiate<op_assert>));
 		m.insert(std::make_pair(std::string("set"), &instantiate<op_set>));

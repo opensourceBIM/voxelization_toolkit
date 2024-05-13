@@ -2837,6 +2837,64 @@ public:
 	}
 };
 
+
+class op_count_neighbours : public voxel_operation {
+public:
+	const std::vector<argument_spec>& arg_names() const {
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { true, "connectivity", "integer" } };
+		return nm_;
+	}
+	symbol_value invoke(const scope_map& scope) const {
+		auto voxels = (regular_voxel_storage*)scope.get_value<abstract_voxel_storage*>("input");
+		voxel_uint32_t u32;
+		auto result = (regular_voxel_storage*)voxels->empty_copy_as(&u32);
+		const auto connectivity = scope.get_value<int>("connectivity");
+		auto extents = voxels->extents().as<long>();
+
+		for (auto it = voxels->begin(); it != voxels->end(); ++it) {
+			uint32_t num = 0;
+
+			if (connectivity == 6) {
+
+				for (size_t f = 0; f < 6; ++f) {
+					vec_n<3, long> n;
+					size_t normal = f / 2;
+					size_t o0 = (normal + 1) % 3;
+					size_t o1 = (normal + 2) % 3;
+					size_t side = f % 2;
+					n.get(normal) = side ? 1 : -1;
+					if (it.neighbour(n)) {
+						++num;
+					}
+				}
+
+			} else {
+
+				for (long i = -1; i <= 1; ++i) {
+					for (long j = -1; j <= 1; ++j) {
+						for (long k = -1; k <= 1; ++k) {
+							if (i == 0 && j == 0 && k == 0) {
+								continue;
+							}
+							auto ijk2 = (*it).as<long>() + make_vec<long>(i, j, k);
+							if ((ijk2 >= 0).all() && (ijk2 < extents).all()) {
+								if (voxels->Get(ijk2.as<size_t>())) {
+									++num;
+								}
+							}
+						}
+					}
+				}
+
+			}
+
+			result->Set(*it, &num);
+		}
+
+		return result;
+	}
+};
+
 class op_set : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
