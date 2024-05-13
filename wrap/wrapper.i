@@ -56,6 +56,9 @@
 				return PyBool_FromLong(0);			
 			} else if ($self->value_bits() == 32) {
 				return PyLong_FromLong(0);
+			} else {
+				Py_INCREF(Py_None);
+				return Py_None;
 			}
 		}
 		if ($self->value_bits() == 1) {
