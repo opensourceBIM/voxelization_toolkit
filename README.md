@@ -85,6 +85,14 @@ A list of available commands is provide below.
 
 ## Available commands:
 
+### assert()
+
+Asserts that a certain the voxel grid or integer value specified in `input` represents a count greater than zero.
+
+name|required|type
+---|---|---
+input|Y|voxels,integer
+
 ### collapse()
 
 Reduce the volume of components along the direction vector <dx dy dz> to 1. Useful to calculate floor area by eliminating the thickness of floor slabs. This is the reverse of extrusion.
@@ -162,6 +170,14 @@ name|required|type
 ---|---|---
 input|Y|voxels
 
+### count_neighbours()
+
+Returns a new u32 grid with for every voxel the number of neighbours counted, with 6 or 26 for `connectivity`.
+
+name|required|type
+---|---|---
+input|Y|voxels
+connectivity|Y|integer
 
 ### create_geometry()
 
@@ -197,7 +213,8 @@ output_path|Y|string
 input|Y|voxels
 groups|Y|voxels
 use_bits|n|integer
-
+conserve_memory|n|integer
+only_counts|n|integer
 
 ### dump_surfaces()
 
@@ -209,6 +226,20 @@ input_voxels|Y|voxels
 input_surfaces|Y|surfaceset
 output_path|Y|string
 
+### dimensionality_estimate()
+
+Use PCA to estimate the local dimensionality for individual voxels. The three eigen values that are returned in a new grid describe the degree of variance along the principal axes. When these eigenvalues are roughly equal the voxel van be considered part of a 3d component. If there is one eigenvalue considerably greater than the other two, it constitutes a part of 1d component. Etc.
+
+For each individual voxel a neighbourhood consisting of voxels within a topological distance of `max_depth` voxels is formed. For voxels on the edge of a component this means an assymetric neighborhood is formed, because the neighborhood extends inwards into the component, but outwards there are no neighbours. This affects the distribution of eigenvalues. In order to get a more uniform distribution of eigenvalues within a component, the `reposition=1` can be used, which first takes a neighborhood of `max_depth` voxels and then takes the mean of that to be the seed of a second neighborhood traversal of `max_depth_2` voxels. This effectively moves the center of the neighborhood inwards.
+
+name|required|type
+---|---|---
+input|Y|voxels
+max_depth|n|integer
+max_depth_2|n|integer
+distance_2|n|real
+neighbourhood_size|n|integer
+reposition|n|integer
 
 ### export_csv()
 
@@ -297,6 +328,13 @@ name|required|type
 ---|---|---
 input|Y|ifcfile
 
+### free()
+
+Frees storage associated with a voxel grid. Use with caution.
+
+name|required|type
+---|---|---
+input|Y|voxels
 
 ### greater_than()
 
@@ -418,7 +456,7 @@ filename|Y|string
 use_value|n|integer
 with_components|n|integer
 groups|n|voxels
-
+with_vertex_normals|n|integer
 
 ### normal_estimate()
 
@@ -528,6 +566,17 @@ input|Y|voxels
 angular_tolerance|n|real
 max_curvature|n|real
 
+
+### set()
+
+Set an individual voxel on grid in `input`.
+
+name|required|type
+---|---|---
+x|Y|integer,real
+y|Y|integer,real
+z|Y|integer,real
+input|n|voxels
 
 ### shift()
 
