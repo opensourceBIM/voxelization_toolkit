@@ -412,6 +412,10 @@ public:
 		return reduce_<>(std::plus<T>());
 	}
 
+	T prod() const {
+		return reduce_<>(std::multiplies<T>(), (T)1);
+	}
+
 	T norm2() const {
 		// `a` is initialized to 0 initially
 		return std::sqrt(reduce_<>([](T a, T b) { return a + b * b; }));

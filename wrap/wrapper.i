@@ -36,6 +36,10 @@
 	}
 }
 
+%typemap(out) std::pair<void*, size_t> {
+    $result = PyBytes_FromStringAndSize((char* const)$1.first, $1.second);
+}
+
 %extend abstract_voxel_storage {
 	std::vector<abstract_voxel_storage*> components() const {
 		std::vector<abstract_voxel_storage*> comps;
@@ -87,6 +91,81 @@
 		} else {
 			throw std::runtime_error("Unsupported data type, size: " + std::to_string($self->value_bits()));
 		}
+	}
+	std::pair<void*, size_t> get_domain_buffer() const {
+		auto acvs_voxels = dynamic_cast<abstract_chunked_voxel_storage const*>($self);
+		if (!acvs_voxels) {
+			throw std::runtime_error("Unsupported");
+		}
+		auto offs = acvs_voxels->grid_offset() * acvs_voxels->chunk_size();
+		size_t oi, oj, ok;
+		offs.tie(oi, oj, ok);
+		auto a = $self->bounds();
+		auto extents = a[1] - a[0] + 1;
+		auto num_elements = extents.prod();
+
+		size_t elem_size_bytes;
+		if ($self->value_bits() == 1) {
+			elem_size_bytes = 1;
+		} else if ($self->value_bits() == 8) {
+			elem_size_bytes = 1;
+		} else if ($self->value_bits() == 32) {
+			elem_size_bytes = 4;
+		} else if ($self->value_bits() == sizeof(normal_and_curvature<int16_t>) * 8) {
+			elem_size_bytes = 16;
+		} else {
+			throw std::runtime_error("Unsupported data type, size: " + std::to_string($self->value_bits()));
+		}
+		
+		// @nb we choose float as that has the highest alignment requirements most likely 
+		void* data = new float[num_elements * elem_size_bytes / sizeof(float)];
+		
+		size_t index = 0;
+        BEGIN_LOOP_I2(a[0], a[1])
+			if (self->value_bits() == 1) {
+				((uint8_t*) (data))[index++] = self->Get(ijk) ? 1 : 0;
+			} else if (self->value_bits() == 8) {
+				uint8_t v;
+				self->Get(ijk, &v);
+				((uint8_t*) (data))[index++] = v;
+			} else if (self->value_bits() == 32) {
+				uint32_t v;
+				self->Get(ijk, &v);
+				((uint32_t*) (data))[index++] = v;
+            } else if (self->value_bits() == sizeof(normal_and_curvature<int16_t>) * 8) {
+                normal_and_curvature_t::storage_type v;
+                self->Get(ijk, &v);
+                auto vf = v.convert<float>();
+                for (size_t l = 0; l < 4; ++l) {
+                    ((float*)(data))[index++] = vf.nxyz_curv[l];
+                }
+            }
+        END_LOOP;
+        return { data, num_elements * elem_size_bytes };
+	}
+	PyObject* get_domain() const {
+		auto acvs_voxels = dynamic_cast<abstract_chunked_voxel_storage const*>($self);
+		if (!acvs_voxels) {
+			throw std::runtime_error("Unsupported");
+		}
+		auto offs = acvs_voxels->grid_offset() * acvs_voxels->chunk_size();
+		auto a = self->bounds();
+        long oi, oj, ok;
+        (offs + a[0].as<long>()).tie(oi, oj, ok);
+        auto extents = a[1] - a[0] + 1;
+		PyObject* idim = PyTuple_New(extents.get<0>());
+		for (long i = 0; i < extents.get<0>(); ++i) {
+			PyObject* jdim = PyTuple_New(extents.get<1>());
+			PyTuple_SetItem(idim, i, jdim);
+			for (long j = 0; j < extents.get<1>(); ++j) {
+				PyObject* kdim = PyTuple_New(extents.get<2>());
+				PyTuple_SetItem(jdim, j, kdim);
+				for (long k = 0; k < extents.get<2>(); ++k) {
+					PyTuple_SetItem(kdim, k, abstract_voxel_storage_get__SWIG_0($self, i + oi, j + oj, k + ok));
+				}
+			}
+		}
+		return idim;
 	}
 	bool set(long i, long j, long k, PyObject* v) {
 		auto acvs_voxels = dynamic_cast<abstract_chunked_voxel_storage const*>($self);
