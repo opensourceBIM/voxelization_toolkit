@@ -146,6 +146,10 @@ struct normal_and_curvature {
 	double curvature() const {
 		return nxyz_curv[3];
 	}
+
+	auto normal() const {
+		return make_vec<T>(nxyz_curv[0], nxyz_curv[1], nxyz_curv[2]);
+	}
 };
 
 struct normal_and_curvature_t : public voxel_desc_t {

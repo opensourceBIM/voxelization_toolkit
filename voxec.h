@@ -2496,11 +2496,21 @@ public:
 	}
 };
 
-
 class op_dimensionality_estimate : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { false, "max_depth", "integer"}, { false, "max_depth_2", "integer"}, {false, "distance_2", "real"}, {false, "neighbourhood_size", "integer"}, {false, "reposition", "integer"}};
+		static std::vector<argument_spec> nm_ = { 
+			{true, "input", "voxels" }, 
+			{false, "max_depth", "integer"}, 
+			{false, "max_depth_2", "integer"}, 
+			{false, "distance_2", "real"}, 
+			{false, "neighbourhood_size", "integer"}, 
+			{false, "reposition", "integer"},
+
+			{false, "inward_distance_approximate", "integer"},
+			{false, "inward_distance_skip", "integer"},
+			{false, "subsampling_factor", "integer"}		
+		};
 		return nm_;
 	}
 	symbol_value invoke(const scope_map& scope) const {
@@ -2512,6 +2522,8 @@ public:
 
 		boost::optional<int> max_depth, max_depth_2, neighbourhood_size;
 		boost::optional<double> distance_2;
+
+		boost::optional<int> inward_distance_approximate, inward_distance_skip, subsampling_factor;
 
 		try {
 			max_depth = scope.get_value<int>("max_depth");
@@ -2526,8 +2538,25 @@ public:
 			distance_2 = scope.get_value<double>("distance_2");
 		} catch (scope_map::not_in_scope&) {}
 
+		try {
+			inward_distance_approximate = scope.get_value<int>("inward_distance_approximate");
+		} catch (scope_map::not_in_scope&) {}
+		try {
+			inward_distance_skip = scope.get_value<int>("inward_distance_skip");
+		} catch (scope_map::not_in_scope&) {}
+		try {
+			subsampling_factor = scope.get_value<int>("subsampling_factor");
+			if (*subsampling_factor != 2) {
+				throw std::runtime_error("Only subsampling_factor of 2 currently supported");
+			}
+		} catch (scope_map::not_in_scope&) {}
+
 		if (!max_depth && !neighbourhood_size) {
 			throw std::runtime_error("Either max_depth or neighbourhood_size needs to be provided");
+		}
+
+		if (inward_distance_approximate && !subsampling_factor) {
+			throw std::runtime_error("inward_distance_approximate requires subsampling_factor to be set");
 		}
 
 		int reposition = scope.get_value_or<int>("reposition", 0) ? 2 : 1;
@@ -2540,11 +2569,54 @@ public:
 			auto box_dim = 1 + (*max_depth) * 2;
 			coords.reserve(box_dim * box_dim * box_dim);
 		}
+
+		uint32_t u32;
+		abstract_voxel_storage* topo_dist_from_exterior = nullptr;
+		if (inward_distance_approximate || inward_distance_skip) {
+			auto inverted = (regular_voxel_storage*) voxels->inverted();
+			voxel_uint32_t fmt;
+			topo_dist_from_exterior = voxels->empty_copy_as(&fmt);
+			auto inner_shell = offset<>()(inverted);
+			visitor<6> vis;
+			vis([&vis, &topo_dist_from_exterior](const auto& pos) {
+				uint32_t v = (uint32_t) vis.depth;
+				topo_dist_from_exterior->Set(pos.pos, &v);
+			}, voxels, inner_shell);
+		}
 		
 		for (auto it = voxels->begin(); it != voxels->end(); ++it) {
 			visitor<26> vis;
 
 			auto seed = *it;
+
+			static auto ONE_DIV_SQRT_THREE_F = 1.f / std::sqrt(3.f);
+
+			if (inward_distance_approximate || inward_distance_skip) {
+				bool has_value = false;
+				topo_dist_from_exterior->Get(*it, &u32);
+				if (inward_distance_skip && u32 >= *inward_distance_skip) {
+					v.nxyz_curv = {
+						(int16_t)(ONE_DIV_SQRT_THREE_F * (float)(std::numeric_limits<int16_t>::max() - 1)),
+						(int16_t)(ONE_DIV_SQRT_THREE_F * (float)(std::numeric_limits<int16_t>::max() - 1)),
+						(int16_t)(ONE_DIV_SQRT_THREE_F * (float)(std::numeric_limits<int16_t>::max() - 1)),
+						0
+					};
+					has_value = true;
+				}
+				if (inward_distance_approximate && u32 >= *inward_distance_approximate) {
+					auto modelo = ((*it) % (*subsampling_factor)) == 0;
+					if (modelo.all()) {
+					} else {
+						v.nxyz_curv = { 0, 0, 0, 1 };
+						has_value = true;
+					}
+				}
+
+				if (has_value) {
+					result->Set(*it, &v);
+					continue;
+				}
+			}
 
 			for (int iter = 0; iter < reposition; ++iter) {
 
@@ -2672,6 +2744,48 @@ public:
 				};
 
 				result->Set(*it, &v);
+			}
+		}
+
+		if (inward_distance_approximate) {
+			for (auto it = voxels->begin(); it != voxels->end(); ++it) {
+				result->Set(*it, &v);
+				if (v.nxyz_curv == decltype(v.nxyz_curv){ 0, 0, 0, 1 }) {
+					auto mod = (*it) % 2;
+					vec_n<3, float> accum;
+					float n_accum = 0;
+					for (int di = mod.get<0>() ? -1 : 0; di < (mod.get<0>() ? 2 : 1); ++di) {
+						for (int dj = mod.get<1>() ? -1 : 0; dj < (mod.get<1>() ? 2 : 1); ++dj) {
+							for (int dk = mod.get<2>() ? -1 : 0; dk < (mod.get<2>() ? 2 : 1); ++dk) {
+								if (di == 0 && dj == 0 && dk == 0) {
+									continue;
+								}
+								auto ijk = (*it).as<long>() + make_vec<long>(di, dj, dk);
+								if ((ijk > 0).all() && (ijk.as<size_t>() < voxels->extents()).all()) {
+									auto ijk_unsigned = ijk.as<size_t>();
+									if (voxels->Get(ijk_unsigned)) {
+										result->Get(*it, &v);
+										auto vf = v.convert<float>();
+										accum += make_vec<float>(vf.nxyz_curv[0], vf.nxyz_curv[1], vf.nxyz_curv[2]);
+										n_accum += 1;
+									}
+								}
+							}
+						}
+					}
+					if (n_accum) {
+						accum /= n_accum;
+						v.nxyz_curv = {
+							(int16_t)(accum.get<0>() * (float)(std::numeric_limits<int16_t>::max() - 1)),
+							(int16_t)(accum.get<1>()* (float)(std::numeric_limits<int16_t>::max() - 1)),
+							(int16_t)(accum.get<2>()* (float)(std::numeric_limits<int16_t>::max() - 1)),
+							0
+						};
+						result->Set(*it, &v);
+					} else {
+						// ?
+					}
+				}
 			}
 		}
 
