@@ -6,6 +6,7 @@
 #include <limits>
 #include <sstream>
 #include <functional>
+#include <numeric>
 
 #include <boost/operators.hpp>
 
@@ -452,6 +453,14 @@ public:
 			get<1>() * other.get<2>() - get<2>() * other.get<1>()
 		);
 	}
+
+	auto begin() const {
+		return ts_.begin();
+	}
+
+	auto end() const {
+		return ts_.end();
+	}
 };
 
 #include <type_traits>
@@ -463,4 +472,45 @@ vec_n<
 	return vec_n<sizeof...(ARGS) + 1U, T
 	>{value0, static_cast<T>(values)...};
 }
+
+struct lex_less {
+	template <typename T>
+	bool operator()(const T& a, const T& b) const {
+		return std::lexicographical_compare(a.begin(), a.end(), b.begin(), b.end());
+	}
+};
+
+namespace std {
+	template <size_t N, typename T>
+	struct hash<vec_n<N, T>> {
+		/*
+		// equivalent but more milliseconds
+		size_t operator()(const vec_n<N, T>& vec) const {
+			const auto& ts = vec.as_array();
+			return std::accumulate(
+				ts.begin(), ts.end(), size_t(0), [](size_t seed, const T& value) {
+				return seed ^ (std::hash<T>{}(value)+0x9e3779b9 + (seed << 6) + (seed >> 2));
+			});
+		}
+		*/
+		size_t operator()(const vec_n<N, T>& vec) const {
+			const auto& ts = vec.as_array();
+			size_t h = 0;
+			for (auto& v : ts) {
+				h ^= std::hash<T>{}(v)+0x9e3779b9 + (h << 6) + (h >> 2);
+			}
+			return h;
+		}
+	};
+
+	// Specialization of std::equal_to for vec_n, because operator== is overloaded and
+	// returns vec_n<bool>
+	template <size_t N, typename T>
+	struct equal_to<vec_n<N, T>> {
+		bool operator()(const vec_n<N, T>& lhs, const vec_n<N, T>& rhs) const {
+			return lhs.as_array() == rhs.as_array();
+		}
+	};
+}
+
 #endif
