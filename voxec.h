@@ -2448,48 +2448,95 @@ public:
 		auto result = voxels->empty_copy_as(&fmt);
 
 		const int max_depth = scope.get_value<int>("max_depth");
-		auto box_dim = 1 + max_depth * 2;
 
-		std::vector<float> coords;
-		coords.reserve(box_dim * box_dim * box_dim);
+		// scoped lock around setting result values
+		auto result_set = [result](const vec_n<3>& ijk, normal_and_curvature<int16_t>* v) {
+			static std::mutex m;
+			std::lock_guard<std::mutex> lock{ m };
+			result->Set(ijk, v);
+		};
 
-		for (auto it = voxels->begin(); it != voxels->end(); ++it) {
-			visitor<26> vis;
-			vis.max_depth = max_depth;
+		// lambda wrapper around the 3-dim loop to
+		// either call directly or invoke from worker
+		// threads. In the last case the z-coord
+		// of the voxel will be used to skip processing
+		// within a thread based on the modelo with the
+		// thread count.
+		auto process = [
+			&result_set, voxels, max_depth
+		](const boost::optional<size_t>& num_threads = boost::none, const boost::optional<size_t>& thread_id = boost::none)
+		{
+			uint32_t u32;
+			normal_and_curvature<int16_t> v;
 
-			coords.clear();
-			
-			vis([&coords](const tagged_index& pos) {
-				if (pos.which == tagged_index::VOXEL) {
-					coords.push_back(pos.pos.get(0));
-					coords.push_back(pos.pos.get(1));
-					coords.push_back(pos.pos.get(2));
-				} else {
-					throw std::runtime_error("Unexpected");
+			std::vector<float> coords;
+			auto box_dim = 1 + max_depth * 2;
+			coords.reserve(box_dim * box_dim * box_dim);
+
+			for (auto it = voxels->begin(); it != voxels->end(); ++it) {
+				if (num_threads && thread_id && ((*it).get<2>() % *num_threads) != *thread_id) {
+					continue;
 				}
-			}, voxels, *it);
 
-			Eigen::MatrixXf points = Eigen::Map<Eigen::MatrixXf>(coords.data(), 3, coords.size() / 3).transpose();
+				visitor<26> vis;
+				vis.max_depth = max_depth;
 
-			// Eigen::RowVector3f it_as_vec((*it).get(0), (*it).get(1), (*it).get(2));
-			// Eigen::MatrixXf centered = points.rowwise() - it_as_vec;
-			
-			Eigen::MatrixXf centered = points.rowwise() - points.colwise().mean();
-			Eigen::MatrixXf cov = centered.adjoint() * centered;
-			Eigen::SelfAdjointEigenSolver<Eigen::MatrixXf> eig(cov);
+				coords.clear();
 
-			auto vec = eig.eigenvectors().col(0);
-			auto norm = vec.normalized();
-			auto curv = eig.eigenvalues().col(0).value() / eig.eigenvalues().sum();
+				vis([&coords](const tagged_index& pos) {
+					if (pos.which == tagged_index::VOXEL) {
+						coords.push_back(pos.pos.get(0));
+						coords.push_back(pos.pos.get(1));
+						coords.push_back(pos.pos.get(2));
+					} else {
+						throw std::runtime_error("Unexpected");
+					}
+				}, voxels, *it);
 
-			v.nxyz_curv = {
-				(int16_t) (norm.x() * (float) (std::numeric_limits<int16_t>::max()-1)),
-				(int16_t) (norm.y() * (float) (std::numeric_limits<int16_t>::max()-1)),
-				(int16_t) (norm.z() * (float) (std::numeric_limits<int16_t>::max()-1)),
-				(int16_t) (curv * (float) (std::numeric_limits<int16_t>::max()-1))
-			};
+				Eigen::MatrixXf points = Eigen::Map<Eigen::MatrixXf>(coords.data(), 3, coords.size() / 3).transpose();
 
-			result->Set(*it, &v);
+				// Eigen::RowVector3f it_as_vec((*it).get(0), (*it).get(1), (*it).get(2));
+				// Eigen::MatrixXf centered = points.rowwise() - it_as_vec;
+
+				Eigen::MatrixXf centered = points.rowwise() - points.colwise().mean();
+				Eigen::MatrixXf cov = centered.adjoint() * centered;
+				Eigen::SelfAdjointEigenSolver<Eigen::MatrixXf> eig(cov);
+
+				auto vec = eig.eigenvectors().col(0);
+				auto norm = vec.normalized();
+				auto curv = eig.eigenvalues().col(0).value() / eig.eigenvalues().sum();
+
+				v.nxyz_curv = {
+					(int16_t)(norm.x() * (float)(std::numeric_limits<int16_t>::max() - 1)),
+					(int16_t)(norm.y() * (float)(std::numeric_limits<int16_t>::max() - 1)),
+					(int16_t)(norm.z() * (float)(std::numeric_limits<int16_t>::max() - 1)),
+					(int16_t)(curv * (float)(std::numeric_limits<int16_t>::max() - 1))
+				};
+
+				result_set(*it, &v);
+			}
+		};
+
+		boost::optional<size_t> threads;
+		if (scope.has("THREADS")) {
+			int t = scope.get_value<int>("THREADS");
+			if (t > 1) {
+				threads = (size_t)t;
+			}
+		}
+		if (threads) {
+			std::vector<std::thread> ts;
+			ts.reserve(*threads);
+			for (size_t i = 0; i < *threads; ++i) {
+				ts.emplace_back(std::thread([&process, threads, i]() {
+					process(threads, i);
+				}));
+			}
+			for (auto jt = ts.begin(); jt != ts.end(); ++jt) {
+				jt->join();
+			}
+		} else {
+			process();
 		}
 
 		return result;

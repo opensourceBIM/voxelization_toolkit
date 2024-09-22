@@ -30,6 +30,12 @@ TEST(Voxelizer, Volume) {
 		symbol_value v = 5;
 		arguments["max_depth"] = v;
 	}
+	/*
+	{
+		symbol_value v = 4;
+		arguments["THREADS"] = v;
+	}
+	*/
 
 	auto r = normal_estimate.invoke(arguments);
 	auto result = (regular_voxel_storage*)boost::get<abstract_voxel_storage*>(r);
