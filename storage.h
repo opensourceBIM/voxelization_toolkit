@@ -147,7 +147,7 @@ struct normal_and_curvature {
 		return nxyz_curv[3];
 	}
 
-	auto normal() const {
+	vec_n<3, T> normal() const {
 		return make_vec<T>(nxyz_curv[0], nxyz_curv[1], nxyz_curv[2]);
 	}
 };
