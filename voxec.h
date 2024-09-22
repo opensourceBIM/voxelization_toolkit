@@ -2561,15 +2561,6 @@ public:
 
 		int reposition = scope.get_value_or<int>("reposition", 0) ? 2 : 1;
 
-		std::vector<float> coords;
-
-		if (neighbourhood_size) {
-			coords.reserve(*neighbourhood_size);
-		} else if (max_depth) {
-			auto box_dim = 1 + (*max_depth) * 2;
-			coords.reserve(box_dim * box_dim * box_dim);
-		}
-
 		uint32_t u32;
 		abstract_voxel_storage* topo_dist_from_exterior = nullptr;
 		if (inward_distance_approximate || inward_distance_skip) {
@@ -2583,168 +2574,225 @@ public:
 				topo_dist_from_exterior->Set(pos.pos, &v);
 			}, voxels, inner_shell);
 		}
-		
-		for (auto it = voxels->begin(); it != voxels->end(); ++it) {
-			visitor<26> vis;
 
-			auto seed = *it;
+		// scoped lock around setting result values
+		auto result_set = [result](const vec_n<3>& ijk, normal_and_curvature<int16_t>* v) {
+			static std::mutex m;
+			std::lock_guard<std::mutex> lock{ m };
+			result->Set(ijk, v);
+		};
 
-			static auto ONE_DIV_SQRT_THREE_F = 1.f / std::sqrt(3.f);
+		// lambda wrapper around the 3-dim loop to
+		// either call directly or invoke from worker
+		// threads. In the last case the z-coord
+		// of the voxel will be used to skip processing
+		// within a thread based on the modelo with the
+		// thread count.
+		auto process = [
+			&result_set, voxels, topo_dist_from_exterior, subsampling_factor,
+			inward_distance_approximate, inward_distance_skip, reposition,
+			neighbourhood_size, distance_2, max_depth, max_depth_2
+		](const boost::optional<size_t>& num_threads = boost::none, const boost::optional<size_t>& thread_id = boost::none)
+		{
+			uint32_t u32;
+			normal_and_curvature<int16_t> v;
 
-			if (inward_distance_approximate || inward_distance_skip) {
-				bool has_value = false;
-				topo_dist_from_exterior->Get(*it, &u32);
-				if (inward_distance_skip && u32 >= *inward_distance_skip) {
-					v.nxyz_curv = {
-						(int16_t)(ONE_DIV_SQRT_THREE_F * (float)(std::numeric_limits<int16_t>::max() - 1)),
-						(int16_t)(ONE_DIV_SQRT_THREE_F * (float)(std::numeric_limits<int16_t>::max() - 1)),
-						(int16_t)(ONE_DIV_SQRT_THREE_F * (float)(std::numeric_limits<int16_t>::max() - 1)),
-						0
-					};
-					has_value = true;
+			std::vector<float> coords;
+
+			if (neighbourhood_size) {
+				coords.reserve(*neighbourhood_size);
+			} else if (max_depth) {
+				auto box_dim = 1 + (*max_depth) * 2;
+				coords.reserve(box_dim * box_dim * box_dim);
+			}
+
+			for (auto it = voxels->begin(); it != voxels->end(); ++it) {
+				if (num_threads && thread_id && ((*it).get<2>() % *num_threads) != *thread_id) {
+					continue;
 				}
-				if (inward_distance_approximate && u32 >= *inward_distance_approximate) {
-					auto modelo = ((*it) % (*subsampling_factor)) == 0;
-					if (modelo.all()) {
-					} else {
-						v.nxyz_curv = { 0, 0, 0, 1 };
+				visitor<26> vis;
+
+				auto seed = *it;
+
+				static auto ONE_DIV_SQRT_THREE_F = 1.f / std::sqrt(3.f);
+
+				if (inward_distance_approximate || inward_distance_skip) {
+					bool has_value = false;
+					topo_dist_from_exterior->Get(*it, &u32);
+					if (inward_distance_skip && u32 >= *inward_distance_skip) {
+						v.nxyz_curv = {
+							(int16_t)(ONE_DIV_SQRT_THREE_F * (float)(std::numeric_limits<int16_t>::max() - 1)),
+							(int16_t)(ONE_DIV_SQRT_THREE_F * (float)(std::numeric_limits<int16_t>::max() - 1)),
+							(int16_t)(ONE_DIV_SQRT_THREE_F * (float)(std::numeric_limits<int16_t>::max() - 1)),
+							0
+						};
 						has_value = true;
 					}
-				}
-
-				if (has_value) {
-					result->Set(*it, &v);
-					continue;
-				}
-			}
-
-			for (int iter = 0; iter < reposition; ++iter) {
-
-				int previous_coord_count = -1;
-				int max_depth_guess = ((int)std::ceil(std::pow(26, 1. / 3) - 1)) / 2;
-
-				while (true) {
-					if (neighbourhood_size) {
-						vis.max_depth = max_depth_guess;
-					} else {
-						vis.max_depth = iter == 1 && max_depth_2 ? max_depth_2 : max_depth;
+					if (inward_distance_approximate && u32 >= *inward_distance_approximate) {
+						auto modelo = ((*it) % (*subsampling_factor)) == 0;
+						if (modelo.all()) {
+						} else {
+							v.nxyz_curv = { 0, 0, 0, 1 };
+							has_value = true;
+						}
 					}
 
-					coords.clear();
+					if (has_value) {
+						result_set(*it, &v);
+						continue;
+					}
+				}
 
-					vis([&coords, neighbourhood_size](const tagged_index& pos) {
-						if (pos.which == tagged_index::VOXEL) {
-							if (!neighbourhood_size || (coords.size() / 3 < *neighbourhood_size)) {
-								coords.push_back(pos.pos.get(0));
-								coords.push_back(pos.pos.get(1));
-								coords.push_back(pos.pos.get(2));
-							}
+				for (int iter = 0; iter < reposition; ++iter) {
+
+					int previous_coord_count = -1;
+					int max_depth_guess = ((int)std::ceil(std::pow(26, 1. / 3) - 1)) / 2;
+
+					while (true) {
+						if (neighbourhood_size) {
+							vis.max_depth = max_depth_guess;
 						} else {
-							throw std::runtime_error("Unexpected");
+							vis.max_depth = iter == 1 && max_depth_2 ? max_depth_2 : max_depth;
 						}
-					}, voxels, seed);
 
-					if (neighbourhood_size) {
-						if (coords.size() / 3 == *neighbourhood_size) {
-							break;
-						}
-						if (previous_coord_count == (int)coords.size()) {
-							break;
-						}
-						if (max_depth) {
-							if (*max_depth == max_depth_guess) {
+						coords.clear();
+
+						vis([&coords, neighbourhood_size](const tagged_index& pos) {
+							if (pos.which == tagged_index::VOXEL) {
+								if (!neighbourhood_size || (coords.size() / 3 < *neighbourhood_size)) {
+									coords.push_back(pos.pos.get(0));
+									coords.push_back(pos.pos.get(1));
+									coords.push_back(pos.pos.get(2));
+								}
+							} else {
+								throw std::runtime_error("Unexpected");
+							}
+						}, voxels, seed);
+
+						if (neighbourhood_size) {
+							if (coords.size() / 3 == *neighbourhood_size) {
 								break;
 							}
+							if (previous_coord_count == (int)coords.size()) {
+								break;
+							}
+							if (max_depth) {
+								if (*max_depth == max_depth_guess) {
+									break;
+								}
+							}
+							previous_coord_count = (int)coords.size();
+						} else if (max_depth) {
+							break;
 						}
-						previous_coord_count = (int)coords.size();
-					} else if (max_depth) {
-						break;
+
+						++max_depth_guess;
 					}
 
-					++max_depth_guess;
-				}
+					auto points = Eigen::Map<Eigen::Matrix<float, 3, Eigen::Dynamic>>(coords.data(), 3, coords.size() / 3).transpose();
 
-				auto points = Eigen::Map<Eigen::Matrix<float, 3, Eigen::Dynamic>>(coords.data(), 3, coords.size() / 3).transpose();
-
-				if (reposition == 2 && iter == 0) {
+					if (reposition == 2 && iter == 0) {
 #if 1
-					auto mean = points.colwise().mean();
+						auto mean = points.colwise().mean();
 #elif 0
-					// median
-					Eigen::RowVector3f mean;
-					size_t i = 0;
-					for (const auto& c : points.colwise()) {
-						std::vector<double> r;
-						r.reserve(c.size());
-						for (auto& v : c) {
-							r.push_back(v);
+						// median
+						Eigen::RowVector3f mean;
+						size_t i = 0;
+						for (const auto& c : points.colwise()) {
+							std::vector<double> r;
+							r.reserve(c.size());
+							for (auto& v : c) {
+								r.push_back(v);
+							}
+							std::sort(r.begin(), r.end());
+							auto v = r.size() % 2 == 0
+								? (r[(r.size() - 2) / 2] + r[(r.size() - 2) / 2 + 1]) / 2.
+								: r[r.size() / 2];
+							mean(i++) = v;
 						}
-						std::sort(r.begin(), r.end());
-						auto v = r.size() % 2 == 0
-							? (r[(r.size() - 2) / 2] + r[(r.size() - 2) / 2 + 1]) / 2.
-							: r[r.size() / 2];
-						mean(i++) = v;
-					}
 #else
-					// bounding box center
-					auto mi = points.colwise().minCoeff();
-					auto ma = points.colwise().maxCoeff();
-					auto mean = (mi + ma) / 2.;
+						// bounding box center
+						auto mi = points.colwise().minCoeff();
+						auto ma = points.colwise().maxCoeff();
+						auto mean = (mi + ma) / 2.;
 #endif
-					
-					// Find point in neighborhood closest to median
-					auto minl = std::numeric_limits<double>::infinity();
-					Eigen::RowVectorXf p;
-					for (const auto& r : points.rowwise()) {
-						auto l = (r - mean).norm();
-						if (l < minl) {
-							minl = l;
-							p = r;
+
+						// Find point in neighborhood closest to median
+						auto minl = std::numeric_limits<double>::infinity();
+						Eigen::RowVectorXf p;
+						for (const auto& r : points.rowwise()) {
+							auto l = (r - mean).norm();
+							if (l < minl) {
+								minl = l;
+								p = r;
+							}
 						}
+
+						// Assign to seed to reposition neighborhood around found median
+						seed.get<0>() = (size_t)p.data()[0];
+						seed.get<1>() = (size_t)p.data()[1];
+						seed.get<2>() = (size_t)p.data()[2];
+
+						// Continue within outer loop to restart traversal from new seed
+						continue;
 					}
 
-					// Assign to seed to reposition neighborhood around found median
-					seed.get<0>() = (size_t)p.data()[0];
-					seed.get<1>() = (size_t)p.data()[1];
-					seed.get<2>() = (size_t)p.data()[2];
+					Eigen::MatrixXf centered = points.rowwise() - points.colwise().mean();
 
-					// Continue within outer loop to restart traversal from new seed
-					continue;
-				}
-
-				Eigen::MatrixXf centered = points.rowwise() - points.colwise().mean();
-
-				if (distance_2) {
-					auto norms = centered.rowwise().norm().array();
-					auto mask = norms < (*distance_2);
-					Eigen::MatrixXf filtered(mask.count(), centered.cols());
-					size_t idx = 0;
-					for (size_t i = 0; i < mask.size(); ++i) {
-						if (mask(i)) {
-							filtered.row(idx++) = centered.row(i);
+					if (distance_2) {
+						auto norms = centered.rowwise().norm().array();
+						auto mask = norms < (*distance_2);
+						Eigen::MatrixXf filtered(mask.count(), centered.cols());
+						size_t idx = 0;
+						for (size_t i = 0; i < mask.size(); ++i) {
+							if (mask(i)) {
+								filtered.row(idx++) = centered.row(i);
+							}
 						}
+						centered = filtered;
 					}
-					centered = filtered;
+
+					Eigen::MatrixXf cov = centered.adjoint() * centered;
+					Eigen::SelfAdjointEigenSolver<Eigen::MatrixXf> eig(cov);
+
+					std::array<double, 3> norm_eigv = {
+						eig.eigenvalues().data()[0] / eig.eigenvalues().norm(),
+						eig.eigenvalues().data()[1] / eig.eigenvalues().norm(),
+						eig.eigenvalues().data()[2] / eig.eigenvalues().norm()
+					};
+
+					v.nxyz_curv = {
+						(int16_t)(norm_eigv[0] * (float)(std::numeric_limits<int16_t>::max() - 1)),
+						(int16_t)(norm_eigv[1] * (float)(std::numeric_limits<int16_t>::max() - 1)),
+						(int16_t)(norm_eigv[2] * (float)(std::numeric_limits<int16_t>::max() - 1)),
+						0
+					};
+
+					result_set(*it, &v);
 				}
-
-				Eigen::MatrixXf cov = centered.adjoint() * centered;
-				Eigen::SelfAdjointEigenSolver<Eigen::MatrixXf> eig(cov);
-
-				std::array<double, 3> norm_eigv = {
-					eig.eigenvalues().data()[0] / eig.eigenvalues().norm(),
-					eig.eigenvalues().data()[1] / eig.eigenvalues().norm(),
-					eig.eigenvalues().data()[2] / eig.eigenvalues().norm()
-				};
-
-				v.nxyz_curv = {
-					(int16_t)(norm_eigv[0] * (float)(std::numeric_limits<int16_t>::max() - 1)),
-					(int16_t)(norm_eigv[1] * (float)(std::numeric_limits<int16_t>::max() - 1)),
-					(int16_t)(norm_eigv[2] * (float)(std::numeric_limits<int16_t>::max() - 1)),
-					0
-				};
-
-				result->Set(*it, &v);
 			}
+		};
+
+		boost::optional<size_t> threads;
+		if (scope.has("THREADS")) {
+			int t = scope.get_value<int>("THREADS");
+			if (t > 1) {
+				threads = (size_t)t;
+			}
+		}
+		if (threads) {
+			std::vector<std::thread> ts;
+			ts.reserve(*threads);
+			for (size_t i = 0; i < *threads; ++i) {
+				ts.emplace_back(std::thread([&process, threads, i](){
+					process(threads, i);
+				}));
+			}
+			for (auto jt = ts.begin(); jt != ts.end(); ++jt) {
+				jt->join();
+			}
+		} else {
+			process();
 		}
 
 		if (inward_distance_approximate) {
