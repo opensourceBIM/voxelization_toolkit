@@ -16,11 +16,11 @@ requirements:
     - {{ compiler('cxx') }}
     - ninja
     - cmake
-    - ifcopenshell ==0.7.0
+    - ifcopenshell =v0.7.0
 
   host:
     - python
-    - ifcopenshell ==0.7.0
+    - ifcopenshell =v0.7.0
 
   run: []
 
