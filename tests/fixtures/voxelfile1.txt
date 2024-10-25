@@ -1,6 +1,6 @@
 file = parse("duplex.ifc")
 surfaces = create_geometry(file)
-slabs = create_geometry(file, entities={"IfcSlab"})
+slabs = create_geometry(file, include={"IfcSlab"})
 slab_voxels = voxelize(slabs)
 voxels = voxelize(surfaces)
 fixed_voxels = fill_gaps(voxels)
