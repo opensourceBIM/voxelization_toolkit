@@ -44,7 +44,7 @@ Geometricaly assess exterior elements on multi-aspect models as BIM authoring to
 The `voxec(.exe)` runtime interpreter can be installed using the Anaconda (conda) package manager from the ifcopenshell channel.
 
 ```
-conda install -c conda-forge ifcopenshell
+conda install -c conda-forge ifcopenshell=v0.7.0
 conda install -c ifcopenshell voxelization_toolkit
 ```
 
