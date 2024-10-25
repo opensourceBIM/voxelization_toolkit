@@ -48,6 +48,42 @@ conda install -c conda-forge ifcopenshell=v0.7.0
 conda install -c ifcopenshell voxelization_toolkit
 ```
 
+## Quick tutorial
+
+0. Perform the installation steps above
+1. Create a new empty folder with:
+    - `voxelfile.txt`; contents of https://github.com/opensourceBIM/voxelization_toolkit/blob/e9ce7e0c5569da67c9953bcd4e6496b5ce1c3699/tests/fixtures/voxelfile1.txt
+    - `duplex.ifc`; contents of https://github.com/opensourceBIM/voxelization_toolkit/blob/e9ce7e0c5569da67c9953bcd4e6496b5ce1c3699/tests/fixtures/duplex.ifc
+2. `cd` to the directory in powershell/bash and run:
+    `voxec voxelfile.txt`
+3. Observe an output is printed like below as the flow of the procedure defined in `voxelfile.txt` is executed.
+```
+[                                                  ]
+  severity: notice
+  message: executing {statement}
+  time: 2024:10:25 14:36:43.283
+  statement:
+    text: file = parse("duplex.ifc")
+[#####                                             ]
+  severity: notice
+  message: executing {statement}
+  time: 2024:10:25 14:36:43.392
+  statement:
+    text: surfaces = create_geometry(file)
+[###########                                       ]
+  severity: notice
+  message: executing {statement}
+  time: 2024:10:25 14:36:44.575
+  statement:
+    text: slabs = create_geometry(file,include={"IfcSlab"})
+```
+4. Now add a line:
+  `export_point_cloud(outmost_voxels, "outmost_voxels.obj")`
+5. and rerun voxec.
+6. The exported file can now be visualized for example in Blender.
+
+![](img/duplex_outer_voxel_pointcloud.png)
+
 ## Usage
 
 Recommended usage is using the `voxec` runtime interpreter, which takes an input "voxelfile" which describes a series of commands. The grammar of such as voxelfile is:
