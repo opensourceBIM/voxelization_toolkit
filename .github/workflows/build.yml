@@ -28,7 +28,7 @@ jobs:
         platform: [
           { name: Windows, distver: windows-2019 },
           { name: Linux, distver: ubuntu-20.04 },
-          { name: macOS, distver: macos-11 }
+          { name: macOS, distver: macos-13 }
         ]
     steps:
       - uses: actions/checkout@v3
