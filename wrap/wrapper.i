@@ -295,13 +295,14 @@ struct context {
 	}
 };
 
-symbol_value run_(const std::string& name, PyObject *args, PyObject *kwargs, context* ctx = nullptr) {
+symbol_value run_(const std::string& name, PyObject *args, PyObject *kwargs, context* ctx = nullptr, bool silent=false) {
 	scope_map scope;
 	if (ctx) {
 		scope = ctx->scope;
 	}
 
 	voxel_operation* op = voxel_operation_map::create(name);
+	op->silent = silent;
 
 	// Process positional arguments
 	auto it = op->arg_names().begin();
@@ -331,22 +332,6 @@ symbol_value run_(const std::string& name, PyObject *args, PyObject *kwargs, con
 	return r;
 }
 
-%}
-
-%pythoncode %{
-
-	import multiprocessing
-
-	default_VOXELSIZE = 0.05
-	default_CHUNKSIZE = 16
-	default_THREADS = multiprocessing.cpu_count()
-	
-	def run(name, *args, **kwargs):
-		ctx = context()
-		ctx.set('VOXELSIZE', default_VOXELSIZE)
-		ctx.set('CHUNKSIZE', default_CHUNKSIZE)
-		ctx.set('THREADS', default_THREADS)
-		return run_(name, args, kwargs, ctx)
 %}
 
 %module voxec %{
