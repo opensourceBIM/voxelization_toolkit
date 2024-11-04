@@ -2932,7 +2932,7 @@ namespace {
 class op_segment : public voxel_operation {
 public:
 	const std::vector<argument_spec>& arg_names() const {
-		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { false, "angular_tolerance", "real" }, { false, "max_curvature", "real" } };
+		static std::vector<argument_spec> nm_ = { { true, "input", "voxels" }, { false, "angular_tolerance", "real" }, { false, "max_curvature", "real" }, { false, "connectedness", "integer" } };
 		return nm_;
 	}
 	symbol_value invoke(const scope_map& scope) const {
@@ -2953,6 +2953,19 @@ public:
 
 		uint32_t component_index = 0;
 
+		// @nb connectedness defaults to 26 here for backwards compat, most other commands
+		// have 6 as the default.
+		int C = 26;
+		try {
+			C = scope.get_value<int>("connectedness");
+		} catch (scope_map::not_in_scope&) {
+			// default 26 connectedness
+		}
+
+		if (C != 6 && C != 26) {
+			throw std::runtime_error("Connectedness should be 6 or 26");
+		}
+
 		while (voxels_bit->count()) {
 			++component_index;
 
@@ -2972,15 +2985,22 @@ public:
 
 			check_curvature_and_normal_deviation lookup_curv(voxels, *seed, angular_tolerance, max_curvature);
 
-			visitor<26, DOF_XYZ, std::function<bool(const vec_n<3, size_t>&)>> vis;
+			visitor<6, DOF_XYZ, std::function<bool(const vec_n<3, size_t>&)>> vis6;
+			visitor<26, DOF_XYZ, std::function<bool(const vec_n<3, size_t>&)>> vis26;
+			vis6.set_postcondition(std::ref(lookup_curv));
+			vis26.set_postcondition(std::ref(lookup_curv));
 
-			vis.set_postcondition(std::ref(lookup_curv));
-
-			vis([&result, &component_index](const tagged_index& pos) {
+			auto callback = [&result, &component_index](const tagged_index& pos) {
 				result->Set(pos.pos, &component_index);
-			}, voxels_bit, *seed);
+			};
 
-			voxels_bit->boolean_subtraction_inplace(vis.get_visited());
+			if (C == 6) {
+				vis6(callback, voxels_bit, *seed);
+			} else {
+				vis26(callback, voxels_bit, *seed);
+			}
+
+			voxels_bit->boolean_subtraction_inplace(C == 6 ? vis6.get_visited() : vis26.get_visited());
 		}
 	
 		return result;
