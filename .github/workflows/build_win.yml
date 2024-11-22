@@ -1,4 +1,4 @@
-name: Build IfcOpenShell Windows
+name: Build Voxelization Toolkit Windows
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  build_ifcopenshell:
+  build_voxec:
     runs-on: windows-2019
     strategy:
       fail-fast: false
@@ -25,6 +25,7 @@ jobs:
         with:
           repository: IfcOpenShell/IfcOpenShell
           path: IfcOpenShell
+          token: ${{ secrets.BUILD_REPO_TOKEN }}
 
       - name: Checkout Build Repository
         uses: actions/checkout@v3
