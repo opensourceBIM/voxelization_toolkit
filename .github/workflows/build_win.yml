@@ -3,7 +3,7 @@ name: Build IfcOpenShell Windows
 on:
   push:
     branches:
-      - v0.8.0
+      - master
   workflow_dispatch:
 
 jobs:
