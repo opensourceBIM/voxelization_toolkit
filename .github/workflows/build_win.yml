@@ -26,6 +26,7 @@ jobs:
           repository: IfcOpenShell/IfcOpenShell
           path: IfcOpenShell
           token: ${{ secrets.BUILD_REPO_TOKEN }}
+          submodules: recursive
 
       - name: Checkout Build Repository
         uses: actions/checkout@v3
