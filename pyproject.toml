@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "voxec"
+version = "0.4.0"
+authors = [
+  { name="Thomas Krijnen", email="thomas@aecgeeks.com" },
+]
+description = "Python bindings for the voxelization toolkit"
+requires-python = ">=3.9,<3.14"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+]
+dependencies = []
+
+[project.urls]
+"Bug Tracker" = "https://github.com/opensourceBIM/voxelization_toolkit/issues"
+
+[tool.setuptools.packages.find]
+include = ["voxec*"]
+
+[tool.setuptools.package-data]
+"*" = ["*.*"]
