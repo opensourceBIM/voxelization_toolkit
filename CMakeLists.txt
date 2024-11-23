@@ -176,8 +176,15 @@ if (IFC_SUPPORT)
 			list(APPEND SCHEMA_VERSIONS ${schema_name})
 		endforeach()
 
-		if(${ifcopenshell_major_version} STREQUAL "0.7")
-			add_definitions("-DIFCOPENSHELL_07")
+		if(${ifcopenshell_major_version} STREQUAL "0.7" OR
+		   ${ifcopenshell_major_version} STREQUAL "0.8")
+
+		    if(${ifcopenshell_major_version} STREQUAL "0.8")
+				add_definitions("-DIFCOPENSHELL_08")
+			else()
+				add_definitions("-DIFCOPENSHELL_07")
+			endif()
+			
 			set(SWIG_DEFINES ${SWIG_DEFINES} -DIFCOPENSHELL_07)
 
 			string(REPLACE ";" ")(" schema_version_seq "(${SCHEMA_VERSIONS})")

@@ -83,14 +83,14 @@ jobs:
             -DUSE_BUILD_SCRIPT_OUTPUT=Off `
             -DBoost_USE_STATIC_LIBS=On `
             -DBoost_NO_BOOST_CMAKE=On `
-            -DCMAKE_INSTALL_PREFIX=../install `
-            -DIFC_INCLUDE_DIR=../IfcOpenShell/_installed-vs2019-x64/include `
-            -DIFC_LIBRARY_DIR=../IfcOpenShell/_installed-vs2019-x64/ifcopenshell/lib `
-            -DOCC_INCLUDE_DIR=../IfcOpenShell/_deps-vs2022-x64-installed/opencascade-7.8.1/inc `
-            -DOCC_LIBRARY_DIR=../IfcOpenShell/_deps-vs2022-x64-installed/opencascade-7.8.1/win64/lib `
+            -DCMAKE_INSTALL_PREFIX=$env:GITHUB_WORKSPACE\install `
+            -DIFC_INCLUDE_DIR=$env:GITHUB_WORKSPACE\IfcOpenShell\_installed-vs2019-x64\include `
+            -DIFC_LIBRARY_DIR=$env:GITHUB_WORKSPACE\IfcOpenShell\_installed-vs2019-x64\ifcopenshell\lib `
+            -DOCC_INCLUDE_DIR=$env:GITHUB_WORKSPACE\IfcOpenShell\_deps-vs2019-x64-installed\opencascade-7.8.1\inc `
+            -DOCC_LIBRARY_DIR=$env:GITHUB_WORKSPACE\IfcOpenShell\_deps-vs2019-x64-installed\opencascade-7.8.1\win64\lib `
             -DPython_EXECUTABLE=C:\Python\${{ matrix.python }}\python.exe `
-            -DBOOST_ROOT=../IfcOpenShell/_deps/boost_1_86_0 `
-            -DSWIG_DIR=../IfcOpenShell/_installed-vs2019-x64/swigwin
+            -DBOOST_ROOT=$env:GITHUB_WORKSPACE\IfcOpenShell\_deps\boost_1_86_0 `
+            -DSWIG_DIR=$env:GITHUB_WORKSPACE\IfcOpenShell\_installed-vs2019-x64\swigwin
           cmake --build . --target install --config Release
 
       - name: Package .zip Archives

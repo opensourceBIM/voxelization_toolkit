@@ -16,6 +16,11 @@
 
 #ifdef WITH_IFC
 
+#ifdef IFCOPENSHELL_08
+#include <ifcgeom/IfcGeomElement.h>
+
+typedef IfcGeom::BRepElement elem_t;
+#else
 #ifdef IFCOPENSHELL_07
 #include <ifcparse/IfcLogger.h>   // @todo < commit in IfcopenShell
 #include <ifcgeom_schema_agnostic/IfcGeomElement.h>
@@ -27,6 +32,7 @@ typedef IfcGeom::BRepElement elem_t;
 #include <ifcgeom/IfcGeomElement.h>
 
 typedef IfcGeom::BRepElement<double> elem_t;
+#endif
 #endif
 #endif
 

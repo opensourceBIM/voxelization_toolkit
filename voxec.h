@@ -5,7 +5,12 @@
 #ifdef IFCOPENSHELL_05
 #include <ifcgeom/IfcGeomIterator.h>
 #else
+#ifdef IFCOPENSHELL_08
+#include <ifcgeom/Iterator.h>
+#include <ifcgeom/kernels/opencascade/OpenCascadeConversionResult.h>
+#else
 #include <ifcgeom_schema_agnostic/IfcGeomIterator.h>
+#endif
 #endif
 
 #include <ifcparse/IfcFile.h>
@@ -293,15 +298,22 @@ public:
 					std::vector<IfcUtil::IfcBaseClass*> projects_copy(projects->begin(), projects->end());
 					if (projects->size() > 1) {
 						for (auto it = projects_copy.begin() + 1; it != projects_copy.end(); ++it) {
+#ifdef IFCOPENSHELL_08
+							auto inverses = f->getInverse((*it)->id(), nullptr, -1);
+#else
 							auto inverses = f->getInverse((*it)->data().id(), nullptr, -1);
-
+#endif
 							f->removeEntity(*it);
 
 							for (auto& inv : *inverses) {
 								if (inv->declaration().name() == "IFCRELAGGREGATES") {
+#ifdef IFCOPENSHELL_08
+									inv->set_attribute_value(4, projects_copy[0]);
+#else
 									auto attr = new IfcWrite::IfcWriteArgument;
 									attr->set(projects_copy[0]);
 									inv->data().setArgument(4, attr);
+#endif
 								}
 							}
 						}
@@ -324,7 +336,7 @@ public:
 };
 
 #ifdef WITH_IFC
-#ifdef IFCOPENSHELL_07
+#if defined(IFCOPENSHELL_07) || defined(IFCOPENSHELL_08)
 typedef IfcGeom::Iterator iterator_t;
 typedef aggregate_of_instance instance_list_t;
 #else
@@ -376,6 +388,11 @@ public:
 
 		const filtered_files_t& ifc_files = scope.get_value<filtered_files_t>("input");
 
+#ifdef IFCOPENSHELL_08
+		ifcopenshell::geometry::Settings settings_surface;
+		settings_surface.get<ifcopenshell::geometry::settings::UseElementHierarchy>().value = true;
+		settings_surface.get<ifcopenshell::geometry::settings::IteratorOutput>().value = ifcopenshell::geometry::settings::NATIVE;
+#else
 		IfcGeom::IteratorSettings settings_surface;
 		settings_surface.set(IfcGeom::IteratorSettings::DISABLE_TRIANGULATION, true);
 		// settings_surface.set(IfcGeom::IteratorSettings::USE_WORLD_COORDS, true);
@@ -384,6 +401,7 @@ public:
 		settings_surface.set(IfcGeom::IteratorSettings::ELEMENT_HIERARCHY, true);
 #else
 		settings_surface.set(IfcGeom::IteratorSettings::SEARCH_FLOOR, true);
+#endif
 #endif
 		
 		boost::optional<bool> include, roof_slabs;
@@ -455,11 +473,15 @@ public:
 #ifdef IFCOPENSHELL_05
 			iterator.reset(iterator_t(settings_surface, ifc_file, filters_surface));
 #else
+#ifdef IFCOPENSHELL_08
+			iterator.reset(new iterator_t("opencascade", settings_surface, ifc_file, filters_surface, threads.get_value_or(1)));
+#else
 			if (threads) {
 				iterator.reset(new iterator_t(settings_surface, ifc_file, filters_surface, *threads));
 			} else {
 				iterator.reset(new iterator_t(settings_surface, ifc_file, filters_surface));
 			}
+#endif
 #endif
 			
 			
@@ -503,7 +525,11 @@ public:
 				}
 				if (roof_slabs && elem_product->declaration().is("IfcSlab")) {
 					auto attr_value = elem_product->get("PredefinedType");
+#ifdef IFCOPENSHELL_08
+					std::string pdt = attr_value.type() == IfcUtil::Argument_STRING ? (std::string)attr_value : std::string("");
+#else
 					std::string pdt = attr_value->isNull() ? std::string("") : (std::string)(*attr_value);
+#endif
 					process = process && (pdt == "ROOF") == *roof_slabs;
 				}
 #endif
@@ -515,14 +541,25 @@ public:
 #ifdef IFCOPENSHELL_05
 						throw std::runtime_error("Error evaluating filter on " + elem_product->toString());
 #else
+#ifdef IFCOPENSHELL_08
+						std::ostringstream oss;
+						elem_product->toString(oss);
+						throw std::runtime_error("Error evaluating filter on " + oss.str());
+#else
 						throw std::runtime_error("Error evaluating filter on " + elem_product->data().toString());
+#endif
 #endif
 					}
 				}
 
 				if (process) {
+#ifdef IFCOPENSHELL_08
+					auto comp = elem->geometry().as_compound();
+					TopoDS_Compound compound = TopoDS::Compound(((ifcopenshell::geometry::OpenCascadeShape*)comp)->shape());
+					delete comp;
+#else
 					TopoDS_Compound compound = elem->geometry().as_compound();
-					
+#endif				
 					bool filtered_non_empty = true;
 					if (only_transparent || only_opaque) {
 						filtered_non_empty = false;
@@ -532,7 +569,7 @@ public:
 
 						auto it = elem->geometry().begin();
 						for (TopoDS_Iterator jt(compound); jt.More(); ++it, jt.Next()) {
-							bool is_transparent = it->hasStyle() && it->Style().Transparency().get_value_or(0.0) > 1.e-9;
+							bool is_transparent = it->hasStyle() && it->Style().has_transparency() && it->Style().transparency > 1.e-9;
 							if (only_transparent == is_transparent) {
 								B.Add(filtered, jt.Value());
 								filtered_non_empty = true;
