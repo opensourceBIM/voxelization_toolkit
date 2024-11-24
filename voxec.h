@@ -580,8 +580,18 @@ public:
 					}
 
 					if (filtered_non_empty) {
+#ifdef IFCOPENSHELL_08
+						const auto& m = elem->transformation().data()->ccomponents();
+						gp_Trsf tr;
+						tr.SetValues(
+							m(0, 0), m(0, 1), m(0, 2), m(0, 3),
+							m(1, 0), m(1, 1), m(1, 2), m(1, 3),
+							m(2, 0), m(2, 1), m(2, 2), m(2, 3)
+						);
+						compound.Move(tr);
+#else
 						compound.Move(elem->transformation().data());
-
+#endif
 						BRepMesh_IncrementalMesh(compound, 0.001);
 						geometries->push_back(std::make_pair(std::pair<void*, int>(ifc_file, elem->id()), compound));
 					}
@@ -1288,7 +1298,11 @@ class op_export_elements : public voxel_operation {
 				}
 			}
 			if (include) {
+#ifdef IFCOPENSHELL_08
+				std::string guid = (std::string)((IfcUtil::IfcBaseEntity*)((IfcParse::IfcFile*)iden.first)->instance_by_id(iden.second))->get("GlobalId");
+#else
 				std::string guid = *((IfcUtil::IfcBaseEntity*)((IfcParse::IfcFile*)iden.first)->instance_by_id(iden.second))->get("GlobalId");
+#endif
 				if (n++) {
 					json << ",\n";
 				}
@@ -2077,17 +2091,30 @@ namespace {
 				if (idx == -1) {
 					throw std::runtime_error(inst->declaration().name() + " has no attribute " + p.first);
 				}
+#ifdef IFCOPENSHELL_08
+				auto attr = inst->as<IfcUtil::IfcBaseEntity>()->data().get_attribute_value(idx);
+				if (attr.isNull()) {
+#else
 				auto attr = inst->data().getArgument(idx);
 				if (!attr || attr->isNull()) {
+#endif
 					return false;
 				}
-				if (attr->type() == IfcUtil::Argument_DOUBLE) {
+				if (attr.type() == IfcUtil::Argument_DOUBLE) {
 					auto op = p.second.at(0);
 					auto v = p.second.substr(1);
 					auto attr_type = inst->declaration().attribute_by_index(idx);
+#ifdef IFCOPENSHELL_08
+					double d0 = attr;
+#else
 					double d0 = *attr;
+#endif
 					if (attr_type->type_of_attribute()->is("IfcLengthMeasure")) {
+#ifdef IFCOPENSHELL_08
+						d0 *= inst->file_->getUnit("LENGTHUNIT").second;
+#else
 						d0 *= inst->data().file->getUnit("LENGTHUNIT").second;
+#endif
 					}
 					auto d1 = boost::lexical_cast<double>(v);
 					if (op == '<') {
@@ -2136,13 +2163,21 @@ namespace {
 				if (rels) {
 					for (auto& rel : *rels) {
 						if (rel->declaration().is("IfcRelDefinesByProperties")) {
+#ifdef IFCOPENSHELL_08
+							IfcUtil::IfcBaseClass* pset = ((IfcUtil::IfcBaseEntity*)rel)->get("RelatingPropertyDefinition");
+							if (pset->declaration().is("IfcPropertySet")) {
+								instance_list_t::ptr props = ((IfcUtil::IfcBaseEntity*)pset)->get("HasProperties");
+								for (auto& prop : *props) {
+									if (prop->declaration().is("IfcPropertySingleValue")) {
+										auto name = (std::string) ((IfcUtil::IfcBaseEntity*)prop)->get("Name");
+#else
 							IfcUtil::IfcBaseClass* pset = *((IfcUtil::IfcBaseEntity*)rel)->get("RelatingPropertyDefinition");
 							if (pset->declaration().is("IfcPropertySet")) {
 								instance_list_t::ptr props = *((IfcUtil::IfcBaseEntity*)pset)->get("HasProperties");
 								for (auto& prop : *props) {
 									if (prop->declaration().is("IfcPropertySingleValue")) {
 										auto name = (std::string) *((IfcUtil::IfcBaseEntity*)prop)->get("Name");
-										
+#endif
 										/*
 										// In the voxelfile grammer we can also have keywords starting with an alpha character
 										// so for the string comparison we need to trim off any others.
@@ -2157,10 +2192,17 @@ namespace {
 
 										if (name == p.first) {
 											has_match = true;
+#ifdef IFCOPENSHELL_08
+											IfcUtil::IfcBaseClass* val = ((IfcUtil::IfcBaseEntity*)prop)->get("NominalValue");
+											auto val_attr = val->data().get_attribute_value(0);
+											if (val_attr.type() == IfcUtil::Argument_BOOL) {
+												auto v_ifc = (bool)val_attr;
+#else
 											IfcUtil::IfcBaseClass* val = *((IfcUtil::IfcBaseEntity*)prop)->get("NominalValue");
 											auto val_attr = val->data().getArgument(0);
 											if (val_attr->type() == IfcUtil::Argument_BOOL) {
 												auto v_ifc = (bool)*val_attr;
+#endif
 												int v_filter = 0;
 												try {
 													v_filter = boost::get<int>(p.second);
@@ -2171,8 +2213,13 @@ namespace {
 												if (!match) {
 													return false;
 												}
+#ifdef IFCOPENSHELL_08
+											} else if (val_attr.type() == IfcUtil::Argument_STRING) {
+												auto v_ifc = (std::string)val_attr;
+#else
 											} else if (val_attr->type() == IfcUtil::Argument_STRING) {
 												auto v_ifc = (std::string)*val_attr;
+#endif
 												std::string v_filter;
 												try {
 													v_filter = boost::get<std::string>(p.second);

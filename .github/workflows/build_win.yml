@@ -92,6 +92,8 @@ jobs:
             "-DPython_EXECUTABLE=C:\Users\tkrij\miniconda3\python.exe" `
             "-DBOOST_ROOT=$base/_deps/boost_1_86_0" `
             "-DBOOST_LIBRARYDIR=$base/_deps/boost_1_86_0/stage/vs2019-x64/lib" `
+            "-DGMP_LIBRARY_DIR=$base/_deps-vs2019-x64-installed/mpir" `
+            "-DMPFR_LIBRARY_DIR=$base/_deps-vs2019-x64-installed/mpfr" `
             "-DSWIG_EXECUTABLE=$base/_deps-vs2019-x64-installed/swigwin/swig.exe"
           cmake --build . --target install --config Release
 
