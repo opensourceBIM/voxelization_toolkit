@@ -101,14 +101,22 @@ jobs:
         run: |
           $SHA = ${env:GITHUB_SHA}.Substring(0, 7)
           $pyVersion = "${{ matrix.python }}"
-          $pyVersionMajor = ($pyVersion -split '\.')[0..1] -join '.'
-          $OUTPUT_DIR = "$env:USERPROFILE\output"
+          $pyVersionMajor = ($pyVersion -split '\.')[0..1] -join ''
+          $OUTPUT_DIR = "$env:GITHUB_WORKSPACE\package"
           New-Item -ItemType Directory -Force -Path $OUTPUT_DIR
 
           cd $OUTPUT_DIR
 
           cp -r C:\Python\${{ matrix.python }}\Lib\site-packages\voxec .
-          cp $env:GITHUB_WORKSPACE\voxelization_toolkit\pyproject.toml .
+          cp $env:GITHUB_WORKSPACE\pyproject.toml .
 
           C:\Python\${{ matrix.python }}\python.exe -m pip install build
-          C:\Python\${{ matrix.python }}\python.exe -m build
+          C:\Python\${{ matrix.python }}\python.exe -m build -w
+          mv .\dist\voxec-0.4.0-py3-none-any.whl .\dist\voxec-0.4.0-py${pyVersionMajor}-none-win_amd64.whl
+
+      - name: Publish a Python distribution to PyPI
+        uses: ortega2247/pypi-upload-action@master
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          packages_dir: package\dist
