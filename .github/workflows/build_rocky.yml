@@ -84,7 +84,7 @@ jobs:
             "-DOCC_INCLUDE_DIR=$base/occt-7.8.1/include/opencascade" \
             "-DOCC_LIBRARY_DIR=$base/occt-7.8.1/lib" \
             "-DPython_EXECUTABLE=$base/python-3.9.11/bin/python3" \
-            "-DBOOST_ROOT=$base/install/boost-1.86.0" \
+            "-DBOOST_ROOT=$base/boost-1.86.0" \
             "-DGMP_LIBRARY_DIR=$base/gmp-6.2.1/lib" \
             "-DMPFR_LIBRARY_DIR=$base/mpfr-3.1.6/lib" \
             "-DSWIG_EXECUTABLE=$base/swig/bin/swig"
