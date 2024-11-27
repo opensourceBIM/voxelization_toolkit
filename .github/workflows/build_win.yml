@@ -77,23 +77,23 @@ jobs:
           mkdir build
           cd build
           $base=(Resolve-Path ../ifcopenshell/).Path
-          cmake .. \
-            "-DCMAKE_BUILD_TYPE=Release" \
-            "-DENABLE_PYTHON_WRAPPER=On" \
-            "-DENABLE_TESTS=Off" \
-            "-DUSE_BUILD_SCRIPT_OUTPUT=Off" \
-            "-DBoost_USE_STATIC_LIBS=On" \
-            "-DBoost_NO_BOOST_CMAKE=On" \
-            "-DCMAKE_INSTALL_PREFIX=../install" \
-            "-DIFC_INCLUDE_DIR=$base/_installed-vs2019-x64/include" \
-            "-DIFC_LIBRARY_DIR=$base/_installed-vs2019-x64/lib" \
-            "-DOCC_INCLUDE_DIR=$base/_deps-vs2019-x64-installed/opencascade-7.8.1/inc" \
-            "-DOCC_LIBRARY_DIR=$base/_deps-vs2019-x64-installed/opencascade-7.8.1/win64/lib" \
-            "-DPython_EXECUTABLE=C:\Python\${{ matrix.python }}\python.exe" \
-            "-DBOOST_ROOT=$base/_deps/boost_1_86_0" \
-            "-DBOOST_LIBRARYDIR=$base/_deps/boost_1_86_0/stage/vs2019-x64/lib" \
-            "-DGMP_LIBRARY_DIR=$base/_deps-vs2019-x64-installed/mpir" \
-            "-DMPFR_LIBRARY_DIR=$base/_deps-vs2019-x64-installed/mpfr" \
+          cmake .. `
+            "-DCMAKE_BUILD_TYPE=Release" `
+            "-DENABLE_PYTHON_WRAPPER=On" `
+            "-DENABLE_TESTS=Off" `
+            "-DUSE_BUILD_SCRIPT_OUTPUT=Off" `
+            "-DBoost_USE_STATIC_LIBS=On" `
+            "-DBoost_NO_BOOST_CMAKE=On" `
+            "-DCMAKE_INSTALL_PREFIX=../install" `
+            "-DIFC_INCLUDE_DIR=$base/_installed-vs2019-x64/include" `
+            "-DIFC_LIBRARY_DIR=$base/_installed-vs2019-x64/lib" `
+            "-DOCC_INCLUDE_DIR=$base/_deps-vs2019-x64-installed/opencascade-7.8.1/inc" `
+            "-DOCC_LIBRARY_DIR=$base/_deps-vs2019-x64-installed/opencascade-7.8.1/win64/lib" `
+            "-DPython_EXECUTABLE=C:\Python\${{ matrix.python }}\python.exe" `
+            "-DBOOST_ROOT=$base/_deps/boost_1_86_0" `
+            "-DBOOST_LIBRARYDIR=$base/_deps/boost_1_86_0/stage/vs2019-x64/lib" `
+            "-DGMP_LIBRARY_DIR=$base/_deps-vs2019-x64-installed/mpir" `
+            "-DMPFR_LIBRARY_DIR=$base/_deps-vs2019-x64-installed/mpfr" `
             "-DSWIG_EXECUTABLE=$base/_deps-vs2019-x64-installed/swigwin/swig.exe"
           cmake --build . --target install --config Release
 
