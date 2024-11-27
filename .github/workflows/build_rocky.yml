@@ -68,7 +68,7 @@ jobs:
 
       - name: Compile voxec
         run: |
-          base=$GITHUB_WORKSPACE/ifcopenshell/build/Linux/x86_64/install
+          base=$GITHUB_WORKSPACE/IfcOpenShell/build/Linux/x86_64/install
           mkdir build
           cd build
           cmake .. \
@@ -92,7 +92,7 @@ jobs:
 
       - name: Package .zip archives
         run: |
-          base=$GITHUB_WORKSPACE/ifcopenshell/build/Linux/x86_64/install
+          base=$GITHUB_WORKSPACE/IfcOpenShell/build/Linux/x86_64/install
           mkdir -p $GITHUB_WORKSPACE/package
           cd $GITHUB_WORKSPACE/package
 
