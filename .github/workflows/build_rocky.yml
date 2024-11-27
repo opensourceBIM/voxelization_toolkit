@@ -71,22 +71,22 @@ jobs:
           base=`readlink -e ifcopenshell/build/Linux/x86_64/install`
           mkdir build
           cd build
-          cmake .. `
-            "-DCMAKE_BUILD_TYPE=Release" `
-            "-DENABLE_PYTHON_WRAPPER=On" `
-            "-DENABLE_TESTS=Off" `
-            "-DUSE_BUILD_SCRIPT_OUTPUT=Off" `
-            "-DBoost_USE_STATIC_LIBS=On" `
-            "-DBoost_NO_BOOST_CMAKE=On" `
-            "-DCMAKE_INSTALL_PREFIX=../install" `
-            "-DIFC_INCLUDE_DIR=$base/ifcopenshell/include" `
-            "-DIFC_LIBRARY_DIR=$base/ifcopenshell/lib" `
-            "-DOCC_INCLUDE_DIR=$base/occt-7.8.1/include/opencascade" `
-            "-DOCC_LIBRARY_DIR=$base/occt-7.8.1/lib" `
-            "-DPython_EXECUTABLE=$base/python-3.9.11/bin/python3" `
-            "-DBOOST_ROOT=$base/install/boost-1.86.0" `
-            "-DGMP_LIBRARY_DIR=$base/gmp-6.2.1/lib" `
-            "-DMPFR_LIBRARY_DIR=$base/mpfr-3.1.6/lib" `
+          cmake .. \
+            "-DCMAKE_BUILD_TYPE=Release" \
+            "-DENABLE_PYTHON_WRAPPER=On" \
+            "-DENABLE_TESTS=Off" \
+            "-DUSE_BUILD_SCRIPT_OUTPUT=Off" \
+            "-DBoost_USE_STATIC_LIBS=On" \
+            "-DBoost_NO_BOOST_CMAKE=On" \
+            "-DCMAKE_INSTALL_PREFIX=../install" \
+            "-DIFC_INCLUDE_DIR=$base/ifcopenshell/include" \
+            "-DIFC_LIBRARY_DIR=$base/ifcopenshell/lib" \
+            "-DOCC_INCLUDE_DIR=$base/occt-7.8.1/include/opencascade" \
+            "-DOCC_LIBRARY_DIR=$base/occt-7.8.1/lib" \
+            "-DPython_EXECUTABLE=$base/python-3.9.11/bin/python3" \
+            "-DBOOST_ROOT=$base/install/boost-1.86.0" \
+            "-DGMP_LIBRARY_DIR=$base/gmp-6.2.1/lib" \
+            "-DMPFR_LIBRARY_DIR=$base/mpfr-3.1.6/lib" \
             "-DSWIG_EXECUTABLE=$base/swig/bin/swig"
           make -j4 install
 
