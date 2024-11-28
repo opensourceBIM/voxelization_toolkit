@@ -1,5 +1,8 @@
-cmake_minimum_required (VERSION 2.8.11)
+cmake_minimum_required (VERSION 3.21)
 project (voxel)
+
+set(CMAKE_CXX_STANDARD 17)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 OPTION(IFC_SUPPORT "Build Volization Toolkit with IFC support (requires IfcOpenShell/master)." ON)
 OPTION(USE_STATIC_MSVC_RUNTIME "Link to the static runtime on MSVC." OFF)
@@ -262,16 +265,6 @@ message(STATUS "Boost libraries found in ${Boost_LIBRARY_DIRS}")
 
 include_directories(${IFC_INCLUDE_DIR} ${OCC_INCLUDE_DIR} ${Boost_INCLUDE_DIRS} ${CMAKE_CURRENT_SOURCE_DIR}/3rdparty/eigen)
 link_directories(${Boost_LIBRARY_DIRS})
-
-if (NOT MSVC)
-	include(CheckCXXCompilerFlag)
-	CHECK_CXX_COMPILER_FLAG("-std=c++14" COMPILER_SUPPORTS_CXX11)
-	if(COMPILER_SUPPORTS_CXX11)
-	    add_definitions(-std=c++14)
-	else()
-	    message(FATAL_ERROR "requires a compiler with C++11 support")
-	endif()
-endif()
 
 if (ENABLE_TESTS)
 
