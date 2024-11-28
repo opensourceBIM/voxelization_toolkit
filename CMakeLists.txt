@@ -356,6 +356,7 @@ endforeach()
 endif()
 
 add_executable(voxec_exe voxec_main.cpp progress.h)
+target_link_options(voxec_exe PRIVATE "/NOIMPLIB")
 target_link_libraries(voxec_exe libvoxec)
 set_property(TARGET voxec_exe PROPERTY OUTPUT_NAME voxec)
 

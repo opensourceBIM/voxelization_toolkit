@@ -616,7 +616,10 @@ public:
 			abort();
 		}
 
-		std::random_shuffle(geometries->begin(), geometries->end());
+		std::random_device rd;
+		std::mt19937 g(rd());
+
+		std::shuffle(geometries->begin(), geometries->end(), g);
 
 		return geometries;
 	}
@@ -2103,7 +2106,7 @@ namespace {
 				if (attr.type() == IfcUtil::Argument_DOUBLE) {
 					auto op = p.second.at(0);
 					auto v = p.second.substr(1);
-					auto attr_type = inst->declaration().attribute_by_index(idx);
+					auto attr_type = inst->declaration().as_entity()->attribute_by_index(idx);
 #ifdef IFCOPENSHELL_08
 					double d0 = attr;
 #else
