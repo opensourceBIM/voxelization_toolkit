@@ -337,7 +337,7 @@ if (ENABLE_PYTHON_WRAPPER)
 
     INSTALL(FILES "${CMAKE_BINARY_DIR}/voxec.py" "${CMAKE_CURRENT_SOURCE_DIR}/module/__init__.py"
             DESTINATION "${Python_SITEARCH}/voxec/")
-    INSTALL(TARGETS _voxec
+    INSTALL(TARGETS ${SWIG_MODULE_voxec_REAL_NAME}
             DESTINATION "${Python_SITEARCH}/voxec/")
 endif()
 
@@ -355,10 +355,11 @@ foreach(filename ${test_filenames})
 endforeach()
 endif()
 
-add_executable(voxec voxec_main.cpp progress.h)
-target_link_libraries(voxec libvoxec)
+add_executable(voxec_exe voxec_main.cpp progress.h)
+target_link_libraries(voxec_exe libvoxec)
+set_property(TARGET voxec_exe PROPERTY OUTPUT_NAME voxec)
 
-install(TARGETS voxec libvoxel libvoxec
+install(TARGETS voxec_exe libvoxel libvoxec
     RUNTIME DESTINATION ${CMAKE_INSTALL_PREFIX}/bin
     LIBRARY DESTINATION ${CMAKE_INSTALL_PREFIX}/lib
     ARCHIVE DESTINATION ${CMAKE_INSTALL_PREFIX}/lib)
