@@ -68,8 +68,8 @@ jobs:
 
       - name: Debug
         run: |
-          find /__w/voxelization_toolkit/voxelization_toolkit/IfcOpenShell/build/Linux/x86_64/install/ifcopenshell/lib
-          cat /__w/voxelization_toolkit/voxelization_toolkit/IfcOpenShell/build/Linux/x86_64/logs/*
+          cat ./IfcOpenShell/build/Linux/x86_64/logs/*
+          find ./IfcOpenShell/build/Linux/x86_64/install/
 
       - name: Compile voxec
         run: |
