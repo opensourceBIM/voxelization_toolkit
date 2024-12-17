@@ -94,10 +94,6 @@ jobs:
             "-DMPFR_LIBRARY_DIR=$base/mpfr-3.1.6/lib"
           make -j4 install
 
-      - name: Install patchelf
-        run : |
-          yum install -y epel-release && yum install -y patchelf
-
       - name: Package .zip archives
         run: |
           base=$GITHUB_WORKSPACE/IfcOpenShell/build/Linux/x86_64/install
@@ -107,7 +103,7 @@ jobs:
           cp -R $base/python-3.9.11/lib/python3.9/site-packages/voxec .
           cp $GITHUB_WORKSPACE/pyproject.toml .
           
-          $base/python-3.9.11/bin/python3 -m pip install build auditwheel
+          $base/python-3.9.11/bin/python3 -m pip install build auditwheel patchelf
           $base/python-3.9.11/bin/python3 -m build -w
           $base/python-3.9.11/bin/python3 -m auditwheel repair --plat manylinux_2_31_x86_64 dist/*.whl -w audited
 
