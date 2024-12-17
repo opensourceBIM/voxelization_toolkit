@@ -105,7 +105,7 @@ jobs:
           
           $base/python-3.9.11/bin/python3 -m pip install build auditwheel
           $base/python-3.9.11/bin/python3 -m build -w
-          $base/python-3.9.11/bin/python3 -m auditwheel repair dist/*.whl -w audited
+          $base/python-3.9.11/bin/python3 -m auditwheel repair --plat manylinux_2_31_x86_64 dist/*.whl -w audited
 
       - name: Publish a Python distribution to PyPI
         uses: ortega2247/pypi-upload-action@master
