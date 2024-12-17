@@ -66,6 +66,11 @@ jobs:
         run: |
           CXXFLAGS="-O3" CFLAGS="-O3 ${DARWIN_C_SOURCE}" ADD_COMMIT_SHA=1 BUILD_CFG=Release python3 ./IfcOpenShell/nix/build-all.py --diskcleanup IfcConvert python
 
+      - name: Debug
+        run: |
+          find /__w/voxelization_toolkit/voxelization_toolkit/IfcOpenShell/build/Linux/x86_64/install/ifcopenshell/lib
+          cat /__w/voxelization_toolkit/voxelization_toolkit/IfcOpenShell/build/Linux/x86_64/logs/*
+
       - name: Compile voxec
         run: |
           base=$GITHUB_WORKSPACE/IfcOpenShell/build/Linux/x86_64/install
