@@ -100,7 +100,7 @@ jobs:
           mkdir -p $GITHUB_WORKSPACE/package
           cd $GITHUB_WORKSPACE/package
 
-          cp -R $base/python-3.9.11/lib/python3.9/site-packages/voxec
+          cp -R $base/python-3.9.11/lib/python3.9/site-packages/voxec .
           cp $GITHUB_WORKSPACE/pyproject.toml .
           
           $base/python-3.9.11/bin/python3 -m pip install build auditwheel
