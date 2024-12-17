@@ -94,6 +94,10 @@ jobs:
             "-DMPFR_LIBRARY_DIR=$base/mpfr-3.1.6/lib"
           make -j4 install
 
+      - name: Install patchelf
+        run : |
+          yum install -y epel-release && yum install -y patchelf
+
       - name: Package .zip archives
         run: |
           base=$GITHUB_WORKSPACE/IfcOpenShell/build/Linux/x86_64/install
