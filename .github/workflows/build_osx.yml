@@ -72,7 +72,7 @@ jobs:
 
       - name: Compile voxec
         run: |
-          base=$GITHUB_WORKSPACE/IfcOpenShell/build/Darwin/10.9/${{ matrix.cpuarch }}/install
+          base=$GITHUB_WORKSPACE/IfcOpenShell/build/Darwin/${{ matrix.cpuarch }}/10.9/install
           mkdir build
           cd build
           cmake .. \
@@ -95,7 +95,7 @@ jobs:
 
       - name: Package .zip archives
         run: |
-          base=$GITHUB_WORKSPACE/IfcOpenShell/build/Darwin/10.9/${{ matrix.cpuarch }}/install
+          base=$GITHUB_WORKSPACE/IfcOpenShell/build/Darwin/${{ matrix.cpuarch }}/10.9/install
           mkdir -p $GITHUB_WORKSPACE/package
           cd $GITHUB_WORKSPACE/package
 
