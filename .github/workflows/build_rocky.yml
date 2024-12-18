@@ -20,6 +20,8 @@ jobs:
                          sqlite-devel bzip2-devel zlib-devel openssl-devel xz-devel      \
                          readline-devel ncurses-devel libffi-devel libuuid-devel git-lfs \
                          findutils swig
+          python3 -m pip install build auditwheel patchelf
+          patchelf --version
 
       - name: Install aws cli
         run: |
@@ -66,11 +68,6 @@ jobs:
         run: |
           CXXFLAGS="-O3" CFLAGS="-O3 ${DARWIN_C_SOURCE}" ADD_COMMIT_SHA=1 BUILD_CFG=Release python3 ./IfcOpenShell/nix/build-all.py --diskcleanup IfcConvert python
 
-      - name: Debug
-        run: |
-          cat ./IfcOpenShell/build/Linux/x86_64/logs/*
-          find ./IfcOpenShell/build/Linux/x86_64/install/
-
       - name: Compile voxec
         run: |
           base=$GITHUB_WORKSPACE/IfcOpenShell/build/Linux/x86_64/install
@@ -103,11 +100,8 @@ jobs:
           cp -R $base/python-3.9.11/lib/python3.9/site-packages/voxec .
           cp $GITHUB_WORKSPACE/pyproject.toml .
           
-          $base/python-3.9.11/bin/python3 -m pip install build auditwheel patchelf
-          echo PATH $PATH
-          echo n | python3 -m pip uninstall patchelf
-          $base/python-3.9.11/bin/python3 -m build -w
-          $base/python-3.9.11/bin/python3 -m auditwheel repair --plat manylinux_2_31_x86_64 dist/*.whl -w audited
+          python3 -m build -w
+          python3 -m auditwheel repair --plat manylinux_2_31_x86_64 dist/*.whl -w audited
 
       - name: Publish a Python distribution to PyPI
         uses: ortega2247/pypi-upload-action@master
