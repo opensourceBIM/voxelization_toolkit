@@ -20,6 +20,7 @@ jobs:
                          sqlite-devel bzip2-devel zlib-devel openssl-devel xz-devel      \
                          readline-devel ncurses-devel libffi-devel libuuid-devel git-lfs \
                          findutils swig
+          python3 -m pip install --upgrade pip setuptools wheel
           python3 -m pip install build auditwheel patchelf
           patchelf --version
 
