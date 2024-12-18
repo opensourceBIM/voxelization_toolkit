@@ -23,14 +23,6 @@ jobs:
           python3 -m pip install --upgrade pip
           ln -s /usr/bin/python3 /usr/bin/python
 
-      - name: Install aws cli
-        run: |
-          curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-          unzip awscliv2.zip
-          ./aws/install
-          rm -rf awscliv2.zip aws
-          aws --version
-
       - name: Checkout Repository
         uses: actions/checkout@v3
         with:
