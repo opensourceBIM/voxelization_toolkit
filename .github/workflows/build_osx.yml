@@ -1,0 +1,118 @@
+name: Build IfcOpenShell OSX
+
+on:
+  push:
+    branches:
+      - master
+  workflow_dispatch:
+
+jobs:
+  build_voxec:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos
+            runner: macos-13
+            arch: x64
+            oldarch:
+            cpuarch: x86_64
+          - os: macos
+            runner: macos-14
+            arch: arm64
+            oldarch: m1
+            cpuarch: arm64
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v3
+        with:
+          submodules: recursive
+
+      - name: Checkout IfcOpenShell
+        uses: actions/checkout@v3
+        with:
+          repository: IfcOpenShell/IfcOpenShell
+          path: IfcOpenShell
+          token: ${{ secrets.BUILD_REPO_TOKEN }}
+          submodules: recursive
+
+      - name: Checkout Build Repository
+        uses: actions/checkout@v3
+        with:
+          repository: IfcOpenShell/build-outputs
+          path: IfcOpenShell/build
+          ref: ${{ matrix.os }}-${{ matrix.arch }}
+          lfs: true
+          token: ${{ secrets.BUILD_REPO_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.x'
+        
+      - name: Install Dependencies
+        run: |
+          brew update
+          brew install git bison autoconf automake libffi cmake findutils
+          echo "$(brew --prefix findutils)/libexec/gnubin" >> $GITHUB_PATH
+        
+      - name: Unpack IfcOpenShell Dependencies
+        run: |
+          install_root=$(find ./IfcOpenShell/build -maxdepth 4 -name install)
+          find "$install_root" -type f -name 'cache-*.tar.gz' -maxdepth 1 -exec tar -xzf {} -C "$install_root" \;
+
+      - name: Run IfcOpenShell Build Script
+        run: |
+          if [ "${{ matrix.os }}" == "macos" ]; then
+            DARWIN_C_SOURCE=-D_DARWIN_C_SOURCE
+          fi
+          CXXFLAGS="-O3" CFLAGS="-O3 ${DARWIN_C_SOURCE}" ADD_COMMIT_SHA=1 BUILD_CFG=Release python3 ./IfcOpenShell/nix/build-all.py --diskcleanup IfcConvert python
+
+      - name: Compile voxec
+        run: |
+          base=$GITHUB_WORKSPACE/IfcOpenShell/build/Darwin/10.9/${{ matrix.cpuarch: x86_64 }}/install
+          mkdir build
+          cd build
+          cmake .. \
+            "-DCMAKE_BUILD_TYPE=Release" \
+            "-DENABLE_PYTHON_WRAPPER=On" \
+            "-DENABLE_TESTS=Off" \
+            "-DUSE_BUILD_SCRIPT_OUTPUT=Off" \
+            "-DBoost_USE_STATIC_LIBS=On" \
+            "-DBoost_NO_BOOST_CMAKE=On" \
+            "-DCMAKE_INSTALL_PREFIX=../install" \
+            "-DIFC_INCLUDE_DIR=$base/ifcopenshell/include" \
+            "-DIFC_LIBRARY_DIR=$base/ifcopenshell/lib64" \
+            "-DOCC_INCLUDE_DIR=$base/occt-7.8.1/include/opencascade" \
+            "-DOCC_LIBRARY_DIR=$base/occt-7.8.1/lib" \
+            "-DPython_EXECUTABLE=$base/python-3.9.11/bin/python3" \
+            "-DBOOST_ROOT=$base/boost-1.86.0" \
+            "-DGMP_LIBRARY_DIR=$base/gmp-6.2.1/lib" \
+            "-DMPFR_LIBRARY_DIR=$base/mpfr-3.1.6/lib"
+          make -j4 install
+
+      - name: Package .zip archives
+        run: |
+          base=$GITHUB_WORKSPACE/IfcOpenShell/build/Darwin/10.9/${{ matrix.cpuarch: x86_64 }}/install
+          mkdir -p $GITHUB_WORKSPACE/package
+          cd $GITHUB_WORKSPACE/package
+
+          cp -R $base/python-3.9.11/lib/python3.9/site-packages/voxec .
+          cp $GITHUB_WORKSPACE/pyproject.toml .
+          echo '[bdist_wheel]' > setup.cfg
+          echo 'python-tag = cp39' >> setup.cfg
+
+          PATH=$base/python-3.9.11/bin:$PATH python3 -m pip install --upgrade pip setuptools wheel
+          PATH=$base/python-3.9.11/bin:$PATH python3 -m pip install build delocate
+          PATH=$base/python-3.9.11/bin:$PATH patchelf --version
+          PATH=$base/python-3.9.11/bin:$PATH python3 -m build -w
+          PATH=$base/python-3.9.11/bin:$PATH python3 -m delocate-wheel dist/*.whl -w audited
+
+      - name: Publish a Python distribution to PyPI
+        uses: ortega2247/pypi-upload-action@master
+        with:
+          user: __token__
+          password: ${{ secrets.PYPI_API_TOKEN }}
+          packages_dir: package/audited
