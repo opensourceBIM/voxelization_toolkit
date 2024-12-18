@@ -104,6 +104,8 @@ jobs:
           cp $GITHUB_WORKSPACE/pyproject.toml .
           
           $base/python-3.9.11/bin/python3 -m pip install build auditwheel patchelf
+          echo PATH $PATH
+          echo n | python3 -m pip uninstall patchelf
           $base/python-3.9.11/bin/python3 -m build -w
           $base/python-3.9.11/bin/python3 -m auditwheel repair --plat manylinux_2_31_x86_64 dist/*.whl -w audited
 
