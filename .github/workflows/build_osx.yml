@@ -55,7 +55,7 @@ jobs:
       - name: Install Dependencies
         run: |
           brew update
-          brew install git bison autoconf automake libffi cmake findutils
+          brew install git bison autoconf automake libffi cmake findutils swig
           echo "$(brew --prefix findutils)/libexec/gnubin" >> $GITHUB_PATH
         
       - name: Unpack IfcOpenShell Dependencies
