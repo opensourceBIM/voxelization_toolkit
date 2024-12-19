@@ -73,6 +73,7 @@ jobs:
       - name: Compile voxec
         run: |
           base=$GITHUB_WORKSPACE/IfcOpenShell/build/Darwin/${{ matrix.cpuarch }}/10.9/install
+          find $base
           mkdir build
           cd build
           cmake .. \
